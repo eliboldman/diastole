@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
     code_challenge_method: "S256",
     redirect_uri: `${origin}/api/garmin/callback`,
     state,
+    // Not in Garmin's PDF, but sent by Garmin's own OAuth2 tool.
+    permissionsUpdated: "true",
+    selectedCapabilities: "COMBINED",
   }).toString();
 
   const res = NextResponse.redirect(url);
