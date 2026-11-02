@@ -36,12 +36,27 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
       ...params,
     }),
   });
-  if (!res.ok) throw new Error(`Garmin token request failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const body = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200);
+    throw new Error(`Garmin token request (${params.grant_type}) failed: ${res.status} ${body}`);
+  }
   return res.json();
 }
 
-export function exchangeCode(code: string, verifier: string, redirectUri: string) {
-  return tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
+export async function exchangeCode(code: string, verifier: string, redirectUri: string) {
+  // Garmin's spec marks redirect_uri as optional here and answers any mismatch with a bare 500,
+  // so if the first attempt fails, retry once without it (the code is still unused at that point).
+  try {
+    return await tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
+  } catch (first) {
+    console.warn("Garmin token exchange with redirect_uri failed; retrying without it", {
+      redirectUri,
+      codeLength: code.length,
+      verifierLength: verifier.length,
+      error: String(first).slice(0, 120),
+    });
+    return tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier });
+  }
 }
 
 export async function saveTokens(athleteId: string, t: TokenResponse) {
