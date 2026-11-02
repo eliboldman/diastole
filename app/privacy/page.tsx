@@ -1,0 +1,164 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+import PublicShell from "@/components/PublicShell";
+import { SITE } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: `Privacy Policy · ${SITE.name}`,
+  description: `How ${SITE.name} collects, uses and protects athlete data.`,
+};
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-10">
+      <h2 className="mb-3 text-lg font-medium text-white">{title}</h2>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+export default function PrivacyPage() {
+  const email = (
+    <a href={`mailto:${SITE.contactEmail}`} className="text-emerald-200/80 underline-offset-4 hover:underline">
+      {SITE.contactEmail}
+    </a>
+  );
+
+  return (
+    <PublicShell>
+      <article className="mx-auto max-w-2xl pt-16 text-sm leading-relaxed text-white/60 sm:text-base [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1.5">
+        <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">Privacy policy</p>
+        <h1 className="mt-3 text-3xl font-medium tracking-tight text-white sm:text-4xl">
+          How {SITE.name} handles your data
+        </h1>
+        <p className="mt-3 text-white/40">Effective {SITE.privacyEffectiveDate}</p>
+
+        <Section title="Who we are">
+          <p>
+            {SITE.name} is a coaching platform operated by {SITE.owner} (&quot;we&quot;, &quot;us&quot;). It
+            helps a coach monitor the recovery and training of the athletes they coach, using data
+            from those athletes&apos; wearable devices. {SITE.name} is used only by athletes who have
+            been invited by their coach. It is a coaching tool, not a medical device, and it does
+            not diagnose or treat any condition.
+          </p>
+        </Section>
+
+        <Section title="What we collect">
+          <p>We only collect data an athlete chooses to connect:</p>
+          <ul>
+            <li>
+              <strong className="text-white/80">Account details:</strong> name and email address.
+            </li>
+            <li>
+              <strong className="text-white/80">From Garmin Connect</strong> (after the athlete
+              authorizes access): daily wellness summaries such as heart rate variability (HRV),
+              resting heart rate, sleep, stress and Body Battery, and completed activities.
+            </li>
+            <li>
+              <strong className="text-white/80">From Apple Health</strong> (through our iPhone app,
+              after the athlete grants permission): HRV, resting heart rate, sleep and workouts.
+            </li>
+            <li>
+              <strong className="text-white/80">Coaching data:</strong> planned workouts, readiness
+              scores we calculate, and notes the coach adds.
+            </li>
+          </ul>
+          <p>
+            We collect data from the date an athlete connects onward. We do not collect location
+            history, contacts, or any data the athlete has not authorized.
+          </p>
+        </Section>
+
+        <Section title="How we use it">
+          <ul>
+            <li>To compare each athlete&apos;s daily metrics to their own baseline and show a readiness summary.</li>
+            <li>To let the athlete&apos;s coach view their recovery and training and plan workouts.</li>
+            <li>
+              To send structured workouts to the athlete&apos;s Garmin device or Apple Watch, only
+              when the coach chooses to.
+            </li>
+          </ul>
+          <p>
+            The coach may use an AI assistant (Claude, provided by Anthropic) to summarize athlete
+            data and suggest training adjustments. Suggestions are reviewed by the coach before
+            anything is changed or sent to an athlete.
+          </p>
+        </Section>
+
+        <Section title="What we never do">
+          <ul>
+            <li>We never sell personal or health data.</li>
+            <li>We never use health data for advertising or marketing.</li>
+            <li>
+              We never share Apple Health data with third parties except as needed to run the
+              service, in line with Apple&apos;s HealthKit rules.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="Who can see your data">
+          <p>
+            Only you and your coach. Each athlete can see only their own data. We use a small
+            number of service providers to run {SITE.name}, who process data on our behalf and
+            may not use it for anything else:
+          </p>
+          <ul>
+            <li>Supabase: secure database and account sign-in.</li>
+            <li>Vercel: website hosting.</li>
+            <li>Anthropic: AI summaries for the coach, as described above.</li>
+          </ul>
+          <p>We may disclose data if required by law.</p>
+        </Section>
+
+        <Section title="How we protect it">
+          <p>
+            Data is encrypted in transit and stored in a database with access rules that limit
+            each person to the data they are allowed to see. No system is perfectly secure, but we
+            keep access limited to what the service needs.
+          </p>
+        </Section>
+
+        <Section title="Your choices">
+          <ul>
+            <li>
+              <strong className="text-white/80">Disconnect anytime:</strong> remove {SITE.name}&apos;s
+              access in Garmin Connect, or turn off its permissions in the iPhone Health settings.
+              We stop receiving new data immediately.
+            </li>
+            <li>
+              <strong className="text-white/80">Delete your data:</strong> email {email} and we
+              will delete your account and all associated data within 30 days.
+            </li>
+            <li>
+              <strong className="text-white/80">Access a copy:</strong> email us and we will send
+              you the data we hold about you.
+            </li>
+          </ul>
+          <p>
+            When an athlete disconnects Garmin, we delete the Garmin connection and stop all
+            further data collection from that account.
+          </p>
+        </Section>
+
+        <Section title="Young athletes">
+          <p>
+            {SITE.name} is not intended for children under 13. Athletes under 18 may use it only
+            with the consent of a parent or guardian.
+          </p>
+        </Section>
+
+        <Section title="Changes">
+          <p>
+            If we change this policy, we will update the date above and let athletes know about
+            any significant change.
+          </p>
+        </Section>
+
+        <Section title="Contact">
+          <p>Questions or requests: {email}.</p>
+        </Section>
+      </article>
+    </PublicShell>
+  );
+}

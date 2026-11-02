@@ -85,7 +85,7 @@ export default async function AthletePage({
 
       <div className="relative z-10">
         <Link
-  href="/"
+  href="/dashboard"
   className="group inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-2.5 text-sm text-white/70 backdrop-blur-2xl transition-all duration-500 hover:border-emerald-300/20 hover:bg-white/[0.075] hover:text-white hover:shadow-[0_0_34px_rgba(110,231,183,0.10)]"
 >
   <span className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-300/15 bg-emerald-300/10 text-emerald-200 transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_18px_rgba(110,231,183,0.25)]">

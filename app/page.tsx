@@ -1,99 +1,82 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
+import PublicShell from "@/components/PublicShell";
+import { SITE } from "@/lib/site";
 
-import InterventionPanel from "@/components/InterventionPanel";
-import PhysiologyBackground from "@/components/PhysiologyBackground";
-import SystemHero from "@/components/SystemHero";
-import AthleteGrid from "@/components/AthleteGrid";
-import SystemMetrics from "@/components/SystemMetrics";
-import DashboardHeader from "@/components/layout/DashboardHeader";
-import DashboardShell from "@/components/layout/DashboardShell";
+const steps = [
+  {
+    tone: "green",
+    title: "Connect",
+    body: "Athletes link their Garmin or Apple Watch with their own permission. Diastole reads HRV, resting heart rate, sleep, stress and workouts from that day forward.",
+  },
+  {
+    tone: "yellow",
+    title: "Read",
+    body: "Each morning, every athlete is compared to their own rolling baseline, not a population average. Recovery, sleep, stress and training load each get a green, yellow or red flag with a plain-language note.",
+  },
+  {
+    tone: "red",
+    title: "Adjust",
+    body: "Their coach sees the whole team at a glance, adjusts the plan, and sends structured workouts straight to the athlete's watch. Nothing is sent without the coach's confirmation.",
+  },
+] as const;
 
-import { athletes } from "@/data/athletes";
-
-import {
-  calculateReadiness,
-  calculateTeamReadiness,
-  getSystemStatus,
-} from "@/lib/readiness";
+const dot = {
+  green: "glow-green bg-emerald-300/80",
+  yellow: "glow-yellow bg-amber-300/80",
+  red: "glow-red bg-red-400/80",
+};
 
 export default function Home() {
-  const [hoveredAthlete, setHoveredAthlete] =
-    useState<string | null>(null);
-
-  const [acceptedAdjustments, setAcceptedAdjustments] =
-    useState<string[]>([]);
-
-  function acceptAdjustment(name: string) {
-    if (acceptedAdjustments.includes(name)) {
-      return;
-    }
-
-    setAcceptedAdjustments((current) => [...current, name]);
-  }
-
-  const teamScore = calculateTeamReadiness(athletes);
-  const system = getSystemStatus(teamScore, false);
-
-  const stabilizationProgress = acceptedAdjustments.length / 2;
-  const environmentOpacity = 0.18 - stabilizationProgress * 0.12;
-
-  const hoveredAthleteData = athletes.find(
-    (athlete) => athlete.name === hoveredAthlete
-  );
-
-  const hoveredReadiness = hoveredAthleteData
-    ? calculateReadiness(hoveredAthleteData)
-    : null;
-
-  const focusTone =
-    hoveredReadiness?.status === "Green"
-      ? "green"
-      : hoveredReadiness?.status === "Yellow"
-        ? "yellow"
-        : hoveredReadiness?.status === "Red"
-          ? "red"
-          : null;
-
   return (
-    <DashboardShell>
-      <PhysiologyBackground
-  variant="atmosphere"
-  stressOpacity={environmentOpacity}
-  focusTone={focusTone}
-  systemTone={
-    acceptedAdjustments.length >= 2
-      ? "blue"
-      : teamScore >= 80
-        ? "green"
-        : teamScore >= 60
-          ? "yellow"
-          : "red"
-  }
-/>
+    <PublicShell>
+      <section className="flex flex-col items-center pt-20 text-center sm:pt-28">
+        <div className="relative mb-12 flex h-40 w-40 items-center justify-center">
+          <div className="monitored-hero-breathe absolute inset-0 rounded-full border border-emerald-300/15 bg-emerald-300/[0.04]" />
+          <div className="glow-green absolute inset-8 rounded-full border border-emerald-300/25 bg-emerald-300/[0.08]" />
+          <div className="glow-red h-4 w-4 rounded-full bg-emerald-200/90" />
+        </div>
 
-      <div className="relative z-10">
-        <DashboardHeader />
+        <p className="mb-4 text-xs uppercase tracking-[0.3em] text-emerald-200/60">
+          di·as·to·le — the moment the heart rests and refills
+        </p>
 
-        <SystemHero
-          teamScore={teamScore}
-          system={system}
-          acceptedCount={acceptedAdjustments.length}
-          totalInterventions={2}
-        >
-          <InterventionPanel
-            acceptedAdjustments={acceptedAdjustments}
-            acceptAdjustment={acceptAdjustment}
-          />
-        </SystemHero>
-<SystemMetrics athletes={athletes} />
-        <AthleteGrid
-          athletes={athletes}
-          hoveredAthlete={hoveredAthlete}
-          setHoveredAthlete={setHoveredAthlete}
-        />
-      </div>
-    </DashboardShell>
+        <h1 className="max-w-3xl text-4xl font-medium leading-tight tracking-tight sm:text-6xl">
+          {SITE.tagline}
+        </h1>
+
+        <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/60 sm:text-lg">
+          {SITE.name} is a coaching platform for endurance athletes. It reads recovery from each
+          athlete&apos;s wearable so their coach can shape training around how the body is actually
+          adapting, day by day.
+        </p>
+      </section>
+
+      <section className="mt-24 grid gap-4 sm:grid-cols-3">
+        {steps.map((step) => (
+          <div
+            key={step.title}
+            className="rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl"
+          >
+            <span className={`mb-5 block h-2.5 w-2.5 rounded-full ${dot[step.tone]}`} />
+            <h2 className="mb-2 text-lg font-medium">{step.title}</h2>
+            <p className="text-sm leading-relaxed text-white/55">{step.body}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="mt-16 rounded-[28px] border border-white/10 bg-white/[0.02] p-6 text-sm leading-relaxed text-white/55 sm:p-8">
+        <h2 className="mb-2 text-base font-medium text-white">Your data stays yours</h2>
+        <p>
+          {SITE.name} is used by invited athletes and their coach. Health data is only visible to
+          the athlete and their coach, is never sold or used for advertising, and can be
+          disconnected or deleted at any time. Read the{" "}
+          <Link href="/privacy" className="text-emerald-200/80 underline-offset-4 hover:underline">
+            privacy policy
+          </Link>
+          .
+        </p>
+      </section>
+    </PublicShell>
   );
 }
