@@ -53,7 +53,7 @@ export default function Sidebar() {
             </p>
 
             <p className="text-xs text-white/35">
-              Physiological OS
+              Diastole
             </p>
           </div>
         </div>
@@ -102,6 +102,11 @@ export default function Sidebar() {
           <p className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-xs leading-relaxed text-white/45">
             Monitoring adaptation, fatigue, and readiness.
           </p>
+          <form action="/auth/signout" method="post" className="mt-3">
+            <button className="w-full rounded-2xl px-3 py-2 text-left text-xs text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white">
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </aside>
