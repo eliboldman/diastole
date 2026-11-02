@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "node supabase/tests/rls.test.mjs"
+    "test:db": "node supabase/tests/rls.test.mjs",
+    "test:workouts": "node lib/workouts/garmin-format.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
