@@ -7,7 +7,10 @@ import { createAdminClient } from "@/lib/supabase/server";
 // Garmin Connect Developer Program, OAuth 2.0 PKCE (per Garmin's OAuth2PKCE spec).
 // Garmin's own OAuth2 tool uses the /partner/ path; the PDF's path without it yields codes the token endpoint rejects (HTTP 500).
 export const GARMIN_AUTHORIZE_URL = "https://connect.garmin.com/partner/oauth2Confirm";
-const TOKEN_URL = "https://connectapi.garmin.com/di-oauth2-service/oauth/token";
+// Garmin's PDF names connectapi.garmin.com, but tokens issued by Garmin's own tool carry
+// iss=https://diauth.garmin.com. We try both hosts and both client-auth styles, and log which works.
+const TOKEN_HOSTS = ["https://diauth.garmin.com", "https://connectapi.garmin.com"];
+const TOKEN_PATH = "/di-oauth2-service/oauth/token";
 export const GARMIN_API = "https://apis.garmin.com";
 
 export function garminConfigured() {
@@ -28,36 +31,35 @@ type TokenResponse = {
 };
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.GARMIN_CLIENT_ID!,
-      client_secret: process.env.GARMIN_CLIENT_SECRET!,
-      ...params,
-    }),
-  });
-  if (!res.ok) {
-    const body = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 200);
-    throw new Error(`Garmin token request (${params.grant_type}) failed: ${res.status} ${body}`);
+  const id = process.env.GARMIN_CLIENT_ID!;
+  const secret = process.env.GARMIN_CLIENT_SECRET!;
+  const failures: string[] = [];
+
+  for (const host of TOKEN_HOSTS) {
+    for (const auth of ["body", "basic"] as const) {
+      const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
+      const body = new URLSearchParams(params);
+      if (auth === "basic") {
+        headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
+        body.set("client_id", id); // PKCE token requests still identify the client
+      } else {
+        body.set("client_id", id);
+        body.set("client_secret", secret);
+      }
+
+      const res = await fetch(`${host}${TOKEN_PATH}`, { method: "POST", headers, body });
+      if (res.ok) {
+        if (failures.length) console.info("Garmin token request succeeded", { host, auth, after: failures });
+        return res.json();
+      }
+      failures.push(`${host.replace("https://", "")}/${auth}: ${res.status}`);
+    }
   }
-  return res.json();
+  throw new Error(`Garmin token request (${params.grant_type}) failed on every variant: ${failures.join(", ")}`);
 }
 
 export async function exchangeCode(code: string, verifier: string, redirectUri: string) {
-  // Garmin's spec marks redirect_uri as optional here and answers any mismatch with a bare 500,
-  // so if the first attempt fails, retry once without it (the code is still unused at that point).
-  try {
-    return await tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
-  } catch (first) {
-    console.warn("Garmin token exchange with redirect_uri failed; retrying without it", {
-      redirectUri,
-      codeLength: code.length,
-      verifierLength: verifier.length,
-      error: String(first).slice(0, 120),
-    });
-    return tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier });
-  }
+  return tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
 }
 
 export async function saveTokens(athleteId: string, t: TokenResponse) {
