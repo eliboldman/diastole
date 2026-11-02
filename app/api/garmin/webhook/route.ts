@@ -14,14 +14,28 @@ function authorized(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!authorized(request)) return new NextResponse("Unauthorized", { status: 401 });
+  if (!authorized(request)) {
+    const given = request.nextUrl.searchParams.get("key");
+    console.warn("Garmin webhook rejected: bad key", {
+      keyPresent: Boolean(given),
+      keyLength: given?.length ?? 0,
+      queryKeys: [...request.nextUrl.searchParams.keys()],
+    });
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
+    console.warn("Garmin webhook: body was not JSON");
     return new NextResponse("Bad JSON", { status: 400 });
   }
+
+  const counts = Object.fromEntries(
+    Object.entries(body as Record<string, unknown>).map(([k, v]) => [k, Array.isArray(v) ? v.length : typeof v]),
+  );
+  console.info("Garmin webhook received", counts);
 
   try {
     await ingestGarminPayload(body as Parameters<typeof ingestGarminPayload>[0]);
