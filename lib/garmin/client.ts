@@ -30,36 +30,45 @@ type TokenResponse = {
   expires_in: number;
 };
 
+type Variant = { host: string; auth: "basic-only" | "body" | "basic"; includeState: boolean };
+
+// First variant mirrors Garmin's own OAuth2 tool exactly (apis.garmin.com/tools/js/oauth2Confirm.js):
+// diauth host, client credentials ONLY in an HTTP Basic header, and `state` in the body.
+// The rest are fallbacks; whichever succeeds is logged so the list can be trimmed.
+const VARIANTS: Variant[] = [
+  { host: "https://diauth.garmin.com", auth: "basic-only", includeState: true },
+  { host: "https://diauth.garmin.com", auth: "body", includeState: true },
+  { host: "https://connectapi.garmin.com", auth: "body", includeState: false },
+];
+
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
   const id = process.env.GARMIN_CLIENT_ID!;
   const secret = process.env.GARMIN_CLIENT_SECRET!;
   const failures: string[] = [];
 
-  for (const host of TOKEN_HOSTS) {
-    for (const auth of ["body", "basic"] as const) {
-      const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
-      const body = new URLSearchParams(params);
-      if (auth === "basic") {
-        headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
-        body.set("client_id", id); // PKCE token requests still identify the client
-      } else {
-        body.set("client_id", id);
-        body.set("client_secret", secret);
-      }
-
-      const res = await fetch(`${host}${TOKEN_PATH}`, { method: "POST", headers, body });
-      if (res.ok) {
-        if (failures.length) console.info("Garmin token request succeeded", { host, auth, after: failures });
-        return res.json();
-      }
-      failures.push(`${host.replace("https://", "")}/${auth}: ${res.status}`);
+  for (const v of VARIANTS) {
+    const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
+    const body = new URLSearchParams(params);
+    if (!v.includeState) body.delete("state");
+    if (v.auth === "body") {
+      body.set("client_id", id);
+      body.set("client_secret", secret);
+    } else {
+      headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
     }
+
+    const res = await fetch(`${v.host}${TOKEN_PATH}`, { method: "POST", headers, body });
+    if (res.ok) {
+      console.info("Garmin token request succeeded", { variant: v, grant: params.grant_type, after: failures });
+      return res.json();
+    }
+    failures.push(`${v.host.replace("https://", "")}/${v.auth}/state=${v.includeState}: ${res.status}`);
   }
   throw new Error(`Garmin token request (${params.grant_type}) failed on every variant: ${failures.join(", ")}`);
 }
 
-export async function exchangeCode(code: string, verifier: string, redirectUri: string) {
-  return tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
+export async function exchangeCode(code: string, verifier: string, redirectUri: string, state: string) {
+  return tokenRequest({ grant_type: "authorization_code", code, state, code_verifier: verifier, redirect_uri: redirectUri });
 }
 
 export async function saveTokens(athleteId: string, t: TokenResponse) {
