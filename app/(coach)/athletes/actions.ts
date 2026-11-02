@@ -28,7 +28,7 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(email, {
     data: fullName ? { full_name: fullName } : undefined,
-    redirectTo: `${await siteUrl()}/auth/confirm`,
+    redirectTo: `${await siteUrl()}/auth/callback`,
   });
 
   if (error) {

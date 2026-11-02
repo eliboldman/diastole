@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+
 import { siteUrl } from "@/lib/site-url";
 
 export type LoginState = { sent: boolean; error?: string };
@@ -9,12 +10,15 @@ export async function sendLoginLink(_prev: LoginState, form: FormData): Promise<
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(email)) return { sent: false, error: "Enter a valid email address." };
 
-  const supabase = await createClient();
+  // Implicit flow: the emailed link works in any browser or mail app, not just this one.
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false },
+  });
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: false, // invite-only: unknown emails get no account
-      emailRedirectTo: `${await siteUrl()}/auth/confirm`,
+      emailRedirectTo: `${await siteUrl()}/auth/callback`,
     },
   });
 
