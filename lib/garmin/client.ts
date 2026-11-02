@@ -4,21 +4,23 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { createAdminClient } from "@/lib/supabase/server";
 
-// Garmin Connect Developer Program, OAuth 2.0 PKCE (per Garmin's OAuth2PKCE spec).
-// Garmin's own OAuth2 tool uses the /partner/ path; the PDF's path without it yields codes the token endpoint rejects (HTTP 500).
+// Garmin Connect Developer Program, OAuth 2.0 PKCE.
+// Note: Garmin's token endpoint answers bad client credentials with a bare HTTP 500 (not 401)
+// in some cases. If every exchange fails with 500, re-check GARMIN_CLIENT_SECRET first.
 export const GARMIN_AUTHORIZE_URL = "https://connect.garmin.com/partner/oauth2Confirm";
-// Garmin's PDF names connectapi.garmin.com, but tokens issued by Garmin's own tool carry
-// iss=https://diauth.garmin.com. We try both hosts and both client-auth styles, and log which works.
-const TOKEN_HOSTS = ["https://diauth.garmin.com", "https://connectapi.garmin.com"];
 const TOKEN_PATH = "/di-oauth2-service/oauth/token";
 export const GARMIN_API = "https://apis.garmin.com";
 
+// Trimmed so stray whitespace pasted into env settings can't break auth.
+const clientId = () => (process.env.GARMIN_CLIENT_ID ?? "").trim();
+const clientSecret = () => (process.env.GARMIN_CLIENT_SECRET ?? "").trim();
+export const garminClientId = clientId;
+
 export function garminConfigured() {
-  return Boolean(process.env.GARMIN_CLIENT_ID && process.env.GARMIN_CLIENT_SECRET);
+  return Boolean(clientId() && clientSecret());
 }
 
 export function newPkce() {
-  // Letters and digits only, in case Garmin's token server mishandles - and _ (unconfirmed; see debug notes).
   const verifier = randomBytes(32).toString("hex"); // 64 chars, within Garmin's 43-128
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = randomBytes(16).toString("hex");
@@ -31,41 +33,34 @@ type TokenResponse = {
   expires_in: number;
 };
 
-type Variant = { host: string; auth: "basic-only" | "body" | "basic"; includeState: boolean };
-
-// First variant mirrors Garmin's own OAuth2 tool exactly (apis.garmin.com/tools/js/oauth2Confirm.js):
-// diauth host, client credentials ONLY in an HTTP Basic header, and `state` in the body.
-// The rest are fallbacks; whichever succeeds is logged so the list can be trimmed.
-const VARIANTS: Variant[] = [
-  { host: "https://diauth.garmin.com", auth: "basic-only", includeState: true },
-  { host: "https://diauth.garmin.com", auth: "body", includeState: true },
-  { host: "https://connectapi.garmin.com", auth: "body", includeState: false },
-];
+// Primary: Garmin's own OAuth2 tool style (diauth host, HTTP Basic client auth, state included).
+// Fallback: Garmin's PDF style (connectapi host, credentials in the body). A fallback hit is logged.
+const VARIANTS = [
+  { host: "https://diauth.garmin.com", auth: "basic" },
+  { host: "https://connectapi.garmin.com", auth: "body" },
+] as const;
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const id = process.env.GARMIN_CLIENT_ID!;
-  const secret = process.env.GARMIN_CLIENT_SECRET!;
   const failures: string[] = [];
 
   for (const v of VARIANTS) {
     const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
     const body = new URLSearchParams(params);
-    if (!v.includeState) body.delete("state");
     if (v.auth === "body") {
-      body.set("client_id", id);
-      body.set("client_secret", secret);
+      body.set("client_id", clientId());
+      body.set("client_secret", clientSecret());
     } else {
-      headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
+      headers.Authorization = `Basic ${Buffer.from(`${clientId()}:${clientSecret()}`).toString("base64")}`;
     }
 
     const res = await fetch(`${v.host}${TOKEN_PATH}`, { method: "POST", headers, body });
     if (res.ok) {
-      console.info("Garmin token request succeeded", { variant: v, grant: params.grant_type, after: failures });
+      if (failures.length) console.warn("Garmin token request needed fallback", { host: v.host, failures });
       return res.json();
     }
-    failures.push(`${v.host.replace("https://", "")}/${v.auth}/state=${v.includeState}: ${res.status}`);
+    failures.push(`${v.host.replace("https://", "")}/${v.auth}: ${res.status}`);
   }
-  throw new Error(`Garmin token request (${params.grant_type}) failed on every variant: ${failures.join(", ")}`);
+  throw new Error(`Garmin token request (${params.grant_type}) failed: ${failures.join(", ")}`);
 }
 
 export async function exchangeCode(code: string, verifier: string, redirectUri: string, state: string) {

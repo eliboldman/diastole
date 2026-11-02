@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { GARMIN_AUTHORIZE_URL, garminConfigured, newPkce } from "@/lib/garmin/client";
+import { GARMIN_AUTHORIZE_URL, garminClientId, garminConfigured, newPkce } from "@/lib/garmin/client";
 import { getProfile } from "@/lib/supabase/server";
 
 // Step 1 of Garmin OAuth: send the signed-in athlete to Garmin's consent screen.
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(GARMIN_AUTHORIZE_URL);
   url.search = new URLSearchParams({
     response_type: "code",
-    client_id: process.env.GARMIN_CLIENT_ID!,
+    client_id: garminClientId(),
     code_challenge: challenge,
     code_challenge_method: "S256",
     redirect_uri: `${origin}/api/garmin/callback`,

@@ -7,7 +7,7 @@ import { ingestGarminPayload } from "@/lib/garmin/ingest";
 // deregistrations, userPermissionsChange). In Garmin's Endpoint Configuration, set each URL to:
 //   https://<site>/api/garmin/webhook?key=<GARMIN_WEBHOOK_SECRET>
 function authorized(request: NextRequest) {
-  const expected = process.env.GARMIN_WEBHOOK_SECRET;
+  const expected = process.env.GARMIN_WEBHOOK_SECRET?.trim();
   const given = request.nextUrl.searchParams.get("key");
   if (!expected || !given || given.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
