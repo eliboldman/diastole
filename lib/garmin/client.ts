@@ -18,9 +18,10 @@ export function garminConfigured() {
 }
 
 export function newPkce() {
-  const verifier = randomBytes(48).toString("base64url"); // 64 chars, within Garmin's 43-128
+  // Letters and digits only: base64url verifiers (with - and _) were rejected by Garmin's token server.
+  const verifier = randomBytes(32).toString("hex"); // 64 chars, within Garmin's 43-128
   const challenge = createHash("sha256").update(verifier).digest("base64url");
-  const state = randomBytes(24).toString("base64url");
+  const state = randomBytes(16).toString("hex");
   return { verifier, challenge, state };
 }
 
