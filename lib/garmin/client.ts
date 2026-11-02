@@ -5,7 +5,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Garmin Connect Developer Program, OAuth 2.0 PKCE (per Garmin's OAuth2PKCE spec).
-export const GARMIN_AUTHORIZE_URL = "https://connect.garmin.com/oauth2Confirm";
+// Garmin's own OAuth2 tool uses the /partner/ path; the PDF's path without it yields codes the token endpoint rejects (HTTP 500).
+export const GARMIN_AUTHORIZE_URL = "https://connect.garmin.com/partner/oauth2Confirm";
 const TOKEN_URL = "https://connectapi.garmin.com/di-oauth2-service/oauth/token";
 export const GARMIN_API = "https://apis.garmin.com";
 
