@@ -4,22 +4,21 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ingestGarminPayload } from "@/lib/garmin/ingest";
 
 // One endpoint for every Garmin push type (dailies, sleeps, hrv, stressDetails, activities,
-// deregistrations, userPermissionsChange). In Garmin's Endpoint Configuration, set each URL to:
-//   https://<site>/api/garmin/webhook?key=<GARMIN_WEBHOOK_SECRET>
-function authorized(request: NextRequest) {
+// deregistrations, userPermissionsChange). Garmin strips query strings when pushing, so the
+// secret goes in the path. In Garmin's Endpoint Configuration, set each URL to:
+//   https://<site>/api/garmin/webhook/<GARMIN_WEBHOOK_SECRET>
+function keyMatches(given: string | null | undefined) {
   const expected = process.env.GARMIN_WEBHOOK_SECRET?.trim();
-  const given = request.nextUrl.searchParams.get("key");
   if (!expected || !given || given.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
-export async function POST(request: NextRequest) {
-  if (!authorized(request)) {
-    const given = request.nextUrl.searchParams.get("key");
+export async function handleGarminPush(request: NextRequest, given: string | null | undefined) {
+  if (!keyMatches(given)) {
     console.warn("Garmin webhook rejected: bad key", {
       keyPresent: Boolean(given),
       keyLength: given?.length ?? 0,
-      queryKeys: [...request.nextUrl.searchParams.keys()],
+      path: request.nextUrl.pathname.replace(/\/webhook\/.+$/, "/webhook/<key>"),
     });
     return new NextResponse("Unauthorized", { status: 401 });
   }
@@ -45,4 +44,9 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Ingest failed", { status: 500 });
   }
   return new NextResponse(null, { status: 200 });
+}
+
+// Legacy form: ?key=... (kept for manual testing; Garmin drops the query string).
+export async function POST(request: NextRequest) {
+  return handleGarminPush(request, request.nextUrl.searchParams.get("key"));
 }
