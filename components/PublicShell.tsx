@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -12,7 +13,7 @@ export default function PublicShell({ children }: { children: ReactNode }) {
       <div className="page-breathe-in relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6 sm:px-8 sm:py-8">
         <header className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <span className="glow-green h-7 w-7 rounded-full border border-emerald-300/30 bg-emerald-300/15 shadow-[0_0_24px_rgba(110,231,183,0.2)]" />
+            <Image src="/logo.png" alt="" width={32} height={32} className="rounded-lg" priority />
             <span className="text-lg font-medium tracking-tight">{SITE.name}</span>
           </Link>
 
