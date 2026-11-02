@@ -2,14 +2,27 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import PublicShell from "@/components/PublicShell";
+import { garminConfigured } from "@/lib/garmin/client";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Connect your device · Diastole" };
 
-const garminReady = Boolean(process.env.GARMIN_CLIENT_ID);
+const garminMessages: Record<string, { text: string; ok: boolean }> = {
+  connected: { text: "Garmin connected. New data will arrive after your watch next syncs.", ok: true },
+  disconnected: { text: "Garmin disconnected. We've stopped receiving your data.", ok: true },
+  declined: { text: "Garmin access wasn't granted. You can try again anytime.", ok: false },
+  expired: { text: "That Garmin sign-in timed out. Please try again.", ok: false },
+  error: { text: "Something went wrong connecting Garmin. Please try again.", ok: false },
+  unavailable: { text: "Garmin connections aren't switched on yet.", ok: false },
+};
 
-export default async function ConnectPage() {
+export default async function ConnectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ garmin?: string }>;
+}) {
   const profile = await requireUser();
+  const message = garminMessages[(await searchParams).garmin ?? ""];
   const supabase = await createClient();
   const { data: connections } = await supabase
     .from("device_connections")
@@ -29,13 +42,28 @@ export default async function ConnectPage() {
           can disconnect anytime.
         </p>
 
+        {message && (
+          <p
+            className={`mt-6 rounded-2xl border p-3 text-sm ${
+              message.ok ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100" : "border-red-300/20 bg-red-300/[0.06] text-red-200"
+            }`}
+          >
+            {message.text}
+          </p>
+        )}
+
         <div className="mt-10 space-y-4">
           <DeviceCard
             title="Garmin"
             connected={connected.has("garmin")}
             body="Sign in with your Garmin Connect account and approve access to your health and activity data."
+            disconnect={
+              <form action="/api/garmin/disconnect" method="post">
+                <button className="text-sm text-white/40 hover:text-white/70">Disconnect Garmin</button>
+              </form>
+            }
             action={
-              garminReady ? (
+              garminConfigured() ? (
                 <a href="/api/garmin/connect" className={buttonClass}>Connect Garmin</a>
               ) : (
                 <span className={`${buttonClass} pointer-events-none opacity-40`}>Coming soon</span>
@@ -73,11 +101,13 @@ function DeviceCard({
   body,
   connected,
   action,
+  disconnect,
 }: {
   title: string;
   body: string;
   connected: boolean;
   action: React.ReactNode;
+  disconnect?: React.ReactNode;
 }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
@@ -90,7 +120,7 @@ function DeviceCard({
         )}
       </div>
       <p className="mt-2 text-sm leading-relaxed text-white/55">{body}</p>
-      {!connected && <div className="mt-5">{action}</div>}
+      <div className="mt-5">{connected ? disconnect : action}</div>
     </div>
   );
 }

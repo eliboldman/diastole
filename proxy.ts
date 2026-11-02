@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Pages anyone can open without signing in.
-const PUBLIC_PATHS = ["/", "/privacy", "/login", "/auth"];
+const PUBLIC_PATHS = ["/", "/privacy", "/login", "/auth", "/api/garmin/webhook"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)));

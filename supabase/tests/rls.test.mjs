@@ -93,5 +93,15 @@ check("athlete cannot create invites", !!r.error);
 r = await as(A1, "select * from private.garmin_tokens");
 check("athlete cannot read Garmin tokens", !!r.error);
 
+r = await as(A1, `select * from public.get_garmin_tokens('${A1}')`);
+check("athlete cannot call get_garmin_tokens", !!r.error);
+r = await as(A1, `select public.save_garmin_tokens('${A1}', 'a', 'b', now())`);
+check("athlete cannot call save_garmin_tokens", !!r.error);
+r = await as(COACH, "select * from public.garmin_raw");
+check("coach cannot read raw Garmin payloads", r.rows?.length === 0);
+await db.exec(`select public.save_garmin_tokens('${A1}', 'acc', 'ref', now() + interval '1 day')`);
+const tok = (await db.query(`select * from public.get_garmin_tokens('${A1}')`)).rows;
+check("server can save and read tokens", tok[0]?.access_token === "acc");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
