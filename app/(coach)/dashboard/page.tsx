@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggestions";
 import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { getRoster, type AthleteSummary } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
-import { requireCoach } from "@/lib/supabase/server";
+import { createClient, requireCoach } from "@/lib/supabase/server";
+import type { Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Today · Diastole" };
 
@@ -25,11 +28,51 @@ function activityLine(a: AthleteSummary["lastActivity"], timeZone: string) {
   const when = new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone });
   return [cap(a.sport?.replaceAll("_", " ") ?? "Activity"), mins && `${mins} min`, km, when].filter(Boolean).join(" · ");
 }
+function isoDaysAgo(n: number) {
+  return new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
+}
+
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default async function TodayPage() {
   const coach = await requireCoach();
   const roster = await getRoster(coach.id);
+
+  // Coaching assistant: today's suggestions (last 2 days, so an early-morning run still shows), settings and spend.
+  const supabase = await createClient();
+  const since = isoDaysAgo(2);
+  const [{ data: rawSuggestions }, { data: settingsRow }, spent] = await Promise.all([
+    supabase
+      .from("ai_suggestions")
+      .select("id, athlete_id, date, overall, concern, summary, action, rationale, proposed_workout, status, planned_workouts!ai_suggestions_target_workout_id_fkey(title, scheduled_date)")
+      .eq("coach_id", coach.id)
+      .gte("date", since)
+      .order("created_at", { ascending: false }),
+    supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", coach.id).maybeSingle(),
+    monthToDateSpend(coach.id),
+  ]);
+  const ai = { ...DEFAULT_SETTINGS, ...(settingsRow ?? {}) };
+  const latestByAthlete = new Map<string, NonNullable<typeof rawSuggestions>[number]>();
+  for (const r of rawSuggestions ?? []) if (!latestByAthlete.has(r.athlete_id)) latestByAthlete.set(r.athlete_id, r);
+  const suggestions: SuggestionView[] = [...latestByAthlete.values()]
+    .filter((r) => r.status === "pending" || r.date >= since)
+    .map((r) => {
+      const target = r.planned_workouts as unknown as { title: string; scheduled_date: string } | null;
+      return {
+        id: r.id,
+        athleteId: r.athlete_id,
+        athleteName: roster.find((a) => a.id === r.athlete_id)?.name ?? "Athlete",
+        overall: r.overall,
+        concern: r.concern,
+        summary: r.summary,
+        action: r.action,
+        rationale: r.rationale,
+        target: target ? { title: target.title, date: target.scheduled_date } : null,
+        proposed: r.proposed_workout as { title: string; sport: string; scheduled_date: string; steps: Step[] } | null,
+        status: r.status,
+      };
+    })
+    .sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending"));
 
   const flagOf = (a: AthleteSummary): Flag => a.readiness?.overall ?? "unknown";
   const sorted = [...roster].sort((a, b) => FLAG_ORDER[flagOf(a)] - FLAG_ORDER[flagOf(b)] || a.name.localeCompare(b.name));
@@ -55,6 +98,15 @@ export default async function TodayPage() {
           </div>
         ))}
       </section>
+
+      <AiSuggestions
+        suggestions={suggestions}
+        spent={spent}
+        cap={Number(ai.ai_monthly_cap_usd)}
+        modelLabel={AI_MODELS[ai.ai_model as AiModel]?.label ?? ai.ai_model}
+        enabled={ai.ai_enabled}
+        hasKey={Boolean(process.env.ANTHROPIC_API_KEY)}
+      />
 
       {roster.length === 0 ? (
         <div className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.03] p-8 text-white/60">

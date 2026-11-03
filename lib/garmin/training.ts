@@ -52,3 +52,12 @@ export async function sendWorkoutToGarmin(workoutId: string) {
 
   return { garminWorkoutId };
 }
+
+/** Removes a previously sent workout from the athlete's Garmin account (and its calendar entry). */
+export async function removeWorkoutFromGarmin(workoutId: string) {
+  const admin = createAdminClient();
+  const { data: w } = await admin.from("planned_workouts").select("athlete_id, external_id").eq("id", workoutId).single();
+  if (!w?.external_id) return;
+  const res = await garminFetch(w.athlete_id, `/training-api/workout/v2/${w.external_id}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the old workout (${res.status}).`);
+}
