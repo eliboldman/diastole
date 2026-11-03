@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import DashboardShell from "@/components/layout/DashboardShell";
-import PhysiologyBackground from "@/components/PhysiologyBackground";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
@@ -19,8 +18,6 @@ export default async function AthletesPage() {
 
   return (
     <DashboardShell>
-      <PhysiologyBackground variant="atmosphere" stressOpacity={0.08} systemTone="green" />
-
       <div className="relative z-10">
         <p className="text-sm uppercase tracking-[0.25em] text-white/35">Roster</p>
         <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Athletes</h1>
@@ -42,12 +39,12 @@ export default async function AthletesPage() {
                 key={a.id}
                 className="flex flex-col gap-2 rounded-[24px] border border-white/10 bg-white/[0.025] p-5 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
+                <Link href={`/athlete/${a.id}`} className="hover:underline">
                   <p className="font-medium">
                     {a.full_name || a.email} {isMe && <span className="text-sm text-white/35">(you)</span>}
                   </p>
                   <p className="text-sm text-white/40">{a.email}</p>
-                </div>
+                </Link>
                 <div className="flex items-center gap-2 text-sm">
                   <span
                     className={`h-2 w-2 rounded-full ${device ? "bg-emerald-300 glow-green" : "bg-white/25"}`}

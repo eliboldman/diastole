@@ -1,228 +1,158 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
+import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
+import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { getAthleteDetail } from "@/lib/coach-data";
+import type { Flag } from "@/lib/readiness/engine";
 
-import CoachNotes from "./components/CoachNotes";
-
-import InterventionRecommendations from "./components/InterventionRecommendations";
-
-import { notes } from "@/data/notes";
-
-import TrainingLoad from "./components/TrainingLoad";
-
-import ReadinessForecast from "./components/ReadinessForecast";
-
-import RecoveryTimeline from "./components/RecoveryTimeline";
-
-import PhysiologicalSystems from "./components/PhysiologicalSystems";
-
-import PhysiologyBackground from "@/components/PhysiologyBackground";
-
-import { athletes } from "@/data/athletes";
-
-import {
-  calculateReadiness,
-  generateInsights,
-  generateTelemetry,
-} from "@/lib/readiness";
-
-type AthletePageProps = {
-  params: Promise<{
-    id: string;
-  }>;
+const AREA_HELP: Record<string, string> = {
+  recovery: "HRV and resting heart rate vs. the athlete's last 28 days",
+  sleep: "Sleep duration (and Garmin sleep score) vs. baseline and minimums",
+  stress: "Garmin all-day stress and Body Battery peak",
+  load: "Last 7 days of training vs. the usual week (HR-weighted minutes)",
 };
 
-export default async function AthletePage({
-  params,
-}: AthletePageProps) {
-  const { id } = await params;
-
-  const athlete = athletes.find(
-    (athlete) => athlete.id === id
-  );
-
-  if (!athlete) {
-    return (
-      <main className="min-h-screen bg-neutral-950 p-10 text-white">
-        <p>Athlete not found.</p>
-      </main>
-    );
+function detailLine(key: string, d: Record<string, unknown> | null | undefined) {
+  if (!d) return null;
+  const v = d as Record<string, Record<string, number> | number | undefined>;
+  switch (key) {
+    case "recovery": {
+      const parts = [];
+      if (v.hrv && typeof v.hrv === "object") parts.push(`HRV ${v.hrv.today} ms (baseline ${v.hrv.baseline}, ${v.hrv.pct > 0 ? "+" : ""}${v.hrv.pct}%)`);
+      if (v.resting_hr && typeof v.resting_hr === "object")
+        parts.push(`RHR ${v.resting_hr.today} bpm (baseline ${v.resting_hr.baseline})`);
+      return parts.join(" · ") || null;
+    }
+    case "sleep":
+      return v.sleep && typeof v.sleep === "object"
+        ? `${v.sleep.hours} h${v.sleep.baseline_hours ? ` (usual ${v.sleep.baseline_hours} h)` : ""}${typeof v.sleep_score === "number" ? ` · score ${v.sleep_score}` : ""}`
+        : null;
+    case "stress": {
+      const parts = [];
+      if (v.stress && typeof v.stress === "object") parts.push(`stress ${v.stress.today} (usual ${v.stress.baseline})`);
+      if (typeof v.body_battery_high === "number") parts.push(`Body Battery peak ${v.body_battery_high}`);
+      return parts.join(" · ") || null;
+    }
+    case "load":
+      return v.load && typeof v.load === "object" ? `7-day load ${v.load.acute} vs usual ${v.load.chronic_weekly} (×${v.load.ratio})` : null;
   }
+  return null;
+}
 
-  const readiness =
-    calculateReadiness(athlete);
+export default async function AthletePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const data = await getAthleteDetail(id);
+  if (!data) notFound();
 
-  const insights =
-    generateInsights(athlete);
-
-  const telemetry =
-    generateTelemetry(athlete);
-
-    const athleteNotes = notes.filter(
-  (note) => note.athleteId === athlete.id
-);
+  const { profile, device, readiness, trend, activities, workouts } = data;
+  const today = readiness[0];
+  const overall: Flag = today?.overall ?? "unknown";
 
   return (
-    <DashboardShell>
-  <div className="relative min-h-screen overflow-hidden text-white">
-      <PhysiologyBackground
-        variant="neural"
-        stressOpacity={
-          readiness.status === "Red"
-            ? 0.18
-            : readiness.status === "Yellow"
-              ? 0.1
-              : 0.06
-        }
-        focusTone={
-          readiness.status === "Green"
-            ? "green"
-            : readiness.status === "Yellow"
-              ? "yellow"
-              : "red"
-        }
-      />
+    <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"}>
+      <Link href="/dashboard" className="text-sm text-white/45 hover:text-white">
+        ← Today
+      </Link>
 
-      <div className="relative z-10">
-        <Link
-  href="/dashboard"
-  className="group inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-2.5 text-sm text-white/70 backdrop-blur-2xl transition-all duration-500 hover:border-emerald-300/20 hover:bg-white/[0.075] hover:text-white hover:shadow-[0_0_34px_rgba(110,231,183,0.10)]"
->
-  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-300/15 bg-emerald-300/10 text-emerald-200 transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_18px_rgba(110,231,183,0.25)]">
-    ←
-  </span>
-
-  <span className="tracking-tight">
-    Return to Command Center
-  </span>
-</Link>
-
-        <section className="mt-10 rounded-[42px] border border-white/10 bg-white/[0.045] p-10 backdrop-blur-3xl">
-          <p className="text-sm uppercase tracking-[0.25em] text-white/35">
-            Athlete Focus
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">{profile.full_name || profile.email}</h1>
+          <p className="mt-2 text-sm text-white/40">
+            {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device connected"}
+            {profile.email ? ` · ${profile.email}` : ""}
           </p>
+        </div>
+        <FlagBadge flag={overall} large />
+      </div>
 
-          <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-6xl font-bold tracking-tight">
-                {athlete.name}
-              </h1>
-
-              <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/60">
-                Focused physiological analysis workspace
-                for readiness, recovery trajectory, and
-                coach intervention.
-              </p>
-            </div>
-
-            <div className="relative flex h-44 w-44 items-center justify-center">
-              <svg
-                className="absolute inset-0 h-44 w-44 -rotate-90"
-                viewBox="0 0 100 100"
-              >
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth="10"
-                  fill="none"
-                />
-
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={`${
-                    readiness.score * 2.64
-                  } 999`}
-                  className={readiness.color}
-                />
-              </svg>
-
-              <div className="text-center">
-                <p className="text-5xl font-bold">
-                  {readiness.score}
-                </p>
-
-                <p
-                  className={`mt-1 text-sm ${readiness.color}`}
-                >
-                  {readiness.status}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-<RecoveryTimeline history={athlete.history}/>
-
-<PhysiologicalSystems athlete={athlete} />
-
-<ReadinessForecast athlete={athlete} />
-
-<InterventionRecommendations athlete={athlete} />
-
-<TrainingLoad athlete={athlete} />
-
-<CoachNotes notes={athleteNotes} />
-
-        <section className="mt-8 grid gap-5 lg:grid-cols-3">
-          {telemetry.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-3xl border border-white/10 bg-[#0b0b0b]/90 p-6"
-            >
-              <p className="text-sm text-white/35">
-                {item.label}
-              </p>
-
-              <h2
-                className={`mt-3 text-3xl font-semibold ${item.tone}`}
-              >
-                {item.value}
-              </h2>
-            </div>
-          ))}
-        </section>
-
-        <section className="mt-8 grid gap-5 lg:grid-cols-2">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
-            <p className="text-sm uppercase tracking-[0.2em] text-white/35">
-              AI Interpretation
-            </p>
-
-            <p className="mt-4 text-lg leading-relaxed text-white/65">
-              {readiness.message} Current
-              physiological signals indicate this
-              athlete should be managed according to
-              today’s readiness state.
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
-            <p className="text-sm uppercase tracking-[0.2em] text-white/35">
-              Key Signals
-            </p>
-
-            <div className="mt-4 space-y-3">
-              {insights.map((insight) => (
-                <div
-                  key={insight}
-                  className="rounded-2xl border border-white/10 bg-[#0b0b0b]/90 px-4 py-3 text-white/60"
-                >
-                  {insight}
+      <section className="mt-8 rounded-[28px] border border-white/10 bg-black/30 p-6 backdrop-blur-xl">
+        <p className="text-lg leading-relaxed text-white/80">{today?.note ?? "No readiness yet — waiting for data."}</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {(["recovery", "sleep", "stress", "load"] as const).map((key) => {
+            const flag: Flag = today?.[key] ?? "unknown";
+            return (
+              <div key={key} className="rounded-2xl border border-white/[0.06] bg-black/30 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium capitalize">{key}</p>
+                  <span className={`inline-flex items-center gap-2 text-sm ${FLAG_STYLE[flag].text}`}>
+                    <span className={`h-2 w-2 rounded-full ${FLAG_STYLE[flag].dot}`} aria-hidden />
+                    {FLAG_STYLE[flag].label}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <p className="mt-1 text-sm text-white/60">{detailLine(key, today?.details) ?? "—"}</p>
+                <p className="mt-2 text-xs text-white/30">{AREA_HELP[key]}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-lg font-medium">Last 14 days</h2>
+        <div className="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4">
+          <Sparkline label="HRV" points={lastNDays(trend, "hrv_ms")} format={fmt.hrv} width={150} height={40} />
+          <Sparkline label="Resting HR" points={lastNDays(trend, "resting_hr")} format={fmt.rhr} width={150} height={40} />
+          <Sparkline label="Sleep" points={lastNDays(trend, "sleep_seconds")} format={fmt.sleep} width={150} height={40} />
+          <Sparkline label="Stress" points={lastNDays(trend, "stress_avg")} format={fmt.stress} width={150} height={40} />
+        </div>
+        {readiness.length > 1 && (
+          <div className="mt-6 flex flex-wrap gap-1.5" aria-label="Daily overall flags, oldest to newest">
+            {[...readiness].reverse().map((r) => (
+              <span key={r.date} title={`${r.date}: ${FLAG_STYLE[r.overall].label}`} className={`h-3 w-3 rounded-full ${FLAG_STYLE[r.overall].dot}`} />
+            ))}
           </div>
+        )}
+      </section>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-lg font-medium">Recent training</h2>
+          {activities.length === 0 ? (
+            <p className="mt-3 text-sm text-white/40">No activities yet.</p>
+          ) : (
+            <table className="mt-3 w-full text-sm">
+              <tbody>
+                {activities.map((a) => (
+                  <tr key={a.id} className="border-t border-white/[0.06]">
+                    <td className="py-2 pr-3 text-white/50">
+                      {new Date(a.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: profile.timezone })}
+                    </td>
+                    <td className="py-2 pr-3 capitalize">{a.sport?.replaceAll("_", " ") ?? "Activity"}</td>
+                    <td className="py-2 pr-3 text-right text-white/70">{a.duration_s ? `${Math.round(a.duration_s / 60)} min` : ""}</td>
+                    <td className="py-2 pr-3 text-right text-white/70">
+                      {a.distance_m && a.distance_m > 100 ? `${(a.distance_m / 1000).toFixed(1)} km` : ""}
+                    </td>
+                    <td className="py-2 text-right text-white/50">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-lg font-medium">Planned workouts</h2>
+          {workouts.length === 0 ? (
+            <p className="mt-3 text-sm text-white/40">Nothing scheduled. The workout builder is coming next.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {workouts.map((w) => (
+                <li key={w.id} className="flex items-center justify-between border-t border-white/[0.06] pt-2">
+                  <span>
+                    <span className="text-white/50">
+                      {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </span>{" "}
+                    {w.title}
+                  </span>
+                  <span className="text-xs uppercase tracking-wider text-white/40">{w.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
-      </div>
-</DashboardShell>
+    </DashboardShell>
   );
 }
