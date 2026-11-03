@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
   if (!saved || saved.state !== searchParams.get("state")) return fail("expired");
 
   try {
-    const tokens = await exchangeCode(code, saved.verifier, `${origin}/api/garmin/callback`, saved.state);
+    const base = process.env.NEXT_PUBLIC_SITE_URL?.trim() || origin;
+    const tokens = await exchangeCode(code, saved.verifier, `${base}/api/garmin/callback`, saved.state);
     const garminUserId = await fetchGarminUserId(tokens.access_token);
 
     const admin = createAdminClient();
