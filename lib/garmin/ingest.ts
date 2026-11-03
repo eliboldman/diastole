@@ -35,6 +35,19 @@ function wellnessFields(type: string, s: Summary): Record<string, unknown> | nul
   }
 }
 
+/** Remove any location fields (e.g. startingLatitudeInDegree) — the privacy policy promises no location data. */
+export function stripLocation<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(stripLocation) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([k]) => !/latitude|longitude|polyline|geo/i.test(k))
+        .map(([k, v]) => [k, stripLocation(v)]),
+    ) as T;
+  }
+  return value;
+}
+
 /** Drop keys whose value is null so partial summaries don't wipe values from other summary types. */
 function present(o: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
@@ -61,7 +74,8 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>) {
   for (const [type, items] of Object.entries(body)) {
     if (!Array.isArray(items)) continue;
 
-    for (let item of items) {
+    for (const rawItem of items) {
+      let item = stripLocation(rawItem);
       const athleteId = await athleteFor(item.userId);
 
       // Ping mode: Garmin sends a URL to fetch the data from instead of the data itself.
