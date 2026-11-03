@@ -8,6 +8,7 @@ const navItems = [
   { label: "Today", href: "/dashboard" },
   { label: "Athletes", href: "/athletes" },
   { label: "Pods", href: "/pods" },
+  { label: "Me", href: "/me" },
   { label: "Settings", href: "/settings" },
 ];
 
@@ -81,7 +82,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 rounded-xl py-2 text-center text-sm ${
+              className={`flex-1 rounded-xl py-2 text-center text-[13px] ${
                 isActive(pathname, item.href) ? "bg-white/[0.08] text-white" : "text-white/50"
               }`}
             >
