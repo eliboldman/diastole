@@ -69,7 +69,7 @@ export async function setPassword(_prev: PasswordState, form: FormData): Promise
     if (error.code === "weak_password") return { error: "That password is too easy to guess. Try a longer one." };
     return { error: error.message };
   }
-  redirect("/login");
+  redirect((await needsOnboarding(data.user.id)) ? "/connect" : "/login");
 }
 
 /** Starts Google or Apple sign-in. Invite-only still applies: Supabase refuses emails with no existing account. */
@@ -84,4 +84,14 @@ export async function signInWithProvider(form: FormData) {
   });
   if (error || !data.url) redirect("/login?error=provider");
   redirect(data.url);
+}
+
+/** Athletes without a connected watch are still setting up. Coaches never are. */
+async function needsOnboarding(userId: string) {
+  const supabase = await createClient();
+  const [{ data: profile }, { data: device }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", userId).maybeSingle(),
+    supabase.from("device_connections").select("source").eq("athlete_id", userId).limit(1).maybeSingle(),
+  ]);
+  return profile?.role === "athlete" && !device;
 }

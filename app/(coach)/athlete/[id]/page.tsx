@@ -53,7 +53,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   return (
     <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"}>
-      <Link href="/dashboard" className="text-sm text-white/60 hover:text-white">
+      <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
         ← Today
       </Link>
 

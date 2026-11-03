@@ -61,7 +61,7 @@ const INTENSITIES: [Intensity, string][] = [
 ];
 
 const field =
-  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
+  "min-h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-base text-white sm:text-base sm:text-sm placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 const sel = `${field} bg-panel`;
 
 // ---------- one step editor
@@ -176,7 +176,7 @@ function StepEditor({
         )}
       </div>
 
-      <button type="button" onClick={onRemove} className="justify-self-end text-xs text-white/50 hover:text-red-300" aria-label="Remove step">
+      <button type="button" onClick={onRemove} className="min-h-11 justify-self-end px-2 text-sm text-white/50 hover:text-red-300" aria-label="Remove step">
         Remove
       </button>
 
@@ -332,7 +332,7 @@ export default function WorkoutBuilder({
                   />
                   times
                 </label>
-                <button type="button" className="text-xs text-white/50 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
+                <button type="button" className="min-h-11 px-2 text-sm text-white/50 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
                   Remove repeat
                 </button>
               </div>
@@ -350,7 +350,7 @@ export default function WorkoutBuilder({
                 )}
                 <button
                   type="button"
-                  className="justify-self-start text-sm text-emerald-200/80 hover:underline"
+                  className="min-h-11 justify-self-start text-sm text-emerald-200/80 hover:underline"
                   onClick={() => setSteps(updateAt(steps, i, { ...s, steps: [...s.steps, newStep("RECOVERY")] }))}
                 >
                   + Step inside repeat
@@ -360,12 +360,12 @@ export default function WorkoutBuilder({
           ),
         )}
         <div className="flex gap-4">
-          <button type="button" className="text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, newStep()])}>
+          <button type="button" className="min-h-11 text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, newStep()])}>
             + Step
           </button>
           <button
             type="button"
-            className="text-sm text-emerald-200/80 hover:underline"
+            className="min-h-11 text-sm text-emerald-200/80 hover:underline"
             onClick={() => setSteps([...steps, { uid: uid(), kind: "repeat", times: 4, steps: [newStep("INTERVAL"), newStep("RECOVERY")] }])}
           >
             + Repeat
@@ -384,14 +384,14 @@ export default function WorkoutBuilder({
           <button
             disabled={pending}
             onClick={() => run(() => saveDraft(input()))}
-            className="rounded-2xl border border-white/15 bg-white/[0.05] px-5 py-3 text-sm font-medium hover:bg-white/[0.1] disabled:opacity-50"
+            className="min-h-12 rounded-2xl border border-white/15 bg-white/[0.05] px-5 text-sm font-medium hover:bg-white/[0.1] disabled:opacity-50"
           >
             Save draft
           </button>
           <button
             disabled={pending}
             onClick={() => setConfirming(true)}
-            className="rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-5 py-3 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
+            className="min-h-12 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
           >
             Approve & send…
           </button>
@@ -399,7 +399,7 @@ export default function WorkoutBuilder({
             <button
               disabled={pending}
               onClick={() => run(() => deleteDraft(id, athleteId), () => router.push(`/athlete/${athleteId}`))}
-              className="ml-auto text-sm text-white/50 hover:text-red-300"
+              className="ml-auto min-h-11 text-sm text-white/50 hover:text-red-300"
             >
               Delete draft
             </button>
@@ -430,13 +430,13 @@ export default function WorkoutBuilder({
               ))}
             </ol>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setConfirming(false)} className="rounded-2xl px-4 py-2 text-sm text-white/60 hover:text-white">
+              <button onClick={() => setConfirming(false)} className="min-h-12 rounded-2xl px-4 text-sm text-white/60 hover:text-white">
                 Cancel
               </button>
               <button
                 disabled={pending}
                 onClick={() => run(() => approveAndSend(input()), () => setConfirming(false))}
-                className="rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-300/25 disabled:opacity-50"
+                className="min-h-12 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/25 disabled:opacity-50"
               >
                 {pending ? "Sending…" : "Approve & send"}
               </button>

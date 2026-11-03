@@ -36,7 +36,7 @@ export default function PrivacyPage() {
 
         <Section title="Who we are">
           <p>
-            {SITE.name} is a coaching platform operated by {SITE.owner} (&quot;we&quot;, &quot;us&quot;). It
+            {SITE.name} is a coaching platform operated by {SITE.owner}{" "}(&quot;we&quot;, &quot;us&quot;). It
             helps a coach monitor the recovery and training of the athletes they coach, using data
             from those athletes&apos; wearable devices. {SITE.name} is used only by athletes who have
             been invited by their coach. It is a coaching tool, not a medical device, and it does

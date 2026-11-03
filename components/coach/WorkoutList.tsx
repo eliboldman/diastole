@@ -93,7 +93,7 @@ export default function WorkoutList({
 
       {removed.length > 0 && (
         <details className="mt-5 text-sm">
-          <summary className="cursor-pointer select-none py-2 text-white/60 hover:text-white/70">
+          <summary className="flex min-h-11 cursor-pointer select-none items-center text-white/60 hover:text-white/70">
             Recently removed ({removed.length})
           </summary>
           <ul className="mt-1 space-y-1">

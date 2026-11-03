@@ -14,12 +14,12 @@ export default function AthleteShell({ children, isCoach = false }: { children: 
             <Image src="/logo.png" alt="" width={32} height={32} className="rounded-lg" />
             <span className="text-lg font-medium tracking-tight">Diastole</span>
           </Link>
-          <nav className="flex items-center gap-4 text-sm text-white/55">
-            <Link href="/me" className="hover:text-white">Home</Link>
-            <Link href="/connect" className="hover:text-white">Device</Link>
-            {isCoach && <Link href="/dashboard" className="hover:text-white">Coach</Link>}
+          <nav className="flex items-center gap-1 text-sm text-white/60 sm:gap-2">
+            <Link href="/me" className="flex min-h-11 items-center rounded-xl px-2.5 transition hover:bg-white/[0.06] hover:text-white">Home</Link>
+            <Link href="/connect" className="flex min-h-11 items-center rounded-xl px-2.5 transition hover:bg-white/[0.06] hover:text-white">Device</Link>
+            {isCoach && <Link href="/dashboard" className="flex min-h-11 items-center rounded-xl px-2.5 transition hover:bg-white/[0.06] hover:text-white">Coach</Link>}
             <form action="/auth/signout" method="post">
-              <button className="hover:text-white">Sign out</button>
+              <button className="flex min-h-11 items-center rounded-xl px-2.5 transition hover:bg-white/[0.06] hover:text-white">Sign out</button>
             </form>
           </nav>
         </header>

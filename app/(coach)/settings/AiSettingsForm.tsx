@@ -23,7 +23,7 @@ export default function AiSettingsForm({ enabled, model, cap, spent }: { enabled
   return (
     <div className="grid max-w-md gap-4">
       <label className="flex items-center gap-3 text-sm">
-        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="h-4 w-4 accent-emerald-400" />
+        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="h-5 w-5 accent-emerald-400" />
         Run the coaching assistant each morning
       </label>
       <label className="grid gap-2 text-sm text-white/60">

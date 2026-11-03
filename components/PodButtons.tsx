@@ -19,11 +19,11 @@ function useAction() {
   return { pending, error, run };
 }
 
-const btn = "rounded-xl border px-3 py-1.5 text-sm transition-colors disabled:opacity-50";
+const btn = "min-h-11 rounded-xl border px-4 text-sm transition-colors disabled:opacity-50";
 const primary = `${btn} border-emerald-300/25 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/20`;
 const quiet = `${btn} border-white/10 text-white/60 hover:bg-white/[0.06] hover:text-white`;
 const field =
-  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
+  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-base sm:text-sm text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 
 // ---------------------------------------------------------------- coach
 
@@ -81,7 +81,7 @@ export function InviteToPod({ podId, candidates }: { podId: string; candidates: 
 export function RemoveMember({ podId, athleteId }: { podId: string; athleteId: string }) {
   const { pending, run } = useAction();
   return (
-    <button disabled={pending} className="text-xs text-white/50 hover:text-red-300" onClick={() => run(() => removeFromPod(podId, athleteId))}>
+    <button disabled={pending} className="min-h-11 text-sm text-white/50 hover:text-red-300" onClick={() => run(() => removeFromPod(podId, athleteId))}>
       Remove
     </button>
   );
@@ -92,7 +92,7 @@ export function DeletePod({ podId, name }: { podId: string; name: string }) {
   return (
     <button
       disabled={pending}
-      className="text-xs text-white/50 hover:text-red-300"
+      className="min-h-11 text-sm text-white/50 hover:text-red-300"
       onClick={() => confirm(`Delete the pod "${name}"? Members stop seeing each other immediately.`) && run(() => deletePod(podId))}
     >
       Delete pod

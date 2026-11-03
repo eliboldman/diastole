@@ -49,7 +49,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
 
   return (
     <section className="mt-6">
-      <div className="sticky top-2 z-30 flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-canvas/90 px-3 py-2 backdrop-blur-xl">
+      <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 flex min-h-14 md:top-2 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-canvas/90 px-3 py-2 backdrop-blur-xl">
         <label className="flex min-h-11 items-center gap-3 px-1 text-sm text-white/70">
           <input
             type="checkbox"

@@ -570,3 +570,30 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cloud-breathe, .cloud-drift-a, .cloud-drift-b, .cloud-drift-c { animation: none; }
 }
+
+/* ---- Onboarding */
+@keyframes onboardingFill {
+  from { transform: scaleX(0.4); opacity: 0.4; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+.onboarding-fill {
+  transform-origin: left;
+  animation: onboardingFill 700ms var(--ease-soft) both;
+  transition: width 700ms var(--ease-soft);
+}
+
+@keyframes successPop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes successRing {
+  from { transform: scale(0.8); opacity: 0.6; }
+  to { transform: scale(1.9); opacity: 0; }
+}
+.success-pop { animation: successPop 600ms var(--ease-soft) both; }
+.success-ring { animation: successRing 1.6s ease-out 300ms 2 both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-fill, .success-pop, .success-ring { animation: none; }
+}

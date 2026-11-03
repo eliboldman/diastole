@@ -17,7 +17,7 @@ export default async function AthletePodPage({ params }: { params: Promise<{ id:
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/me" className="text-sm text-white/60 hover:text-white">
+      <Link href="/me" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
         ← Home
       </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">

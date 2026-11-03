@@ -70,7 +70,7 @@ function Card({ s }: { s: SuggestionView }) {
   return (
     <article className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href={`/athlete/${s.athleteId}`} className="font-semibold hover:underline">
+        <Link href={`/athlete/${s.athleteId}`} className="inline-flex min-h-11 items-center font-semibold hover:underline">
           {s.athleteName}
         </Link>
         <span className={`inline-flex items-center gap-2 text-xs ${flag.text}`}>
@@ -100,7 +100,7 @@ function Card({ s }: { s: SuggestionView }) {
           <button
             disabled={pending}
             onClick={() => (!changesSchedule || confirm(confirmText)) && run(() => approveSuggestion(s.id))}
-            className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-sm text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
+            className="min-h-11 rounded-xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
           >
             Approve
           </button>
@@ -108,12 +108,12 @@ function Card({ s }: { s: SuggestionView }) {
             <button
               disabled={pending}
               onClick={() => run(() => editSuggestion(s.id))}
-              className="rounded-xl border border-white/10 px-3 py-1.5 text-sm text-white/70 hover:bg-white/[0.06] disabled:opacity-50"
+              className="min-h-11 rounded-xl border border-white/10 px-4 text-sm text-white/75 hover:bg-white/[0.06] disabled:opacity-50"
             >
               Edit
             </button>
           )}
-          <button disabled={pending} onClick={() => run(() => dismissSuggestion(s.id))} className="px-2 text-sm text-white/55 hover:text-white">
+          <button disabled={pending} onClick={() => run(() => dismissSuggestion(s.id))} className="min-h-11 px-3 text-sm text-white/55 hover:text-white">
             Dismiss
           </button>
         </div>
@@ -153,7 +153,7 @@ export default function AiSuggestions({
         <button
           disabled={pending || !enabled || !hasKey}
           onClick={() => run(runAssistantNow)}
-          className="rounded-xl border border-white/10 px-3 py-1.5 text-sm text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
+          className="min-h-11 rounded-xl border border-white/10 px-4 text-sm text-white/75 hover:bg-white/[0.06] disabled:opacity-40"
         >
           {pending ? "Reviewing…" : "Run now"}
         </button>

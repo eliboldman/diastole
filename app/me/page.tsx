@@ -58,7 +58,7 @@ export default async function MePage() {
       {!device && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6">
           <p className="text-white/70">Connect your watch so your coach can see how you&apos;re recovering.</p>
-          <Link href="/connect" className="mt-3 inline-block text-emerald-200 hover:underline">
+          <Link href="/connect" className="mt-3 inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 font-medium text-emerald-50 active:scale-95">
             Connect Garmin or Apple Watch →
           </Link>
         </section>
@@ -111,7 +111,7 @@ export default async function MePage() {
           <ul className="mt-3 space-y-2">
             {pods.map((p) => (
               <li key={p.pod_id}>
-                <Link href={`/me/pods/${p.pod_id}`} className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-white/[0.04]">
+                <Link href={`/me/pods/${p.pod_id}`} className="flex min-h-12 items-center justify-between rounded-xl px-2 transition active:scale-[0.99] hover:bg-white/[0.06]">
                   <span>{podName(p)}</span>
                   <span className="text-sm text-emerald-200">Open →</span>
                 </Link>

@@ -15,7 +15,7 @@ export default async function CoachPodFeedPage({ params }: { params: Promise<{ i
 
   return (
     <DashboardShell>
-      <Link href="/pods" className="text-sm text-white/60 hover:text-white">
+      <Link href="/pods" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
         ← Pods
       </Link>
       <h1 className="mt-4 text-4xl font-bold tracking-tight">{feed.pod.name}</h1>

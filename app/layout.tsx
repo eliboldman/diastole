@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Diastole",
   description: "Fitness is built between the beats. A coaching platform that reads recovery from Garmin and Apple Watch.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d1513",
+  viewportFit: "cover",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
