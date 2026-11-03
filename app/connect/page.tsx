@@ -38,7 +38,7 @@ export default async function ConnectPage({
   // New athlete who just connected: step 3, "you're all set".
   if (isAthlete && garmin === "connected" && connected.size > 0) {
     return (
-      <PublicShell>
+      <PublicShell signedIn>
         <div className="mx-auto max-w-xl pt-16">
           <OnboardingProgress step={3} />
           <div className="relative mx-auto flex h-24 w-24 items-center justify-center">
@@ -79,7 +79,7 @@ export default async function ConnectPage({
   const onboarding = isAthlete && connected.size === 0;
 
   return (
-    <PublicShell>
+    <PublicShell signedIn>
       <div className="mx-auto max-w-xl pt-16">
         {onboarding && <OnboardingProgress step={2} />}
         <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">Welcome{firstName ? `, ${firstName}` : ""}</p>

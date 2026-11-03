@@ -21,7 +21,7 @@ export default async function SetPasswordPage() {
   const onboarding = profile?.role === "athlete" && !device;
 
   return (
-    <PublicShell>
+    <PublicShell signedIn>
       <div className="mx-auto max-w-sm pt-16">
         {onboarding && <OnboardingProgress step={1} />}
         <h1 className="text-3xl font-medium tracking-tight">{onboarding ? "Welcome to Diastole" : "Choose a password"}</h1>

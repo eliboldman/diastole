@@ -50,13 +50,13 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           ))}
         </select>
         <div className="grid grid-cols-2 gap-2 sm:contents">
-          <label className="grid gap-1 text-xs text-white/55 sm:block">
+          <label className="grid min-w-0 gap-1 text-xs text-white/55 sm:block">
             <span className="sm:sr-only">From</span>
-            <input type="date" name="from" defaultValue={sp.from} className="min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base text-white sm:text-sm" />
+            <input type="date" name="from" defaultValue={sp.from} className="min-h-12 w-full min-w-0 appearance-none rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base text-white sm:text-sm" />
           </label>
-          <label className="grid gap-1 text-xs text-white/55 sm:block">
+          <label className="grid min-w-0 gap-1 text-xs text-white/55 sm:block">
             <span className="sm:sr-only">To</span>
-            <input type="date" name="to" defaultValue={sp.to} className="min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base text-white sm:text-sm" />
+            <input type="date" name="to" defaultValue={sp.to} className="min-h-12 w-full min-w-0 appearance-none rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base text-white sm:text-sm" />
           </label>
         </div>
         <input
