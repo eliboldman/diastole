@@ -22,7 +22,7 @@ export default async function MePage() {
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status").eq("athlete_id", me.id).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
+    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
   ]);

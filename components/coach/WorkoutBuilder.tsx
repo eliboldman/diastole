@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
+import { describe } from "@/lib/workouts/describe";
 import type { Duration, Intensity, Sport, Step, Target } from "@/lib/workouts/garmin-format";
 
 // ---------- unit helpers (UI works in minutes:seconds, miles/km; storage is seconds, meters, sec/km)
@@ -235,25 +236,6 @@ function PaceInput({ unit, slow, fast, onChange }: { unit: "mi" | "km"; slow: nu
       <input key={`f${unit}`} className={`${field} w-16`} defaultValue={show(fast)} aria-label="Fastest pace" onBlur={(e) => onChange(slow, read(e.target.value) || fast)} />
       /{unit}
     </div>
-  );
-}
-
-// ---------- summary for the confirmation dialog
-function describe(steps: Step[], paceUnit: "mi" | "km"): string[] {
-  const dur = (d: Duration) =>
-    d.type === "time" ? clock(d.seconds) : d.type === "distance" ? (d.meters >= 1000 ? `${+(d.meters / 1000).toFixed(2)} km` : `${d.meters} m`) : "until lap";
-  const tgt = (t?: Target) => {
-    if (!t) return "";
-    if (t.type === "hr_zone") return ` @ HR zone ${t.zone}`;
-    if (t.type === "hr_range") return ` @ ${t.low}–${t.high} bpm`;
-    if (t.type === "power_range") return ` @ ${t.low}–${t.high} W`;
-    const f = paceUnit === "mi" ? MI / 1000 : 1;
-    return ` @ ${clock(t.slowSecPerKm * f)}–${clock(t.fastSecPerKm * f)}/${paceUnit}`;
-  };
-  return steps.flatMap((s) =>
-    s.kind === "repeat"
-      ? [`${s.times} × [ ${s.steps.map((c) => (c.kind === "step" ? `${c.intensity.toLowerCase()} ${dur(c.duration)}${tgt(c.target)}` : "")).join(", ")} ]`]
-      : [`${s.intensity.toLowerCase()} ${dur(s.duration)}${tgt(s.target)}`],
   );
 }
 

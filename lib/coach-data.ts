@@ -151,10 +151,19 @@ export async function getAthleteDetail(athleteId: string) {
         .from("planned_workouts")
         .select("id, scheduled_date, sport, title, status, sent_at")
         .eq("athlete_id", athleteId)
+        .is("deleted_at", null)
         .gte("scheduled_date", daysAgo(7))
         .order("scheduled_date"),
       supabase.from("device_connections").select("source, last_synced_at, connected_at").eq("athlete_id", athleteId).maybeSingle(),
     ]);
+  const { data: removed } = await supabase
+    .from("planned_workouts")
+    .select("id, scheduled_date, title, status, removal_status, removal_error, deleted_at")
+    .eq("athlete_id", athleteId)
+    .not("deleted_at", "is", null)
+    .gte("deleted_at", new Date(Date.now() - 14 * 86400_000).toISOString())
+    .order("deleted_at", { ascending: false })
+    .limit(20);
 
   const source = device?.source ?? "garmin";
   return {
@@ -164,5 +173,6 @@ export async function getAthleteDetail(athleteId: string) {
     trend: (wellness ?? []).filter((w) => w.source === source) as WellnessPoint[],
     activities: (activities ?? []) as ActivityRow[],
     workouts: workouts ?? [],
+    removed: removed ?? [],
   };
 }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
+import WorkoutList from "@/components/coach/WorkoutList";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { getAthleteDetail } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
@@ -46,7 +47,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const data = await getAthleteDetail(id);
   if (!data) notFound();
 
-  const { profile, device, readiness, trend, activities, workouts } = data;
+  const { profile, device, readiness, trend, activities, workouts, removed } = data;
   const today = readiness[0];
   const overall: Flag = today?.overall ?? "unknown";
 
@@ -137,39 +138,12 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             <h2 className="text-lg font-medium">Planned workouts</h2>
             <Link
               href={`/athlete/${profile.id}/workouts/new`}
-              className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-sm text-emerald-100 hover:bg-emerald-300/20"
+              className="flex min-h-11 items-center rounded-xl border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm text-emerald-100 transition active:scale-95 hover:bg-emerald-300/20"
             >
               + New workout
             </Link>
           </div>
-          {workouts.length === 0 ? (
-            <p className="mt-3 text-sm text-white/40">Nothing scheduled.</p>
-          ) : (
-            <ul className="mt-3 space-y-1 text-sm">
-              {workouts.map((w) => (
-                <li key={w.id}>
-                  <Link
-                    href={`/athlete/${profile.id}/workouts/${w.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border-t border-white/[0.06] px-2 py-2 hover:bg-white/[0.04]"
-                  >
-                    <span className="min-w-0 truncate">
-                      <span className="text-white/50">
-                        {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </span>{" "}
-                      {w.title}
-                    </span>
-                    <span
-                      className={`shrink-0 text-xs uppercase tracking-wider ${
-                        w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/40" : "text-amber-200/80"
-                      }`}
-                    >
-                      {w.status}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <WorkoutList athleteId={profile.id} workouts={workouts} removed={removed} device={device?.source ?? null} />
         </section>
       </div>
     </DashboardShell>

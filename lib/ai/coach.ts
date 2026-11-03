@@ -109,7 +109,7 @@ async function buildPayload(athleteId: string, name: string, timeZone: string): 
     admin.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", athleteId).order("date", { ascending: false }).limit(1).maybeSingle(),
     admin.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, sleep_score, stress_avg, body_battery_high").eq("athlete_id", athleteId).gte("date", since).order("date"),
     admin.from("activities").select("sport, start_time, duration_s, distance_m, avg_hr, max_hr").eq("athlete_id", athleteId).gte("start_time", since).order("start_time"),
-    admin.from("planned_workouts").select("id, scheduled_date, title, sport, status, steps").eq("athlete_id", athleteId).gte("scheduled_date", today).lte("scheduled_date", until).neq("status", "draft").order("scheduled_date"),
+    admin.from("planned_workouts").select("id, scheduled_date, title, sport, status, steps").eq("athlete_id", athleteId).is("deleted_at", null).gte("scheduled_date", today).lte("scheduled_date", until).neq("status", "draft").order("scheduled_date"),
   ]);
 
   return {

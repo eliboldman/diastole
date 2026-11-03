@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { sendWorkoutToGarmin } from "@/lib/garmin/training";
+import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Sport, type Step } from "@/lib/workouts/garmin-format";
 
@@ -46,12 +47,16 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
   if (input.id) {
     const { error } = await supabase.from("planned_workouts").update(row).eq("id", input.id).eq("status", "draft");
     if (error) return { ok: false, error: error.message };
+    await recordVersion(input.id, "edited");
+    await syncToLibrary(input.id);
     revalidatePath(`/athlete/${input.athleteId}`);
     return { ok: true, id: input.id, message: "Draft saved." };
   }
 
   const { data, error } = await supabase.from("planned_workouts").insert({ ...row, status: "draft" }).select("id").single();
   if (error) return { ok: false, error: error.message };
+  await recordVersion(data.id, "created");
+  await syncToLibrary(data.id); // every builder workout is kept in the coach's library
   revalidatePath(`/athlete/${input.athleteId}`);
   return { ok: true, id: data.id, message: "Draft saved." };
 }
@@ -77,8 +82,8 @@ export async function deliver(workoutId: string, athleteId: string): Promise<Act
   await requireCoach();
   const supabase = await createClient();
   // Confirms, via row-level security, that this workout belongs to one of the coach's athletes.
-  const { data: w } = await supabase.from("planned_workouts").select("id, status").eq("id", workoutId).maybeSingle();
-  if (!w) return { ok: false, error: "Workout not found." };
+  const { data: w } = await supabase.from("planned_workouts").select("id, status, deleted_at").eq("id", workoutId).maybeSingle();
+  if (!w || w.deleted_at) return { ok: false, error: "Workout not found." };
 
   const { data: device } = await supabase.from("device_connections").select("source").eq("athlete_id", athleteId).maybeSingle();
   revalidatePath(`/athlete/${athleteId}`);

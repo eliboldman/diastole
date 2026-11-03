@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { label: "Today", href: "/dashboard" },
   { label: "Athletes", href: "/athletes" },
+  { label: "Workouts", href: "/workouts" },
+  { label: "Library", href: "/library" },
   { label: "Pods", href: "/pods" },
   { label: "Me", href: "/me" },
   { label: "Settings", href: "/settings" },
@@ -77,12 +79,12 @@ export default function Sidebar() {
           </Link>
           <SignOut className="text-xs text-white/40" />
         </div>
-        <nav className="flex gap-1 px-2 pb-2 pt-2">
+        <nav className="no-scrollbar flex gap-1 overflow-x-auto px-2 pb-2 pt-2">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 rounded-xl py-2 text-center text-[13px] ${
+              className={`flex min-h-10 shrink-0 items-center rounded-xl px-3.5 text-[13px] ${
                 isActive(pathname, item.href) ? "bg-white/[0.08] text-white" : "text-white/50"
               }`}
             >

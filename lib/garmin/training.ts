@@ -16,7 +16,9 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     .eq("id", workoutId)
     .single();
   if (error || !w) throw new Error("Workout not found.");
-  if (!w.approved_at || w.status !== "approved") throw new Error("Workout must be approved by the coach before sending.");
+  // "sent" is allowed for re-sends after an adjust or reschedule (the old copy is removed first).
+  if (!w.approved_at || (w.status !== "approved" && w.status !== "sent"))
+    throw new Error("Workout must be approved by the coach before sending.");
   if (w.external_id) throw new Error("Workout was already sent to Garmin.");
 
   const body = toGarminWorkout({
@@ -45,19 +47,55 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     throw new Error(`Garmin couldn't schedule the workout (${scheduled.status}): ${(await scheduled.text()).slice(0, 300)}`);
   }
 
+  // The schedule id lets a later delete remove the calendar entry explicitly, not just the workout.
+  const scheduleText = await scheduled.text();
+  let scheduleId: string | null = null;
+  try {
+    const parsed = JSON.parse(scheduleText);
+    scheduleId = String(typeof parsed === "object" && parsed ? (parsed.scheduleId ?? parsed.id ?? "") : parsed) || null;
+  } catch {
+    scheduleId = scheduleText.trim() || null;
+  }
+
   await admin
     .from("planned_workouts")
-    .update({ status: "sent", sent_at: new Date().toISOString(), external_id: String(garminWorkoutId) })
+    .update({
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      external_id: String(garminWorkoutId),
+      garmin_schedule_id: scheduleId,
+    })
     .eq("id", w.id);
 
   return { garminWorkoutId };
 }
 
-/** Removes a previously sent workout from the athlete's Garmin account (and its calendar entry). */
+/**
+ * Removes a previously sent workout from the athlete's Garmin account: the calendar entry first,
+ * then the workout itself. Clears the Garmin ids so the workout can be sent again later.
+ */
 export async function removeWorkoutFromGarmin(workoutId: string) {
   const admin = createAdminClient();
-  const { data: w } = await admin.from("planned_workouts").select("athlete_id, external_id").eq("id", workoutId).single();
+  const { data: w } = await admin
+    .from("planned_workouts")
+    .select("athlete_id, external_id, garmin_schedule_id")
+    .eq("id", workoutId)
+    .single();
   if (!w?.external_id) return;
+
+  if (w.garmin_schedule_id) {
+    const res = await garminFetch(w.athlete_id, `/training-api/schedule/${w.garmin_schedule_id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the calendar entry (${res.status}).`);
+  }
+  // Deleting the workout also drops any schedule Garmin still has for it (older sends stored no schedule id).
   const res = await garminFetch(w.athlete_id, `/training-api/workout/v2/${w.external_id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the old workout (${res.status}).`);
+  if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the workout (${res.status}).`);
+
+  await admin.from("planned_workouts").update({ external_id: null, garmin_schedule_id: null }).eq("id", workoutId);
+}
+
+/** Replace what's on Garmin with the current version (after an adjust or reschedule of a sent workout). */
+export async function resendWorkoutToGarmin(workoutId: string) {
+  await removeWorkoutFromGarmin(workoutId);
+  return sendWorkoutToGarmin(workoutId);
 }
