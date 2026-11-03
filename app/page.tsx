@@ -46,10 +46,17 @@ export default function Home() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/60 sm:text-lg">
-          {SITE.name} is a coaching platform for endurance athletes. It reads recovery from each
+          {SITE.name}{" "}is a coaching platform for endurance athletes. It reads recovery from each
           athlete&apos;s wearable so their coach can shape training around how the body is actually
           adapting, day by day.
         </p>
+
+        <Link
+          href="/login"
+          className="mt-10 inline-flex min-h-12 items-center rounded-full border border-emerald-300/30 bg-emerald-300/15 px-8 text-base font-medium text-emerald-50 transition active:scale-95 hover:bg-emerald-300/25"
+        >
+          Log in
+        </Link>
       </section>
 
       <section className="mt-24 grid gap-4 sm:grid-cols-3">

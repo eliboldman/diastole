@@ -21,9 +21,15 @@ export default function PublicShell({ children }: { children: ReactNode }) {
             <Link href="/privacy" className="transition-colors hover:text-white">
               Privacy
             </Link>
-            <a href={`mailto:${SITE.contactEmail}`} className="transition-colors hover:text-white">
+            <a href={`mailto:${SITE.contactEmail}`} className="hidden transition-colors hover:text-white sm:inline">
               Contact
             </a>
+            <Link
+              href="/login"
+              className="rounded-full border border-emerald-300/30 bg-emerald-300/15 px-4 py-2 font-medium text-emerald-50 transition active:scale-95 hover:bg-emerald-300/25"
+            >
+              Log in
+            </Link>
           </nav>
         </header>
 

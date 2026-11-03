@@ -24,7 +24,10 @@ export default function AuthCallback() {
     const refreshToken = hash.get("refresh_token");
     const code = new URLSearchParams(window.location.search).get("code");
 
-    const finish = (ok: boolean) => (ok ? window.location.replace("/login") : setFailed(true));
+    // Invites and password resets land on /set-password; everything else goes to /login, which routes by role.
+    const type = hash.get("type");
+    const next = type === "invite" || type === "recovery" ? "/set-password" : "/login";
+    const finish = (ok: boolean) => (ok ? window.location.replace(next) : setFailed(true));
 
     if (accessToken && refreshToken) {
       supabase.auth
@@ -47,7 +50,7 @@ export default function AuthCallback() {
             <h1 className="text-2xl font-medium">That link didn&apos;t work</h1>
             <p className="mt-3 text-white/55">It may have expired or already been used.</p>
             <a href="/login" className="mt-6 inline-block text-emerald-200 hover:underline">
-              Request a new sign-in link →
+              Back to sign in →
             </a>
           </>
         ) : (

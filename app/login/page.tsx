@@ -25,7 +25,9 @@ export default async function LoginPage({
         <p className="mt-2 mb-8 text-white/50">Diastole is invite-only. Use the email your coach invited.</p>
         {error && (
           <p className="mb-4 rounded-2xl border border-red-300/20 bg-red-300/[0.06] p-3 text-sm text-red-200">
-            That link has expired or was already used. Request a new one below.
+            {error === "provider"
+              ? "That sign-in didn't work. Diastole is invite-only, so use the account your coach invited, or sign in with email."
+              : "That link has expired or was already used. Sign in below, or use “Forgot password” for a new link."}
           </p>
         )}
         <LoginForm />
