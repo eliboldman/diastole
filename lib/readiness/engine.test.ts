@@ -85,6 +85,18 @@ check("Apple athlete (no stress/BB/sleep score) still gets recovery + sleep", ()
   assert.equal(r.overall, "green");
 });
 
+check("no recovery baseline: a good absolute reading doesn't make the day green", () => {
+  const r = computeReadiness(day(0), [{ date: day(0), body_battery_high: 92, stress_avg: 25 }], []);
+  assert.equal(r.stress, "green");
+  assert.equal(r.overall, "unknown");
+  assert.match(r.note, /Building baseline/);
+});
+
+check("no recovery baseline: a real warning still shows", () => {
+  const r = computeReadiness(day(0), [{ date: day(0), sleep_seconds: 4.5 * 3600 }], []);
+  assert.equal(r.overall, "red");
+});
+
 check("activity load handles missing HR", () => {
   assert.equal(activityLoad({ date: today, duration_s: 600 }, 50, 190), 5);
   assert.equal(activityLoad({ date: today, duration_s: 0 }, 50, 190), 0);

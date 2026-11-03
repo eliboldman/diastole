@@ -10,7 +10,21 @@ function isPublic(pathname: string) {
 
 // Keeps the Supabase session fresh and sends signed-out visitors to /login.
 // Role checks (coach vs athlete) happen in the page layouts, not here.
+// Old production address (before the rename to diastole.app). Everything redirects to the
+// canonical site, except Garmin webhooks, which keep working in case Garmin retries old deliveries.
+const LEGACY_HOSTS = new Set(["physiology-os-eta.vercel.app"]);
+
 export async function proxy(request: NextRequest) {
+  const canonical = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (
+    canonical &&
+    LEGACY_HOSTS.has(request.nextUrl.hostname) &&
+    !request.nextUrl.pathname.startsWith("/api/garmin/webhook")
+  ) {
+    const target = new URL(request.nextUrl.pathname + request.nextUrl.search, canonical);
+    return NextResponse.redirect(target, 308);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

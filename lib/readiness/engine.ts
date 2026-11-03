@@ -174,7 +174,11 @@ export function computeReadiness(
     }
   }
 
-  const overall = worst(recovery, sleep, stress, load);
+  // Recovery (HRV/RHR vs baseline) is the core signal. Until it has a baseline, only surface
+  // real warnings from the other areas; never call a day "green" on absolute checks alone.
+  const others = worst(sleep, stress, load);
+  const overall =
+    recovery === "unknown" ? (others === "yellow" || others === "red" ? others : "unknown") : worst(recovery, others);
 
   let note: string;
   if (overall === "unknown") note = "Building baseline — flags start after about a week of data.";
