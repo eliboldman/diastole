@@ -102,7 +102,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
             </h3>
             {sentCount > 0 && (
               <p className="mt-2 text-sm text-amber-100/80">
-                {sentCount} {sentCount === 1 ? "is" : "are"} on an athlete&apos;s watch and will be removed there too.
+                {`${sentCount} ${sentCount === 1 ? "is" : "are"} on an athlete's watch and will be removed there too.`}
               </p>
             )}
             <p className="mt-2 text-sm text-white/50">You can undo right after.</p>

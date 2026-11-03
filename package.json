@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:db": "node supabase/tests/rls.test.mjs",
     "test:workouts": "node lib/workouts/garmin-format.test.ts",
-    "test:readiness": "node lib/readiness/engine.test.ts"
+    "test:readiness": "node lib/readiness/engine.test.ts",
+    "test:adjust": "node lib/workouts/adjust.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
