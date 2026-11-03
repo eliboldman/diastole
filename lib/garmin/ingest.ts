@@ -98,7 +98,8 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
       }
       if (!athleteId) continue; // Unknown or disconnected Garmin user: keep raw only.
 
-      if (type === "activities") {
+      // An activity edited in Garmin Connect arrives as manuallyUpdatedActivities with the same fields.
+      if (type === "activities" || type === "manuallyUpdatedActivities") {
         item = item as Summary;
         const start = num(item.startTimeInSeconds);
         const externalId = String(item.summaryId ?? item.activityId ?? "");
