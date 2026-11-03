@@ -133,20 +133,39 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
         </section>
 
         <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="text-lg font-medium">Planned workouts</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-medium">Planned workouts</h2>
+            <Link
+              href={`/athlete/${profile.id}/workouts/new`}
+              className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-sm text-emerald-100 hover:bg-emerald-300/20"
+            >
+              + New workout
+            </Link>
+          </div>
           {workouts.length === 0 ? (
-            <p className="mt-3 text-sm text-white/40">Nothing scheduled. The workout builder is coming next.</p>
+            <p className="mt-3 text-sm text-white/40">Nothing scheduled.</p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-3 space-y-1 text-sm">
               {workouts.map((w) => (
-                <li key={w.id} className="flex items-center justify-between border-t border-white/[0.06] pt-2">
-                  <span>
-                    <span className="text-white/50">
-                      {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                    </span>{" "}
-                    {w.title}
-                  </span>
-                  <span className="text-xs uppercase tracking-wider text-white/40">{w.status}</span>
+                <li key={w.id}>
+                  <Link
+                    href={`/athlete/${profile.id}/workouts/${w.id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border-t border-white/[0.06] px-2 py-2 hover:bg-white/[0.04]"
+                  >
+                    <span className="min-w-0 truncate">
+                      <span className="text-white/50">
+                        {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      </span>{" "}
+                      {w.title}
+                    </span>
+                    <span
+                      className={`shrink-0 text-xs uppercase tracking-wider ${
+                        w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/40" : "text-amber-200/80"
+                      }`}
+                    >
+                      {w.status}
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
