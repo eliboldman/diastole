@@ -53,8 +53,10 @@ function present(o: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
 }
 
-export async function ingestGarminPayload(body: Record<string, Summary[]>) {
+/** Stores a Garmin push payload. Returns the athletes whose data changed. */
+export async function ingestGarminPayload(body: Record<string, Summary[]>): Promise<Set<string>> {
   const admin = createAdminClient();
+  const touched = new Set<string>();
   const athleteCache = new Map<string, string | null>();
 
   async function athleteFor(garminUser?: string) {
@@ -83,7 +85,8 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>) {
         const url = new URL(item.callbackURL);
         const res = await garminFetch(athleteId, url.pathname + url.search);
         const fetched = res.ok ? await res.json() : [];
-        await ingestGarminPayload({ [type]: (Array.isArray(fetched) ? fetched : [fetched]).map((f) => ({ ...f, userId: item.userId })) });
+        const sub = await ingestGarminPayload({ [type]: (Array.isArray(fetched) ? fetched : [fetched]).map((f) => ({ ...f, userId: item.userId })) });
+        sub.forEach((id) => touched.add(id));
         continue;
       }
 
@@ -130,6 +133,8 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>) {
         .update({ last_synced_at: new Date().toISOString() })
         .eq("athlete_id", athleteId)
         .eq("source", "garmin");
+      touched.add(athleteId);
     }
   }
+  return touched;
 }

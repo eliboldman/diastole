@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ingestGarminPayload } from "@/lib/garmin/ingest";
+import { refreshReadiness } from "@/lib/readiness/run";
 
 // One endpoint for every Garmin push type (dailies, sleeps, hrv, stressDetails, activities,
 // deregistrations, userPermissionsChange). Garmin strips query strings when pushing, so the
@@ -36,12 +37,18 @@ export async function handleGarminPush(request: NextRequest, given: string | nul
   );
   console.info("Garmin webhook received", counts);
 
+  let touched: Set<string>;
   try {
-    await ingestGarminPayload(body as Parameters<typeof ingestGarminPayload>[0]);
+    touched = await ingestGarminPayload(body as Parameters<typeof ingestGarminPayload>[0]);
   } catch (e) {
     console.error("Garmin webhook ingest failed", e);
     // Non-200 makes Garmin retry later.
     return new NextResponse("Ingest failed", { status: 500 });
+  }
+
+  // Data is stored; a readiness failure shouldn't make Garmin resend it.
+  for (const athleteId of touched) {
+    await refreshReadiness(athleteId).catch((e) => console.error("Readiness refresh failed", athleteId, e));
   }
   return new NextResponse(null, { status: 200 });
 }
