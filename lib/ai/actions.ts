@@ -36,7 +36,13 @@ export async function approveSuggestion(id: string): Promise<AiResult> {
   if (!s || s.status !== "pending") return { ok: false, error: "This suggestion was already handled." };
 
   const notes: string[] = [];
-  const { data: device } = await supabase.from("device_connections").select("source").eq("athlete_id", s.athlete_id).maybeSingle();
+  const [{ data: athlete }, { data: realDevice }] = await Promise.all([
+    supabase.from("profiles").select("is_test").eq("id", s.athlete_id).maybeSingle(),
+    supabase.from("device_connections").select("source").eq("athlete_id", s.athlete_id).maybeSingle(),
+  ]);
+  // Hard guard: nothing ever reaches a watch for an AI test-mode athlete.
+  const isTest = Boolean(athlete?.is_test);
+  const device = isTest ? null : realDevice;
 
   // 1. Retire the planned session it replaces (rest / replace / easier swap).
   if (s.target_workout_id && s.action !== "keep") {
@@ -82,7 +88,14 @@ export async function approveSuggestion(id: string): Promise<AiResult> {
       } catch (e) {
         notes.push(`New session saved, but sending to Garmin failed: ${(e as Error).message}`);
       }
-    } else notes.push(device?.source === "apple" ? "New session waiting for the iPhone app." : "New session saved (no device yet).");
+    } else
+      notes.push(
+        isTest
+          ? "Test athlete: new session saved, nothing sent to any watch."
+          : device?.source === "apple"
+            ? "New session waiting for the iPhone app."
+            : "New session saved (no device yet).",
+      );
   }
 
   await supabase
@@ -150,4 +163,38 @@ export async function saveAiSettings(input: { enabled: boolean; model: string; c
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
   return { ok: true, message: "Saved." };
+}
+
+// ---------------------------------------------------------------- AI test mode
+
+export async function createTestAthletes(): Promise<AiResult> {
+  const coach = await requireCoach();
+  const { seedTestAthletes } = await import("@/lib/ai/test-athletes");
+  const n = await seedTestAthletes(coach.id);
+  revalidatePath("/lab");
+  return { ok: true, message: `${n} test athletes ready with fresh scenarios.` };
+}
+
+export async function runTestAnalysis(): Promise<AiResult> {
+  const coach = await requireCoach();
+  // Scenarios are built around "today"; if they were created on an earlier day, rebuild them first.
+  const { seedTestAthletes, testScenariosAreStale } = await import("@/lib/ai/test-athletes");
+  const refreshed = await testScenariosAreStale(coach.id);
+  if (refreshed) await seedTestAthletes(coach.id);
+  const r = await runCoachAssistant(coach.id, "test");
+  revalidatePath("/lab");
+  const prefix = refreshed ? "Scenarios were from an earlier day, so they were rebuilt for today. " : "";
+  if (r.status === "skipped") return { ok: true, message: prefix + r.reason };
+  return {
+    ok: true,
+    message: `${prefix}${r.suggestions} suggestion${r.suggestions === 1 ? "" : "s"} from ${AI_MODELS[r.model].label} ($${r.costUsd.toFixed(3)}).`,
+  };
+}
+
+export async function deleteTestAthletes(): Promise<AiResult> {
+  const coach = await requireCoach();
+  const { removeTestAthletes } = await import("@/lib/ai/test-athletes");
+  const n = await removeTestAthletes(coach.id);
+  revalidatePath("/lab");
+  return { ok: true, message: n ? `Removed ${n} test athletes and all their data.` : "No test athletes to remove." };
 }

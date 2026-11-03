@@ -13,6 +13,9 @@ import type { Flag } from "@/lib/readiness/engine";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
+// Server actions on this page can run the Claude analysis (tens of seconds).
+export const maxDuration = 120;
+
 export const metadata: Metadata = { title: "Today · Diastole" };
 
 function activityLine(a: AthleteSummary["lastActivity"], timeZone: string) {
@@ -49,6 +52,7 @@ export default async function TodayPage() {
   const latestByAthlete = new Map<string, NonNullable<typeof rawSuggestions>[number]>();
   for (const r of rawSuggestions ?? []) if (!latestByAthlete.has(r.athlete_id)) latestByAthlete.set(r.athlete_id, r);
   const suggestions: SuggestionView[] = [...latestByAthlete.values()]
+    .filter((r) => roster.some((a) => a.id === r.athlete_id)) // test-mode athletes show on /lab, not here
     .filter((r) => r.status === "pending" || r.date >= since)
     .map((r) => {
       const target = r.planned_workouts as unknown as { title: string; scheduled_date: string } | null;

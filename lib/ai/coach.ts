@@ -145,7 +145,11 @@ export async function monthToDateSpend(coachId: string) {
   return (data ?? []).reduce((s, r) => s + Number(r.cost_usd), 0);
 }
 
-export async function runCoachAssistant(coachId: string, trigger: "cron" | "manual"): Promise<RunResult> {
+/**
+ * Morning analysis. "cron"/"manual" review the coach's real athletes; "test" reviews only AI test-mode
+ * athletes and re-runs even if they already have a suggestion today (their old ones are cleared).
+ */
+export async function runCoachAssistant(coachId: string, trigger: "cron" | "manual" | "test"): Promise<RunResult> {
   if (!process.env.ANTHROPIC_API_KEY) return { status: "skipped", reason: "No Anthropic API key configured." };
   const admin = createAdminClient();
 
@@ -159,7 +163,15 @@ export async function runCoachAssistant(coachId: string, trigger: "cron" | "manu
   if (spent >= cap - 0.02) return { status: "skipped", reason: `Monthly cap reached ($${spent.toFixed(2)} of $${cap.toFixed(2)}).` };
 
   // Fresh readiness for every athlete, then pick the flagged ones without a suggestion today.
-  const { data: roster } = await admin.from("profiles").select("id, full_name, email, timezone").eq("coach_id", coachId);
+  const testMode = trigger === "test";
+  const { data: roster } = await admin
+    .from("profiles")
+    .select("id, full_name, email, timezone")
+    .eq("coach_id", coachId)
+    .eq("is_test", testMode);
+  if (testMode && roster?.length) {
+    await admin.from("ai_suggestions").delete().in("athlete_id", roster.map((a) => a.id));
+  }
   const flagged: { id: string; name: string; timezone: string; overall: "yellow" | "red"; today: string }[] = [];
   for (const a of roster ?? []) {
     const r = await refreshReadiness(a.id).catch(() => null);
@@ -168,7 +180,11 @@ export async function runCoachAssistant(coachId: string, trigger: "cron" | "manu
     if (existing) continue;
     flagged.push({ id: a.id, name: a.full_name || a.email || "Athlete", timezone: a.timezone, overall: r.overall, today: r.date });
   }
-  if (!flagged.length) return { status: "skipped", reason: "No new yellow or red flags today. Nothing sent to Claude." };
+  if (!flagged.length)
+    return {
+      status: "skipped",
+      reason: testMode && !roster?.length ? "No test athletes yet. Create them first." : "No new yellow or red flags today. Nothing sent to Claude.",
+    };
 
   const payload = await Promise.all(flagged.map((a) => buildPayload(a.id, a.name, a.timezone)));
 

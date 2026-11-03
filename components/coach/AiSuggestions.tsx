@@ -54,21 +54,41 @@ function useRun() {
   return { pending, msg, run };
 }
 
-function Card({ s }: { s: SuggestionView }) {
-  const { pending, msg, run } = useRun();
-  const flag = FLAG_STYLE[s.overall];
-  const changesSchedule = s.action !== "keep" && (s.target || s.proposed);
+const STATUS_STYLE: Record<SuggestionView["status"], string> = {
+  pending: "",
+  approved: "border-emerald-300/30 bg-emerald-300/[0.07]",
+  edited: "border-sky-300/25 bg-sky-300/[0.05]",
+  dismissed: "opacity-60",
+};
+const STATUS_LABEL: Record<SuggestionView["status"], string> = {
+  pending: "",
+  approved: "Approved",
+  edited: "Opened as a draft",
+  dismissed: "Dismissed",
+};
 
-  const confirmText = [
-    `Approve for ${s.athleteName}: ${ACTION_LABEL[s.action]}?`,
-    s.target && s.action !== "keep" ? `• Removes "${s.target.title}" (${day(s.target.date)})${""}` : "",
-    s.proposed && s.action !== "keep" && s.action !== "rest" ? `• Sends "${s.proposed.title}" for ${day(s.proposed.scheduled_date)} to their device` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+export function SuggestionCard({ s, test = false }: { s: SuggestionView; test?: boolean }) {
+  const { pending, msg, run } = useRun();
+  const [confirming, setConfirming] = useState(false);
+  const [justDone, setJustDone] = useState<SuggestionView["status"] | null>(null);
+  const flag = FLAG_STYLE[s.overall];
+  const changesSchedule = s.action !== "keep" && Boolean(s.target || s.proposed);
+  const status = justDone ?? s.status;
+
+  const act = (fn: () => Promise<AiResult>, next: SuggestionView["status"]) =>
+    run(async () => {
+      const r = await fn();
+      if (r.ok) {
+        navigator.vibrate?.(next === "approved" ? [12, 40, 12] : 10);
+        setJustDone(next);
+        setConfirming(false);
+      }
+      return r;
+    });
 
   return (
-    <article className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
+    <article className={`row-in relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-5 transition-all duration-500 ${STATUS_STYLE[status]}`}>
+      {justDone === "approved" && <span className="approve-sweep pointer-events-none absolute inset-0" aria-hidden />}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={`/athlete/${s.athleteId}`} className="inline-flex min-h-11 items-center font-semibold hover:underline">
           {s.athleteName}
@@ -77,50 +97,88 @@ function Card({ s }: { s: SuggestionView }) {
           <span className={`h-2 w-2 rounded-full ${flag.dot}`} aria-hidden /> {flag.label} · {s.concern} concern
         </span>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{s.summary}</p>
+      <p className="mt-2 text-sm leading-relaxed text-white/75">{s.summary}</p>
 
       <div className="mt-3 rounded-2xl border border-white/[0.09] bg-white/[0.055] p-3 text-sm">
         <p className="font-medium">{ACTION_LABEL[s.action]}</p>
-        <p className="mt-1 text-white/55">{s.rationale}</p>
+        <p className="mt-1 text-white/60">{s.rationale}</p>
         {s.target && s.action !== "keep" && (
           <p className="mt-2 text-white/60">
-            Changes: <span className="text-white/70">{s.target.title}</span> ({day(s.target.date)})
+            Changes: <span className="text-white/80">{s.target.title}</span> ({day(s.target.date)})
           </p>
         )}
         {s.proposed && s.action !== "keep" && s.action !== "rest" && (
           <p className="mt-2 text-white/60">
-            New: <span className="text-white/70">{s.proposed.title}</span> ({day(s.proposed.scheduled_date)}, {s.proposed.sport}) —{" "}
+            New: <span className="text-white/80">{s.proposed.title}</span> ({day(s.proposed.scheduled_date)}, {s.proposed.sport}) —{" "}
             {s.proposed.steps.map(stepLine).join(" → ")}
           </p>
         )}
       </div>
 
-      {s.status === "pending" ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled={pending}
-            onClick={() => (!changesSchedule || confirm(confirmText)) && run(() => approveSuggestion(s.id))}
-            className="min-h-11 rounded-xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
-          >
-            Approve
-          </button>
-          {s.proposed && (
+      {status === "pending" ? (
+        confirming ? (
+          <div className="toast-in mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.06] p-4 text-sm">
+            <p className="font-medium text-white">Approve for {s.athleteName.replace(/^Test · /, "")}?</p>
+            <ul className="mt-2 space-y-1 text-white/70">
+              {s.target && s.action !== "keep" && <li>• Removes “{s.target.title}” ({day(s.target.date)})</li>}
+              {s.proposed && s.action !== "keep" && s.action !== "rest" && (
+                <li>
+                  • Adds “{s.proposed.title}” for {day(s.proposed.scheduled_date)}
+                  {test ? " (test: not sent to any watch)" : " and sends it to their device"}
+                </li>
+              )}
+            </ul>
+            <div className="mt-4 flex gap-2">
+              <button
+                disabled={pending}
+                onClick={() => act(() => approveSuggestion(s.id), "approved")}
+                className="min-h-11 rounded-xl border border-emerald-300/30 bg-emerald-300/20 px-5 font-medium text-emerald-50 disabled:opacity-50"
+              >
+                {pending ? "Applying…" : "Yes, approve"}
+              </button>
+              <button onClick={() => setConfirming(false)} className="min-h-11 rounded-xl px-4 text-white/60">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               disabled={pending}
-              onClick={() => run(() => editSuggestion(s.id))}
-              className="min-h-11 rounded-xl border border-white/10 px-4 text-sm text-white/75 hover:bg-white/[0.06] disabled:opacity-50"
+              onClick={() => (changesSchedule ? setConfirming(true) : act(() => approveSuggestion(s.id), "approved"))}
+              className="min-h-11 rounded-xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/25 disabled:opacity-50"
             >
-              Edit
+              Approve
             </button>
-          )}
-          <button disabled={pending} onClick={() => run(() => dismissSuggestion(s.id))} className="min-h-11 px-3 text-sm text-white/55 hover:text-white">
-            Dismiss
-          </button>
-        </div>
+            {s.proposed && (
+              <button
+                disabled={pending}
+                onClick={() => act(() => editSuggestion(s.id), "edited")}
+                className="min-h-11 rounded-xl border border-white/10 px-4 text-sm text-white/75 hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              disabled={pending}
+              onClick={() => act(() => dismissSuggestion(s.id), "dismissed")}
+              className="min-h-11 px-3 text-sm text-white/55 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        )
       ) : (
-        <p className="mt-3 text-xs uppercase tracking-wider text-white/50">{s.status}</p>
+        <p className={`mt-4 inline-flex items-center gap-2 text-sm ${status === "approved" ? "text-emerald-200" : "text-white/60"}`}>
+          {status === "approved" && (
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full bg-emerald-300/90 text-xs font-bold text-emerald-950 ${justDone ? "success-pop" : ""}`}>
+              ✓
+            </span>
+          )}
+          {STATUS_LABEL[status]}
+        </p>
       )}
-      {msg && <p className={`mt-2 text-sm ${msg.ok ? "text-emerald-200" : "text-red-300"}`}>{msg.text}</p>}
+      {msg && <p className={`mt-2 text-sm ${msg.ok ? "text-emerald-200/90" : "text-red-300"}`}>{msg.text}</p>}
     </article>
   );
 }
@@ -167,7 +225,7 @@ export default function AiSuggestions({
       ) : (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {suggestions.map((s) => (
-            <Card key={s.id} s={s} />
+            <SuggestionCard key={s.id} s={s} />
           ))}
         </div>
       )}

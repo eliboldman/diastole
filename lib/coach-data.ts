@@ -58,6 +58,7 @@ export async function getRoster(coachId: string): Promise<AthleteSummary[]> {
     .from("profiles")
     .select("id, full_name, email, timezone")
     .eq("coach_id", coachId)
+    .eq("is_test", false) // AI test-mode athletes live on /lab only
     .order("full_name");
   if (!athletes?.length) return [];
 

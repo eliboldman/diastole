@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarDays, Ellipsis, LogOut, Orbit, Settings, Sun, User, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarDays, Ellipsis, FlaskConical, LogOut, Orbit, Settings, Sun, User, Users, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +13,7 @@ const navItems = [
   { label: "Library", href: "/library" },
   { label: "Pods", href: "/pods" },
   { label: "Me", href: "/me" },
+  { label: "Test lab", href: "/lab" },
   { label: "Settings", href: "/settings" },
 ];
 
@@ -96,6 +97,7 @@ const TABS: { label: string; href: string; icon: LucideIcon }[] = [
 const MORE: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Pods", href: "/pods", icon: Orbit },
   { label: "My athlete view", href: "/me", icon: User },
+  { label: "Test lab", href: "/lab", icon: FlaskConical },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

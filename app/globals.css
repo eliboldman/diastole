@@ -605,3 +605,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .onboarding-fill, .success-pop, .success-ring { animation: none; }
 }
+
+/* ---- Approval: a soft green light sweeps across the card */
+@keyframes approveSweep {
+  from { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+.approve-sweep {
+  background: linear-gradient(100deg, transparent 20%, rgba(110, 231, 183, 0.18) 50%, transparent 80%);
+  animation: approveSweep 900ms var(--ease-soft) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .approve-sweep { animation: none; display: none; }
+}

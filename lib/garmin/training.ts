@@ -16,6 +16,9 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     .eq("id", workoutId)
     .single();
   if (error || !w) throw new Error("Workout not found.");
+  // Hard guard: AI test-mode athletes are fake, so nothing for them ever goes to Garmin.
+  const { data: athlete } = await admin.from("profiles").select("is_test").eq("id", w.athlete_id).single();
+  if (athlete?.is_test) throw new Error("Test athletes never receive workouts on a watch.");
   // "sent" is allowed for re-sends after an adjust or reschedule (the old copy is removed first).
   if (!w.approved_at || (w.status !== "approved" && w.status !== "sent"))
     throw new Error("Workout must be approved by the coach before sending.");

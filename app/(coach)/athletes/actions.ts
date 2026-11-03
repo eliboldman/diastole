@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient, createClient, requireCoach } from "@/lib/supabase/server";
+import { disconnectGarmin } from "@/lib/garmin/client";
+import { removeWorkoutFromGarmin } from "@/lib/garmin/training";
 import { siteUrl } from "@/lib/site-url";
 
 export type InviteState = { ok?: string; error?: string };
@@ -44,4 +46,55 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
 
   revalidatePath("/athletes");
   return { ok: `Invite sent to ${email}.` };
+}
+
+export type RemoveState = { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Permanently remove an athlete: take Diastole's workouts off their Garmin calendar, disconnect Garmin,
+ * then delete their account, which cascades to all of their data (wellness, activities, workouts, pods).
+ */
+export async function removeAthlete(athleteId: string, typedName: string): Promise<RemoveState> {
+  const coach = await requireCoach();
+  if (athleteId === coach.id) return { ok: false, error: "You can't remove yourself." };
+
+  const admin = createAdminClient();
+  const { data: athlete } = await admin
+    .from("profiles")
+    .select("id, coach_id, role, full_name, email")
+    .eq("id", athleteId)
+    .maybeSingle();
+  if (!athlete || athlete.coach_id !== coach.id) return { ok: false, error: "Athlete not found." };
+  if (athlete.role !== "athlete") return { ok: false, error: "Only athletes can be removed here." };
+
+  const name = (athlete.full_name || athlete.email || "").trim();
+  const expected = name.split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (!expected || typedName.trim().toLowerCase() !== expected) {
+    return { ok: false, error: `Type “${name.split(/\s+/)[0]}” to confirm.` };
+  }
+
+  const notes: string[] = [];
+  const { data: device } = await admin.from("device_connections").select("source").eq("athlete_id", athleteId).maybeSingle();
+  if (device?.source === "garmin") {
+    const { data: sent } = await admin
+      .from("planned_workouts")
+      .select("id")
+      .eq("athlete_id", athleteId)
+      .not("external_id", "is", null)
+      .is("deleted_at", null);
+    let failed = 0;
+    for (const w of sent ?? []) await removeWorkoutFromGarmin(w.id).catch(() => (failed += 1));
+    if (sent?.length) notes.push(failed ? `${failed} workout(s) couldn't be removed from their Garmin calendar.` : "Removed Diastole workouts from their Garmin calendar.");
+    await disconnectGarmin(athleteId);
+    notes.push("Disconnected Garmin.");
+  }
+
+  // Invites are stored lowercased (see inviteAthlete); exact match, no pattern wildcards.
+  if (athlete.email) await admin.from("invites").delete().eq("coach_id", coach.id).eq("email", athlete.email.toLowerCase());
+  const { error } = await admin.auth.admin.deleteUser(athleteId);
+  if (error) return { ok: false, error: `Couldn't delete the account: ${error.message}` };
+
+  revalidatePath("/athletes");
+  revalidatePath("/dashboard");
+  return { ok: true, message: [`Removed ${name} and all of their data.`, ...notes].join(" ") };
 }
