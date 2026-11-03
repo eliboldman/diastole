@@ -11,12 +11,15 @@
     "test:workouts": "node lib/workouts/garmin-format.test.ts",
     "test:readiness": "node lib/readiness/engine.test.ts",
     "test:adjust": "node lib/workouts/adjust.test.ts",
-    "test:scenarios": "node lib/ai/scenarios.test.ts"
+    "test:scenarios": "node lib/ai/scenarios.test.ts",
+    "test:export": "node lib/garmin/export-parse.test.ts",
+    "test:source": "node lib/readiness/source.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "fflate": "^0.8.2",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "react": "19.2.4",

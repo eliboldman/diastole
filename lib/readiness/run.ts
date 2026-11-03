@@ -1,5 +1,7 @@
 import "server-only";
 
+import { dominantFamily, oneFamily } from "@/lib/readiness/source";
+
 import { createAdminClient } from "@/lib/supabase/server";
 
 import { BASELINE_DAYS, computeReadiness, type ActivityLite, type WellnessDay } from "./engine";
@@ -33,9 +35,9 @@ export async function refreshReadiness(athleteId: string, date?: string) {
 
   // One source per athlete (HRV scales differ between Garmin and Apple): use whichever has more days.
   const rows = wellnessRows ?? [];
-  const garminDays = rows.filter((r) => r.source === "garmin").length;
-  const source = garminDays >= rows.length - garminDays ? "garmin" : "apple";
-  const wellness: WellnessDay[] = rows.filter((r) => r.source === source);
+  // Live Garmin and imported Garmin history count as one source.
+  const source = dominantFamily(rows);
+  const wellness: WellnessDay[] = oneFamily(rows, source);
 
   const activities: ActivityLite[] = (activityRows ?? []).map((a) => ({
     date: localDate(new Date(a.start_time), tz),

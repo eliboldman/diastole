@@ -121,6 +121,12 @@ export default async function MePage() {
         </section>
       )}
 
+      {device?.source === "garmin" && (
+        <Link href="/me/import" className="mt-6 inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
+          Import your Garmin history →
+        </Link>
+      )}
+
       <p className="mt-10 text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
     </AthleteShell>
   );

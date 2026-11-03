@@ -64,6 +64,9 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device connected"}
             {profile.email ? ` · ${profile.email}` : ""}
           </p>
+          <Link href={`/athlete/${profile.id}/import`} className="mt-1 inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
+            Import Garmin history →
+          </Link>
         </div>
         <FlagBadge flag={overall} large />
       </div>

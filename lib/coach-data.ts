@@ -1,5 +1,7 @@
 import "server-only";
 
+import { familyOf, oneFamily } from "@/lib/readiness/source";
+
 import type { Flag } from "@/lib/readiness/engine";
 import { localDate, refreshReadiness } from "@/lib/readiness/run";
 import { createClient } from "@/lib/supabase/server";
@@ -110,7 +112,7 @@ export async function getRoster(coachId: string): Promise<AthleteSummary[]> {
       isCoach: a.id === coachId,
       device: device ? { source: device.source, last_synced_at: device.last_synced_at } : null,
       readiness: readiness?.find((r) => r.athlete_id === a.id) ?? null,
-      trend: (wellness ?? []).filter((w) => w.athlete_id === a.id && w.source === source),
+      trend: oneFamily((wellness ?? []).filter((w) => w.athlete_id === a.id), familyOf(source)),
       lastActivity: activities?.find((x) => x.athlete_id === a.id) ?? null,
     };
   });
@@ -171,7 +173,7 @@ export async function getAthleteDetail(athleteId: string) {
     profile,
     device,
     readiness: (readiness ?? []) as ReadinessRow[],
-    trend: (wellness ?? []).filter((w) => w.source === source) as WellnessPoint[],
+    trend: oneFamily(wellness ?? [], familyOf(source)) as WellnessPoint[],
     activities: (activities ?? []) as ActivityRow[],
     workouts: workouts ?? [],
     removed: removed ?? [],
