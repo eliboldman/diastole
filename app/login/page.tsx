@@ -14,7 +14,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const profile = await getProfile();
-  if (profile) redirect(profile.role === "coach" ? "/dashboard" : "/connect");
+  if (profile) redirect(profile.role === "coach" ? "/dashboard" : "/me");
 
   const { error } = await searchParams;
 

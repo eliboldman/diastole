@@ -82,7 +82,7 @@ export default async function ConnectPage({
           {profile.role === "coach" ? (
             <Link href="/dashboard" className="hover:text-white/70">← Back to dashboard</Link>
           ) : (
-            <span>Signed in as {profile.email}</span>
+            <Link href="/me" className="hover:text-white/70">← My Diastole</Link>
           )}
           <form action="/auth/signout" method="post">
             <button className="hover:text-white/70">Sign out</button>

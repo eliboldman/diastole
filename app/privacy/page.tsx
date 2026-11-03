@@ -99,7 +99,18 @@ export default function PrivacyPage() {
 
         <Section title="Who can see your data">
           <p>
-            Only you and your coach. Each athlete can see only their own data. We use a small
+            You and your coach. Each athlete can see only their own data, with one exception you
+            control: pods.
+          </p>
+          <p>
+            <strong className="text-white/80">Pods:</strong> your coach may invite you to a pod, a
+            small group of athletes who see each other&apos;s training. Nothing is shared unless you
+            accept the invite. Once you accept, other members who have also accepted can see your
+            readiness flag and note, your HRV, resting heart rate, sleep and stress for the last 14
+            days, and your recent activities. They see your name, not your email. You can leave a pod
+            at any time, and sharing stops immediately.
+          </p>
+          <p> We use a small
             number of service providers to run {SITE.name}, who process data on our behalf and
             may not use it for anything else:
           </p>

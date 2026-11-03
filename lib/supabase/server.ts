@@ -64,6 +64,6 @@ export async function requireUser(): Promise<Profile> {
 
 export async function requireCoach(): Promise<Profile> {
   const profile = await requireUser();
-  if (profile.role !== "coach") redirect("/connect");
+  if (profile.role !== "coach") redirect("/me");
   return profile;
 }

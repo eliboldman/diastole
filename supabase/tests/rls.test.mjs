@@ -103,5 +103,57 @@ await db.exec(`select public.save_garmin_tokens('${A1}', 'acc', 'ref', now() + i
 const tok = (await db.query(`select * from public.get_garmin_tokens('${A1}')`)).rows;
 check("server can save and read tokens", tok[0]?.access_token === "acc");
 
+// ---------------------------------------------------------------- pods
+await db.exec("grant select, insert, update, delete on public.pods, public.pod_members to authenticated;");
+r = await as(COACH, "insert into public.pods (coach_id, name) values (auth.uid(), 'Tuesday Group') returning id");
+const POD = r.rows?.[0]?.id;
+check("coach can create a pod", Boolean(POD));
+r = await as(A1, `insert into public.pods (coach_id, name) values ('${A1}', 'mine') returning id`);
+check("athlete cannot create a pod", !!r.error);
+r = await as(COACH, `insert into public.pod_members (pod_id, athlete_id) values ('${POD}', '${A1}'), ('${POD}', '${A2}')`);
+check("coach can invite own athletes", !r.error);
+r = await as(COACH, `insert into public.pod_members (pod_id, athlete_id) values ('${POD}', '${STRANGER}')`);
+check("coach cannot invite someone else's athlete", !!r.error);
+r = await as(A1, `insert into public.pod_members (pod_id, athlete_id, status) values ('${POD}', '${A1}', 'active')`);
+check("athlete cannot add themselves as active", !!r.error);
+r = await as(A1, `update public.pod_members set status = 'active' where pod_id = '${POD}'`);
+check("athlete cannot flip status by direct update", !!r.error || (await db.query(`select status from public.pod_members where athlete_id='${A1}'`)).rows[0].status === "invited");
+
+r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
+check("invited (not accepted) athlete cannot read the feed", !r.error && r.rows[0].f === null);
+r = await as(A1, `select * from public.pods`);
+check("invited athlete can see the pod name", r.rows?.length === 1);
+r = await as(STRANGER, `select * from public.pods`);
+check("stranger cannot see the pod", r.rows?.length === 0);
+
+r = await as(A1, `select public.respond_to_pod('${POD}', 'accept')`);
+check("athlete can accept", !r.error);
+r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
+let feed = r.rows?.[0]?.f;
+check("feed shows only accepted members (A2 still invited)", feed?.members?.length === 1 && feed.members[0].is_me === true);
+check("feed never includes email", !JSON.stringify(feed ?? {}).includes("@x.com"));
+
+r = await as(A2, `select public.respond_to_pod('${POD}', 'accept')`);
+r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
+feed = r.rows?.[0]?.f;
+const a2 = feed?.members?.find((m) => m.id === A2);
+check("after both accept, A1 sees A2's wellness", a2?.wellness?.length >= 1);
+r = await as(A1, `select * from public.daily_wellness where athlete_id = '${A2}'`);
+check("pod membership does not open the base tables", r.rows?.length === 0);
+r = await as(STRANGER, `select public.get_pod_feed('${POD}') as f`);
+check("stranger cannot read the feed", !r.error && r.rows[0].f === null);
+r = await as(A1, `select public.respond_to_pod('${POD}', 'accept') as s`);
+check("cannot accept twice", r.rows?.[0]?.s === null);
+
+r = await as(A2, `select public.respond_to_pod('${POD}', 'leave')`);
+r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
+check("after A2 leaves, A1 no longer sees A2", !r.rows?.[0]?.f?.members?.some((m) => m.id === A2));
+r = await as(A2, `select public.get_pod_feed('${POD}') as f`);
+check("A2 who left can no longer read the feed", !r.error && r.rows[0].f === null);
+r = await as(COACH, `select public.reinvite_to_pod('${POD}', '${A2}')`);
+check("coach can re-invite", !r.error && (await db.query(`select status from public.pod_members where athlete_id='${A2}'`)).rows[0].status === "invited");
+r = await as(A1, `select public.reinvite_to_pod('${POD}', '${A2}') as ok`);
+check("athlete cannot re-invite", r.rows?.[0]?.ok === false);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
