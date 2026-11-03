@@ -23,7 +23,7 @@ const btn = "rounded-xl border px-3 py-1.5 text-sm transition-colors disabled:op
 const primary = `${btn} border-emerald-300/25 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/20`;
 const quiet = `${btn} border-white/10 text-white/60 hover:bg-white/[0.06] hover:text-white`;
 const field =
-  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none";
+  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 
 // ---------------------------------------------------------------- coach
 
@@ -48,7 +48,7 @@ export function NewPodForm() {
 export function InviteToPod({ podId, candidates }: { podId: string; candidates: { id: string; name: string }[] }) {
   const { pending, error, run } = useAction();
   const [picked, setPicked] = useState<string[]>([]);
-  if (!candidates.length) return <p className="text-sm text-white/35">Everyone on your roster is already in this pod.</p>;
+  if (!candidates.length) return <p className="text-sm text-white/50">Everyone on your roster is already in this pod.</p>;
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
@@ -81,7 +81,7 @@ export function InviteToPod({ podId, candidates }: { podId: string; candidates: 
 export function RemoveMember({ podId, athleteId }: { podId: string; athleteId: string }) {
   const { pending, run } = useAction();
   return (
-    <button disabled={pending} className="text-xs text-white/35 hover:text-red-300" onClick={() => run(() => removeFromPod(podId, athleteId))}>
+    <button disabled={pending} className="text-xs text-white/50 hover:text-red-300" onClick={() => run(() => removeFromPod(podId, athleteId))}>
       Remove
     </button>
   );
@@ -92,7 +92,7 @@ export function DeletePod({ podId, name }: { podId: string; name: string }) {
   return (
     <button
       disabled={pending}
-      className="text-xs text-white/35 hover:text-red-300"
+      className="text-xs text-white/50 hover:text-red-300"
       onClick={() => confirm(`Delete the pod "${name}"? Members stop seeing each other immediately.`) && run(() => deletePod(podId))}
     >
       Delete pod

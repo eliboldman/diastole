@@ -59,7 +59,7 @@ export default async function ConnectPage({
             body="Sign in with your Garmin Connect account and approve access to your health and activity data."
             disconnect={
               <form action="/api/garmin/disconnect" method="post">
-                <button className="text-sm text-white/40 hover:text-white/70">Disconnect Garmin</button>
+                <button className="text-sm text-white/55 hover:text-white/70">Disconnect Garmin</button>
               </form>
             }
             action={
@@ -78,7 +78,7 @@ export default async function ConnectPage({
           />
         </div>
 
-        <div className="mt-12 flex items-center justify-between text-sm text-white/40">
+        <div className="mt-12 flex items-center justify-between text-sm text-white/55">
           {profile.role === "coach" ? (
             <Link href="/dashboard" className="hover:text-white/70">← Back to dashboard</Link>
           ) : (
@@ -110,7 +110,7 @@ function DeviceCard({
   disconnect?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+    <div className="rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-medium">{title}</h2>
         {connected && (

@@ -19,13 +19,13 @@ export default async function AthletesPage() {
   return (
     <DashboardShell>
       <div className="relative z-10">
-        <p className="text-sm uppercase tracking-[0.25em] text-white/35">Roster</p>
+        <p className="text-sm uppercase tracking-[0.25em] text-white/50">Roster</p>
         <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Athletes</h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/55">
           Invite an athlete by email. They&apos;ll get a sign-in link, then connect their Garmin or Apple Watch.
         </p>
 
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+        <section className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
           <h2 className="mb-4 text-lg font-medium">Invite an athlete</h2>
           <InviteForm />
         </section>
@@ -41,15 +41,15 @@ export default async function AthletesPage() {
               >
                 <Link href={`/athlete/${a.id}`} className="hover:underline">
                   <p className="font-medium">
-                    {a.full_name || a.email} {isMe && <span className="text-sm text-white/35">(you)</span>}
+                    {a.full_name || a.email} {isMe && <span className="text-sm text-white/50">(you)</span>}
                   </p>
-                  <p className="text-sm text-white/40">{a.email}</p>
+                  <p className="text-sm text-white/55">{a.email}</p>
                 </Link>
                 <div className="flex items-center gap-2 text-sm">
                   <span
                     className={`h-2 w-2 rounded-full ${device ? "bg-emerald-300 glow-green" : "bg-white/25"}`}
                   />
-                  <span className={device ? "text-emerald-200" : "text-white/45"}>
+                  <span className={device ? "text-emerald-200" : "text-white/60"}>
                     {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device yet"}
                   </span>
                   {isMe && !device && (
@@ -61,7 +61,7 @@ export default async function AthletesPage() {
               </div>
             );
           })}
-          {!athletes?.length && <p className="text-white/40">No athletes yet.</p>}
+          {!athletes?.length && <p className="text-white/55">No athletes yet.</p>}
         </section>
       </div>
     </DashboardShell>

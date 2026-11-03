@@ -38,10 +38,10 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   return (
     <DashboardShell>
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workouts</h1>
-      <p className="mt-2 text-sm text-white/40">Every planned workout across your athletes. Filter, select, and clean up in bulk.</p>
+      <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, and clean up in bulk.</p>
 
-      <form className="mt-6 grid gap-2 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr_auto]">
-        <select name="athlete" defaultValue={sp.athlete ?? ""} className="min-h-12 rounded-2xl border border-white/10 bg-neutral-900 px-3 text-base sm:text-sm">
+      <form className="mt-6 grid gap-2 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr_auto]">
+        <select name="athlete" defaultValue={sp.athlete ?? ""} className="min-h-12 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:text-sm">
           <option value="">All athletes</option>
           {(athletes ?? []).map((a) => (
             <option key={a.id} value={a.id}>
@@ -55,7 +55,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           name="q"
           defaultValue={sp.q}
           placeholder="Search title"
-          className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base placeholder:text-white/30 sm:text-sm"
+          className="min-h-12 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-base placeholder:text-white/45 sm:text-sm"
         />
         <div className="flex gap-2">
           <button className="min-h-12 flex-1 rounded-2xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium active:scale-95">Filter</button>

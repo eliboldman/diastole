@@ -5,7 +5,7 @@ export const FLAG_STYLE: Record<Flag, { dot: string; glow: string; label: string
   green: { dot: "bg-emerald-300", glow: "glow-green", label: "Ready", text: "text-emerald-200" },
   yellow: { dot: "bg-amber-300", glow: "glow-yellow", label: "Caution", text: "text-amber-200" },
   red: { dot: "bg-red-400", glow: "glow-red", label: "Recover", text: "text-red-200" },
-  unknown: { dot: "bg-white/25", glow: "", label: "Building baseline", text: "text-white/45" },
+  unknown: { dot: "bg-white/25", glow: "", label: "Building baseline", text: "text-white/60" },
 };
 
 export const FLAG_ORDER: Record<Flag, number> = { red: 0, yellow: 1, green: 2, unknown: 3 };
@@ -34,7 +34,7 @@ export function FlagRow({ flags }: { flags: Record<(typeof AREAS)[number][0], Fl
       {AREAS.map(([key, label]) => {
         const s = FLAG_STYLE[flags[key]];
         return (
-          <div key={key} className="rounded-xl border border-white/[0.06] bg-black/30 px-2 py-2 text-center" title={`${label}: ${s.label}`}>
+          <div key={key} className="rounded-xl border border-white/[0.09] bg-white/[0.05] px-2 py-2 text-center" title={`${label}: ${s.label}`}>
             <span className={`mx-auto mb-1.5 block h-2 w-2 rounded-full ${s.dot}`} aria-hidden />
             <span className="block text-[11px] text-white/55">{label}</span>
             <span className="sr-only">{s.label}</span>

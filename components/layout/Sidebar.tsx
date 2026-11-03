@@ -33,7 +33,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop: slim sidebar that expands on hover */}
-      <aside className="group fixed left-6 top-6 z-50 hidden h-[calc(100vh-3rem)] w-16 overflow-hidden rounded-[32px] border border-white/10 bg-black/40 backdrop-blur-3xl transition-all duration-700 hover:w-60 hover:shadow-[0_0_80px_rgba(255,255,255,0.06)] md:block">
+      <aside className="group fixed left-6 top-6 z-50 hidden h-[calc(100vh-3rem)] w-16 overflow-hidden rounded-[32px] border border-white/10 bg-panel/60 backdrop-blur-3xl transition-all duration-700 hover:w-60 hover:shadow-[0_0_80px_rgba(255,255,255,0.06)] md:block">
         <div className="relative z-10 flex h-full flex-col p-4">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Image src="/logo.png" alt="Diastole" width={32} height={32} className="shrink-0 rounded-lg" />
@@ -65,19 +65,19 @@ export default function Sidebar() {
           </nav>
 
           <div className="mt-auto opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-            <SignOut className="w-full rounded-2xl px-3 py-2 text-left text-xs text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white" />
+            <SignOut className="w-full rounded-2xl px-3 py-2 text-left text-xs text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white" />
           </div>
         </div>
       </aside>
 
       {/* Mobile: top bar with tabs */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-neutral-950/85 backdrop-blur-2xl md:hidden">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-canvas/85 backdrop-blur-2xl md:hidden">
         <div className="flex items-center justify-between px-4 pt-3">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Image src="/logo.png" alt="" width={26} height={26} className="rounded-md" />
             <span className="text-sm font-semibold">Diastole</span>
           </Link>
-          <SignOut className="text-xs text-white/40" />
+          <SignOut className="text-xs text-white/55" />
         </div>
         <nav className="no-scrollbar flex gap-1 overflow-x-auto px-2 pb-2 pt-2">
           {navItems.map((item) => (

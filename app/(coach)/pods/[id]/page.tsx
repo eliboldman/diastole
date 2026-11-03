@@ -15,11 +15,11 @@ export default async function CoachPodFeedPage({ params }: { params: Promise<{ i
 
   return (
     <DashboardShell>
-      <Link href="/pods" className="text-sm text-white/45 hover:text-white">
+      <Link href="/pods" className="text-sm text-white/60 hover:text-white">
         ← Pods
       </Link>
       <h1 className="mt-4 text-4xl font-bold tracking-tight">{feed.pod.name}</h1>
-      <p className="mt-2 text-sm text-white/40">This is what members who have accepted see of each other.</p>
+      <p className="mt-2 text-sm text-white/55">This is what members who have accepted see of each other.</p>
       <div className="mt-8">
         <PodFeed feed={feed} timeZone={coach.timezone} />
       </div>

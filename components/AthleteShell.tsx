@@ -6,8 +6,8 @@ import PhysiologyBackground from "@/components/PhysiologyBackground";
 
 export default function AthleteShell({ children, isCoach = false }: { children: ReactNode; isCoach?: boolean }) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 text-white">
-      <PhysiologyBackground variant="atmosphere" systemTone="green" stressOpacity={0.08} />
+    <main className="relative min-h-screen overflow-hidden app-canvas text-white">
+      <PhysiologyBackground variant="atmosphere" systemTone="green" stressOpacity={0.15} />
       <div className="page-breathe-in relative z-10 mx-auto max-w-5xl px-4 py-6 sm:px-8">
         <header className="flex items-center justify-between gap-4">
           <Link href="/me" className="flex items-center gap-3">

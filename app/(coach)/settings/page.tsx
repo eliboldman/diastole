@@ -23,15 +23,15 @@ export default async function SettingsPage() {
 
   return (
     <DashboardShell>
-      <p className="text-sm uppercase tracking-[0.25em] text-white/35">Account</p>
+      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Account</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Settings</h1>
 
-      <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+      <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="mb-4 text-lg font-medium">Profile</h2>
         <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} />
       </section>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="mb-1 text-lg font-medium">Coaching assistant</h2>
         <p className="mb-4 text-sm text-white/50">
           Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. Their
@@ -40,7 +40,7 @@ export default async function SettingsPage() {
         <AiSettingsForm enabled={ai.ai_enabled} model={ai.ai_model} cap={Number(ai.ai_monthly_cap_usd)} spent={spent} />
       </section>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="text-lg font-medium">Your own watch</h2>
         <p className="mt-2 text-sm text-white/55">You&apos;re also an athlete on your roster, so your own data shows on Today.</p>
         <Link href="/connect" className="mt-4 inline-block text-sm text-emerald-200 hover:underline">

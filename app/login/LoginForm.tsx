@@ -6,7 +6,7 @@ import { useActionState } from "react";
 import { signInWithPassword, signInWithProvider, type LoginState } from "./actions";
 
 const input =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none";
+  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 
 // Providers appear once they're configured in Supabase: NEXT_PUBLIC_AUTH_PROVIDERS="google,apple".
 const providers = (process.env.NEXT_PUBLIC_AUTH_PROVIDERS ?? "")
@@ -36,7 +36,7 @@ export default function LoginForm() {
               </button>
             ))}
           </form>
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-white/30">
+          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-white/45">
             <span className="h-px flex-1 bg-white/10" />
             or
             <span className="h-px flex-1 bg-white/10" />

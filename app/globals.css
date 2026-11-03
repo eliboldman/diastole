@@ -1,14 +1,113 @@
 @import "tailwindcss";
 
+/* Design tokens. The canvas is a deep green-slate rather than pure black, so cards and
+   glows read softer and the page feels lit rather than empty. */
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-canvas: #0d1513;
+  --color-panel: #15201d;
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 :root {
-  --background: #090909;
-  --foreground: #ffffff;
+  --background: #0d1513;
+  --foreground: #f4f7f5;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -0.005em;
+}
+
+/* Lit canvas: a soft glow from above plus a faint warm wash low on the page. */
+.app-canvas {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(1100px 520px at 50% -8%, rgba(110, 231, 183, 0.11), transparent 70%),
+    radial-gradient(900px 600px at 100% 110%, rgba(125, 211, 252, 0.06), transparent 70%);
+}
+
+/* Every press gets a small, quick give. Lives in the base layer so Tailwind utilities still win. */
+@layer base {
+  button,
+  summary,
+  [role="button"] {
+    transition:
+      transform 160ms var(--ease-soft),
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease,
+      box-shadow 200ms ease,
+      opacity 200ms ease;
+  }
+  button:not(:disabled):active,
+  summary:active {
+    transform: scale(0.97);
+  }
+  :focus-visible {
+    outline: 2px solid rgba(110, 231, 183, 0.55);
+    outline-offset: 2px;
+  }
+}
+
+/* Cards that respond to the pointer: lift, brighten the edge, soft shadow. */
+.lift {
+  transition:
+    transform 260ms var(--ease-soft),
+    border-color 260ms ease,
+    background-color 260ms ease,
+    box-shadow 260ms ease;
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 18px 50px -24px rgba(110, 231, 183, 0.25);
+  }
+}
+.lift:active {
+  transform: scale(0.99);
+}
+
+/* Children fade up one after another on load. */
+.stagger > * {
+  animation: rowIn 420ms var(--ease-soft) both;
+}
+.stagger > *:nth-child(2) { animation-delay: 50ms; }
+.stagger > *:nth-child(3) { animation-delay: 100ms; }
+.stagger > *:nth-child(4) { animation-delay: 150ms; }
+.stagger > *:nth-child(5) { animation-delay: 200ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+/* Fresh-data indicator: a dot with a ring that ripples outward. */
+@keyframes liveRipple {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: rgb(110, 231, 183);
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: liveRipple 2.4s ease-out infinite;
 }
 
 @keyframes breathe {
@@ -432,3 +531,42 @@ body {
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *, .live-dot::after, .lift { animation: none; transition: none; }
+  button:not(:disabled):active, summary:active, .lift:hover { transform: none; }
+}
+
+/* ---- Breathing background clouds (transform + opacity only: GPU-friendly) */
+@keyframes cloudBreathe {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  40% { transform: scale(1.1); opacity: 1; }   /* inhale */
+  52% { transform: scale(1.1); opacity: 1; }   /* brief hold */
+  100% { transform: scale(0.9); opacity: 0.6; } /* long exhale */
+}
+.cloud-breathe {
+  animation: cloudBreathe 10s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes cloudDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(4vw, -3vh, 0); }
+  66% { transform: translate3d(-2vw, 3vh, 0); }
+}
+@keyframes cloudDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-5vw, 4vh, 0); }
+}
+@keyframes cloudDriftC {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  40% { transform: translate3d(3vw, -4vh, 0); }
+  75% { transform: translate3d(-4vw, -1vh, 0); }
+}
+.cloud-drift-a { animation: cloudDriftA 58s ease-in-out infinite; will-change: transform; }
+.cloud-drift-b { animation: cloudDriftB 71s ease-in-out infinite; will-change: transform; }
+.cloud-drift-c { animation: cloudDriftC 64s ease-in-out infinite; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud-breathe, .cloud-drift-a, .cloud-drift-b, .cloud-drift-c { animation: none; }
+}

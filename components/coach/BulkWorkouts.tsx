@@ -49,7 +49,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
 
   return (
     <section className="mt-6">
-      <div className="sticky top-2 z-30 flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-neutral-950/90 px-3 py-2 backdrop-blur-xl">
+      <div className="sticky top-2 z-30 flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-canvas/90 px-3 py-2 backdrop-blur-xl">
         <label className="flex min-h-11 items-center gap-3 px-1 text-sm text-white/70">
           <input
             type="checkbox"
@@ -69,23 +69,23 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
       </div>
 
       {workouts.length === 0 ? (
-        <p className="mt-6 text-sm text-white/40">No workouts match.</p>
+        <p className="mt-6 text-sm text-white/55">No workouts match.</p>
       ) : (
         <ul className="mt-2">
           {workouts.map((w) => (
-            <li key={w.id} className="row-in flex items-center gap-2 border-b border-white/[0.06]">
+            <li key={w.id} className="row-in flex items-center gap-2 border-b border-white/[0.09]">
               <label className="flex h-12 w-11 shrink-0 cursor-pointer items-center justify-center">
                 <input type="checkbox" checked={selected.has(w.id)} onChange={() => toggle(w.id)} className="h-5 w-5 accent-emerald-300" aria-label={`Select ${w.title}`} />
               </label>
               <Link href={`/athlete/${w.athlete_id}/workouts/${w.id}`} className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 py-2 text-sm">
                 <span className="min-w-0">
                   <span className="block truncate">{w.title}</span>
-                  <span className="text-xs text-white/40">
+                  <span className="text-xs text-white/55">
                     {w.athleteName} ·{" "}
                     {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   </span>
                 </span>
-                <span className={`shrink-0 text-xs uppercase tracking-wider ${w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/40" : "text-amber-200/80"}`}>
+                <span className={`shrink-0 text-xs uppercase tracking-wider ${w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"}`}>
                   {w.status}
                 </span>
               </Link>
@@ -96,7 +96,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
 
       {confirming && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-          <div className="toast-in w-full max-w-sm rounded-[28px] border border-white/10 bg-neutral-950 p-6">
+          <div className="toast-in w-full max-w-sm rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium">
               Delete {selected.size} workout{selected.size === 1 ? "" : "s"}?
             </h3>

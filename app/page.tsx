@@ -59,11 +59,11 @@ export default function Home() {
         </Link>
       </section>
 
-      <section className="mt-24 grid gap-4 sm:grid-cols-3">
+      <section className="stagger mt-24 grid gap-4 sm:grid-cols-3">
         {steps.map((step) => (
           <div
             key={step.title}
-            className="rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl"
+            className="lift rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl"
           >
             <span className={`mb-5 block h-2.5 w-2.5 rounded-full ${dot[step.tone]}`} />
             <h2 className="mb-2 text-lg font-medium">{step.title}</h2>
@@ -72,7 +72,7 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="mt-16 rounded-[28px] border border-white/10 bg-white/[0.02] p-6 text-sm leading-relaxed text-white/55 sm:p-8">
+      <section className="mt-16 rounded-[28px] border border-white/10 bg-white/[0.045] p-6 text-sm leading-relaxed text-white/55 sm:p-8">
         <h2 className="mb-2 text-base font-medium text-white">Your data stays yours</h2>
         <p>
           {SITE.name} is used by invited athletes and their coach. Health data is only visible to

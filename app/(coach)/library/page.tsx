@@ -23,7 +23,7 @@ export default async function LibraryPage() {
   return (
     <DashboardShell>
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workout library</h1>
-      <p className="mt-2 text-sm text-white/40">
+      <p className="mt-2 text-sm text-white/55">
         Every workout you build is saved here. Assign one to any athlete as a draft, then approve and send as usual.
       </p>
       <Library

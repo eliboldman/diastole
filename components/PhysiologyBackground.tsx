@@ -72,33 +72,38 @@ export default function PhysiologyBackground({
     );
   }
 
-  const blobClass =
+  // Breathing clouds: soft radial gradients (no blur filter, so phones stay smooth) that swell
+  // and settle about six times a minute, each slightly out of phase, while drifting very slowly.
+  const primary =
     activeTone === "green"
-      ? "bg-emerald-400"
+      ? "74,222,128"
       : activeTone === "yellow"
-        ? "bg-orange-300"
+        ? "253,186,116"
         : activeTone === "blue"
-          ? "bg-sky-300"
-          : "bg-red-400";
+          ? "125,211,252"
+          : "248,113,113";
+  const o = Math.min(1, stressOpacity * 3.2);
+  const clouds = [
+    { rgb: primary, a: 0.55 * o, size: "46rem", pos: "left-[-14%] top-[-18%]", drift: "cloud-drift-a", delay: "0s" },
+    { rgb: "125,211,252", a: 0.32 * o, size: "38rem", pos: "right-[-16%] top-[12%]", drift: "cloud-drift-b", delay: "-3.3s" },
+    { rgb: "45,212,191", a: 0.3 * o, size: "52rem", pos: "left-[22%] bottom-[-30%]", drift: "cloud-drift-c", delay: "-6.6s" },
+    { rgb: "253,224,200", a: 0.12 * o, size: "30rem", pos: "right-[8%] bottom-[-8%]", drift: "cloud-drift-a", delay: "-1.7s" },
+  ];
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        className={`background-blob absolute left-[-12%] top-[-12%] h-[30rem] w-[30rem] rounded-full ${blobClass} blur-3xl`}
-        style={{ opacity: stressOpacity }}
-      />
-
-      <div
-        className={`background-blob-slow absolute right-[-14%] top-[18%] h-[26rem] w-[26rem] rounded-full ${blobClass} blur-3xl`}
-        style={{ opacity: stressOpacity * 0.7 }}
-      />
-
-      <div
-        className={`background-blob absolute bottom-[-16%] left-[35%] h-[34rem] w-[34rem] rounded-full ${blobClass} blur-3xl`}
-        style={{ opacity: stressOpacity * 1.15 }}
-      />
-
-      <div className="absolute inset-0 opacity-[0.08] neural-grid" />
+    <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+      {clouds.map((c, i) => (
+        <div key={i} className={`absolute ${c.pos} ${c.drift}`} style={{ width: c.size, height: c.size }}>
+          <div
+            className="cloud-breathe h-full w-full rounded-full"
+            style={{
+              background: `radial-gradient(closest-side, rgba(${c.rgb},${c.a.toFixed(3)}), rgba(${c.rgb},${(c.a * 0.35).toFixed(3)}) 55%, transparent)`,
+              animationDelay: c.delay,
+            }}
+          />
+        </div>
+      ))}
+      <div className="absolute inset-0 opacity-[0.03] neural-grid" />
     </div>
   );
 }

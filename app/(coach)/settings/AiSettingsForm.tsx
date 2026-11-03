@@ -28,7 +28,7 @@ export default function AiSettingsForm({ enabled, model, cap, spent }: { enabled
       </label>
       <label className="grid gap-2 text-sm text-white/60">
         Model
-        <select className={`${field} bg-neutral-900`} value={m} onChange={(e) => setM(e.target.value)}>
+        <select className={`${field} bg-panel`} value={m} onChange={(e) => setM(e.target.value)}>
           {MODELS.map(([v, l]) => (
             <option key={v} value={v}>
               {l}
@@ -39,7 +39,7 @@ export default function AiSettingsForm({ enabled, model, cap, spent }: { enabled
       <label className="grid gap-2 text-sm text-white/60">
         Monthly spending cap (USD)
         <input className={field} type="number" min={0} max={100} step={0.5} value={c} onChange={(e) => setC(e.target.value)} />
-        <span className="text-xs text-white/35">
+        <span className="text-xs text-white/50">
           ${spent.toFixed(2)} spent this month. The assistant stops for the rest of the month once the cap is reached.
         </span>
       </label>

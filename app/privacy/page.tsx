@@ -32,7 +32,7 @@ export default function PrivacyPage() {
         <h1 className="mt-3 text-3xl font-medium tracking-tight text-white sm:text-4xl">
           How {SITE.name} handles your data
         </h1>
-        <p className="mt-3 text-white/40">Effective {SITE.privacyEffectiveDate}</p>
+        <p className="mt-3 text-white/55">Effective {SITE.privacyEffectiveDate}</p>
 
         <Section title="Who we are">
           <p>

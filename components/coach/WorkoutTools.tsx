@@ -86,7 +86,7 @@ export default function WorkoutTools({
   return (
     <div className="grid gap-4">
       {/* Quick adjust */}
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Quick adjust</h2>
           <div role="radiogroup" aria-label="What to adjust" className="flex rounded-2xl border border-white/10 p-1 text-xs">
@@ -154,12 +154,12 @@ export default function WorkoutTools({
       {/* Adjust preview */}
       {preview && adjusted && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-          <div className="toast-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white/10 bg-neutral-950 p-6">
+          <div className="toast-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium capitalize">{describeAdjustment(preview)}</h3>
             <p className="mt-1 text-sm text-white/50">Only Active and Interval steps change.</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="mb-1 text-xs uppercase tracking-wider text-white/40">Now</p>
+                <p className="mb-1 text-xs uppercase tracking-wider text-white/55">Now</p>
                 <ol className="list-decimal space-y-1 pl-5 text-sm text-white/55">
                   {before.map((l, i) => (
                     <li key={i}>{l}</li>
@@ -178,7 +178,7 @@ export default function WorkoutTools({
               </div>
             </div>
             {adjustmentNotes(workout.steps, preview).map((n) => (
-              <p key={n} className="mt-3 text-xs text-white/45">
+              <p key={n} className="mt-3 text-xs text-white/60">
                 {n}
               </p>
             ))}
@@ -202,7 +202,7 @@ export default function WorkoutTools({
       {/* Reschedule */}
       {moving && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-          <div className="toast-in w-full max-w-sm rounded-[28px] border border-white/10 bg-neutral-950 p-6">
+          <div className="toast-in w-full max-w-sm rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium">Move “{workout.title}”</h3>
             <input
               type="date"

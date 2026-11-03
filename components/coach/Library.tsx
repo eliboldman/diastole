@@ -58,12 +58,12 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
   return (
     <div className="mt-6">
       <div className="relative">
-        <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+        <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search titles and tags"
-          className="min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-11 pr-4 text-base placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none"
+          className="min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-11 pr-4 text-base placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none"
         />
       </div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -81,17 +81,17 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
       </div>
 
       {shown.length === 0 ? (
-        <p className="mt-8 text-sm text-white/40">
+        <p className="mt-8 text-sm text-white/55">
           {items.length ? "Nothing matches." : "Your library is empty. Workouts you create in the builder show up here automatically."}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3 lg:grid-cols-2">
           {shown.map((i) => (
-            <li key={i.id} className="row-in rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <li key={i.id} className="row-in rounded-[24px] border border-white/10 bg-white/[0.055] p-4">
               <div className="flex items-start justify-between gap-3">
                 <button onClick={() => setOpen(open === i.id ? null : i.id)} className="min-w-0 text-left">
                   <p className="truncate font-medium">{i.title}</p>
-                  <p className="mt-0.5 text-xs text-white/40">
+                  <p className="mt-0.5 text-xs text-white/55">
                     <span className="capitalize">{i.sport}</span> · <span className="capitalize">{i.workout_type}</span>
                     {i.use_count ? ` · used ${i.use_count}×` : ""}
                   </p>
@@ -117,7 +117,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
                 </div>
               )}
               {open === i.id && (
-                <div className="mt-4 grid gap-3 border-t border-white/[0.06] pt-4 text-sm">
+                <div className="mt-4 grid gap-3 border-t border-white/[0.09] pt-4 text-sm">
                   <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
                     {describe(i.steps).map((l, k) => (
                       <li key={k}>{l}</li>
@@ -128,7 +128,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
                       defaultValue={i.workout_type}
                       onChange={(e) => save(i.id, { workout_type: e.target.value })}
                       aria-label="Workout type"
-                      className="min-h-11 rounded-2xl border border-white/10 bg-neutral-900 px-3 capitalize"
+                      className="min-h-11 rounded-2xl border border-white/10 bg-panel px-3 capitalize"
                     >
                       {TYPES.map((t) => (
                         <option key={t} value={t}>
@@ -143,7 +143,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
                         const tags = e.target.value.split(",");
                         if (tags.join(",").trim() !== i.tags.join(",")) save(i.id, { tags });
                       }}
-                      className="min-h-11 rounded-2xl border border-white/10 bg-white/[0.04] px-3 placeholder:text-white/30"
+                      className="min-h-11 rounded-2xl border border-white/10 bg-white/[0.04] px-3 placeholder:text-white/45"
                     />
                   </div>
                   <button
@@ -155,7 +155,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
                         show(r.ok ? "Removed from library." : r.error, { ok: r.ok });
                       })
                     }
-                    className="min-h-11 justify-self-start text-sm text-white/35 hover:text-red-300"
+                    className="min-h-11 justify-self-start text-sm text-white/50 hover:text-red-300"
                   >
                     Remove from library
                   </button>
@@ -168,7 +168,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
 
       {assigning && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-          <div className="toast-in max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[28px] border border-white/10 bg-neutral-950 p-6">
+          <div className="toast-in max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium">Assign “{assigning.title}”</h3>
             <p className="mt-1 text-sm text-white/50">Creates a draft for each athlete. Nothing is sent until you approve it.</p>
             <div className="mt-4 flex flex-wrap gap-2">

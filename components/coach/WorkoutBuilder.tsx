@@ -61,8 +61,8 @@ const INTENSITIES: [Intensity, string][] = [
 ];
 
 const field =
-  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none";
-const sel = `${field} bg-neutral-900`;
+  "rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
+const sel = `${field} bg-panel`;
 
 // ---------- one step editor
 function StepEditor({
@@ -81,7 +81,7 @@ function StepEditor({
   const set = (patch: Partial<Extract<UiStep, { kind: "step" }>>) => onChange({ ...step, ...patch });
 
   return (
-    <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-black/30 p-3 sm:grid-cols-[auto_auto_1fr_auto]">
+    <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-3 sm:grid-cols-[auto_auto_1fr_auto]">
       <select className={sel} value={step.intensity} onChange={(e) => set({ intensity: e.target.value as Intensity })}>
         {INTENSITIES.map(([v, l]) => (
           <option key={v} value={v}>
@@ -176,7 +176,7 @@ function StepEditor({
         )}
       </div>
 
-      <button type="button" onClick={onRemove} className="justify-self-end text-xs text-white/35 hover:text-red-300" aria-label="Remove step">
+      <button type="button" onClick={onRemove} className="justify-self-end text-xs text-white/50 hover:text-red-300" aria-label="Remove step">
         Remove
       </button>
 
@@ -303,7 +303,7 @@ export default function WorkoutBuilder({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Steps</h2>
         {sport === "run" && (
-          <label className="flex items-center gap-2 text-xs text-white/45">
+          <label className="flex items-center gap-2 text-xs text-white/60">
             Pace in
             <select className={sel} value={paceUnit} onChange={(e) => setPaceUnit(e.target.value as "mi")}>
               <option value="mi">min/mi</option>
@@ -332,7 +332,7 @@ export default function WorkoutBuilder({
                   />
                   times
                 </label>
-                <button type="button" className="text-xs text-white/35 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
+                <button type="button" className="text-xs text-white/50 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
                   Remove repeat
                 </button>
               </div>
@@ -399,7 +399,7 @@ export default function WorkoutBuilder({
             <button
               disabled={pending}
               onClick={() => run(() => deleteDraft(id, athleteId), () => router.push(`/athlete/${athleteId}`))}
-              className="ml-auto text-sm text-white/35 hover:text-red-300"
+              className="ml-auto text-sm text-white/50 hover:text-red-300"
             >
               Delete draft
             </button>
@@ -418,7 +418,7 @@ export default function WorkoutBuilder({
 
       {confirming && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-neutral-950 p-6">
+          <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium">Send this workout?</h3>
             <p className="mt-2 text-sm text-white/60">
               <strong className="text-white">{title || "Untitled"}</strong> ({sport}) on{" "}

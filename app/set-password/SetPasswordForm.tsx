@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { setPassword, type PasswordState } from "@/app/login/actions";
 
 const input =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none";
+  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 
 export default function SetPasswordForm({ email }: { email: string }) {
   const [state, action, pending] = useActionState<PasswordState, FormData>(setPassword, {});

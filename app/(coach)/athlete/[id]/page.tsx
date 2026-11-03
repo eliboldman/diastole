@@ -53,14 +53,14 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   return (
     <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"}>
-      <Link href="/dashboard" className="text-sm text-white/45 hover:text-white">
+      <Link href="/dashboard" className="text-sm text-white/60 hover:text-white">
         ← Today
       </Link>
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight">{profile.full_name || profile.email}</h1>
-          <p className="mt-2 text-sm text-white/40">
+          <p className="mt-2 text-sm text-white/55">
             {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device connected"}
             {profile.email ? ` · ${profile.email}` : ""}
           </p>
@@ -68,13 +68,13 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
         <FlagBadge flag={overall} large />
       </div>
 
-      <section className="mt-8 rounded-[28px] border border-white/10 bg-black/30 p-6 backdrop-blur-xl">
+      <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
         <p className="text-lg leading-relaxed text-white/80">{today?.note ?? "No readiness yet — waiting for data."}</p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {(["recovery", "sleep", "stress", "load"] as const).map((key) => {
             const flag: Flag = today?.[key] ?? "unknown";
             return (
-              <div key={key} className="rounded-2xl border border-white/[0.06] bg-black/30 p-4">
+              <div key={key} className="rounded-2xl border border-white/[0.09] bg-white/[0.05] p-4">
                 <div className="flex items-center justify-between">
                   <p className="font-medium capitalize">{key}</p>
                   <span className={`inline-flex items-center gap-2 text-sm ${FLAG_STYLE[flag].text}`}>
@@ -83,14 +83,14 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-white/60">{detailLine(key, today?.details) ?? "—"}</p>
-                <p className="mt-2 text-xs text-white/30">{AREA_HELP[key]}</p>
+                <p className="mt-2 text-xs text-white/45">{AREA_HELP[key]}</p>
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
         <h2 className="text-lg font-medium">Last 14 days</h2>
         <div className="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4">
           <Sparkline label="HRV" points={lastNDays(trend, "hrv_ms")} format={fmt.hrv} width={150} height={40} />
@@ -108,15 +108,15 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
           <h2 className="text-lg font-medium">Recent training</h2>
           {activities.length === 0 ? (
-            <p className="mt-3 text-sm text-white/40">No activities yet.</p>
+            <p className="mt-3 text-sm text-white/55">No activities yet.</p>
           ) : (
             <table className="mt-3 w-full text-sm">
               <tbody>
                 {activities.map((a) => (
-                  <tr key={a.id} className="border-t border-white/[0.06]">
+                  <tr key={a.id} className="border-t border-white/[0.09]">
                     <td className="py-2 pr-3 text-white/50">
                       {new Date(a.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: profile.timezone })}
                     </td>
@@ -133,7 +133,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           )}
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium">Planned workouts</h2>
             <Link

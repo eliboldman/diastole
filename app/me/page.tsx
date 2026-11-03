@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import SyncedAgo from "@/components/SyncedAgo";
+
 import AthleteShell from "@/components/AthleteShell";
 import { FlagBadge, FlagRow } from "@/components/coach/Flags";
 import { RespondToInvite } from "@/components/PodButtons";
@@ -46,7 +48,7 @@ export default async function MePage() {
               <li key={s}>{s}</li>
             ))}
           </ul>
-          <p className="mt-2 text-sm text-white/45">You&apos;ll see theirs too. Your email isn&apos;t shared. You can leave anytime.</p>
+          <p className="mt-2 text-sm text-white/60">You&apos;ll see theirs too. Your email isn&apos;t shared. You can leave anytime.</p>
           <div className="mt-4">
             <RespondToInvite podId={inv.pod_id} />
           </div>
@@ -54,7 +56,7 @@ export default async function MePage() {
       ))}
 
       {!device && (
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.035] p-6">
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6">
           <p className="text-white/70">Connect your watch so your coach can see how you&apos;re recovering.</p>
           <Link href="/connect" className="mt-3 inline-block text-emerald-200 hover:underline">
             Connect Garmin or Apple Watch →
@@ -62,8 +64,15 @@ export default async function MePage() {
         </section>
       )}
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-black/30 p-6 backdrop-blur-xl">
-        <FlagBadge flag={(readiness?.overall as Flag) ?? "unknown"} large />
+      <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <FlagBadge flag={(readiness?.overall as Flag) ?? "unknown"} large />
+          {device && (
+            <span className="text-xs text-white/55">
+              {device.source === "garmin" ? "Garmin" : "Apple Watch"} · <SyncedAgo at={device.last_synced_at} />
+            </span>
+          )}
+        </div>
         <p className="mt-3 text-white/70">{readiness?.note ?? "Waiting for your first data."}</p>
         {readiness && (
           <div className="mt-4 max-w-md">
@@ -72,32 +81,32 @@ export default async function MePage() {
         )}
       </section>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+      <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
         <h2 className="text-lg font-medium">Coming up</h2>
         {!workouts?.length ? (
-          <p className="mt-2 text-sm text-white/40">No workouts scheduled.</p>
+          <p className="mt-2 text-sm text-white/55">No workouts scheduled.</p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {workouts.map((w) => (
-              <li key={w.id} className="flex justify-between gap-3 border-t border-white/[0.06] pt-2">
+              <li key={w.id} className="flex justify-between gap-3 border-t border-white/[0.09] pt-2">
                 <span>
                   <span className="text-white/50">
                     {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   </span>{" "}
                   {w.title}
                 </span>
-                <span className="text-xs uppercase tracking-wider text-white/40">{w.sport}</span>
+                <span className="text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
               </li>
             ))}
           </ul>
         )}
         {device?.source === "garmin" && workouts?.length ? (
-          <p className="mt-3 text-xs text-white/35">These are on your Garmin calendar after your watch syncs.</p>
+          <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
         ) : null}
       </section>
 
       {pods.length > 0 && (
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
+        <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
           <h2 className="text-lg font-medium">My pods</h2>
           <ul className="mt-3 space-y-2">
             {pods.map((p) => (
@@ -112,7 +121,7 @@ export default async function MePage() {
         </section>
       )}
 
-      <p className="mt-10 text-xs text-white/30">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
+      <p className="mt-10 text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
     </AthleteShell>
   );
 }

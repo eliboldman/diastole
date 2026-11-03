@@ -23,9 +23,9 @@ export default function Sparkline({
   if (valid.length < 2) {
     return (
       <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-[0.15em] text-white/35">{label}</p>
+        <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">{label}</p>
         <p className="mt-1 text-sm text-white/70">{latest ? format(latest.value) : "—"}</p>
-        <p className="text-[11px] text-white/30">{valid.length ? "trend after 2 days" : "no data yet"}</p>
+        <p className="text-[11px] text-white/45">{valid.length ? "trend after 2 days" : "no data yet"}</p>
       </div>
     );
   }
@@ -51,7 +51,7 @@ export default function Sparkline({
 
   return (
     <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-[0.15em] text-white/35">{label}</p>
+      <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">{label}</p>
       <div className="mt-1 flex items-end gap-3">
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}, last ${points.length} days`} className="shrink-0 overflow-visible">
           {segments.map((s) => (

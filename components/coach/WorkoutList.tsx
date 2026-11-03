@@ -59,11 +59,11 @@ export default function WorkoutList({
   return (
     <>
       {visible.length === 0 ? (
-        <p className="mt-3 text-sm text-white/40">Nothing scheduled.</p>
+        <p className="mt-3 text-sm text-white/55">Nothing scheduled.</p>
       ) : (
         <ul className="mt-3 space-y-1 text-sm">
           {visible.map((w) => (
-            <li key={w.id} className="row-in flex items-center gap-1 border-t border-white/[0.06]">
+            <li key={w.id} className="row-in flex items-center gap-1 border-t border-white/[0.09]">
               <Link
                 href={`/athlete/${athleteId}/workouts/${w.id}`}
                 className="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-2 py-2 transition active:scale-[0.99] hover:bg-white/[0.04]"
@@ -73,7 +73,7 @@ export default function WorkoutList({
                 </span>
                 <span
                   className={`shrink-0 text-xs uppercase tracking-wider ${
-                    w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/40" : "text-amber-200/80"
+                    w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"
                   }`}
                 >
                   {w.status}
@@ -82,7 +82,7 @@ export default function WorkoutList({
               <button
                 onClick={() => remove(w)}
                 aria-label={`Delete ${w.title}`}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/35 transition active:scale-90 hover:bg-red-400/10 hover:text-red-300"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition active:scale-90 hover:bg-red-400/10 hover:text-red-300"
               >
                 <Trash2 size={18} />
               </button>
@@ -93,17 +93,17 @@ export default function WorkoutList({
 
       {removed.length > 0 && (
         <details className="mt-5 text-sm">
-          <summary className="cursor-pointer select-none py-2 text-white/45 hover:text-white/70">
+          <summary className="cursor-pointer select-none py-2 text-white/60 hover:text-white/70">
             Recently removed ({removed.length})
           </summary>
           <ul className="mt-1 space-y-1">
             {removed.map((w) => (
-              <li key={w.id} className="flex min-h-11 items-center justify-between gap-3 border-t border-white/[0.06] px-2 py-2">
+              <li key={w.id} className="flex min-h-11 items-center justify-between gap-3 border-t border-white/[0.09] px-2 py-2">
                 <span className="min-w-0">
                   <span className="block truncate text-white/50 line-through decoration-white/20">
                     {day(w.scheduled_date)} {w.title}
                   </span>
-                  <span className={`text-xs ${w.removal_status === "failed" ? "text-red-300" : "text-white/35"}`}>
+                  <span className={`text-xs ${w.removal_status === "failed" ? "text-red-300" : "text-white/50"}`}>
                     {removalLabel(w.removal_status, device)}
                     {w.removal_error ? `: ${w.removal_error}` : ""}
                   </span>

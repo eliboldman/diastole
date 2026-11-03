@@ -26,7 +26,7 @@ export default function ResetForm() {
         required
         autoComplete="email"
         placeholder="you@example.com"
-        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none"
+        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-base text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none"
       />
       {state.error && <p className="text-sm text-red-300">{state.error}</p>}
       <button

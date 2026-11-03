@@ -74,13 +74,13 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
 
   return (
     <DashboardShell>
-      <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center text-sm text-white/45 hover:text-white">
+      <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
         ← {name}
       </Link>
       <h1 className={`mt-2 text-3xl font-bold tracking-tight sm:text-4xl ${w?.deleted_at ? "text-white/50 line-through decoration-white/20" : ""}`}>
         {w ? w.title : "New workout"}
       </h1>
-      <p className="mt-2 text-sm text-white/40">For {name}. Drafts stay private until you approve and send.</p>
+      <p className="mt-2 text-sm text-white/55">For {name}. Drafts stay private until you approve and send.</p>
 
       {w && (
         <div className="mt-6">
@@ -103,7 +103,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
       )}
 
       {!w?.deleted_at && (
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 sm:p-6">
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:p-6">
           <WorkoutBuilder athleteId={id} athleteName={firstName} device={source} initial={initial} />
         </section>
       )}

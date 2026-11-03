@@ -10,8 +10,8 @@ export const metadata: Metadata = { title: "Pods · Diastole" };
 const STATUS: Record<string, string> = {
   active: "text-emerald-200",
   invited: "text-amber-200/80",
-  declined: "text-white/35",
-  left: "text-white/35",
+  declined: "text-white/50",
+  left: "text-white/50",
 };
 
 export default async function PodsPage() {
@@ -29,14 +29,14 @@ export default async function PodsPage() {
 
   return (
     <DashboardShell>
-      <p className="text-sm uppercase tracking-[0.25em] text-white/35">Groups</p>
+      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Groups</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Pods</h1>
       <p className="mt-4 max-w-2xl text-white/55">
         Athletes in a pod see each other&apos;s readiness, health numbers and training, but only after each one accepts the
         invite. Anyone can leave at any time.
       </p>
 
-      <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.035] p-6 backdrop-blur-2xl">
+      <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="mb-4 text-lg font-medium">New pod</h2>
         <NewPodForm />
       </section>
@@ -48,7 +48,7 @@ export default async function PodsPage() {
           const candidates = (roster ?? []).filter((r) => !inPod.has(r.id)).map((r) => ({ id: r.id, name: nameOf(r.id) }));
           const active = members.filter((m) => m.status === "active").length;
           return (
-            <section key={pod.id} className="rounded-[28px] border border-white/10 bg-black/30 p-6 backdrop-blur-xl">
+            <section key={pod.id} className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">{pod.name}</h2>
                 <div className="flex items-center gap-4">
@@ -77,8 +77,8 @@ export default async function PodsPage() {
                 </ul>
               )}
 
-              <div className="mt-4 border-t border-white/[0.06] pt-4">
-                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-white/35">Invite athletes</p>
+              <div className="mt-4 border-t border-white/[0.09] pt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-white/50">Invite athletes</p>
                 <InviteToPod podId={pod.id} candidates={candidates} />
               </div>
             </section>

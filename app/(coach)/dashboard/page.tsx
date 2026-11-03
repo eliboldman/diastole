@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import SyncedAgo from "@/components/SyncedAgo";
+
 import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggestions";
 import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
@@ -12,14 +14,6 @@ import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Today · Diastole" };
-
-function ago(iso: string | null) {
-  if (!iso) return "never";
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 60) return `${mins} min ago`;
-  if (mins < 48 * 60) return `${Math.round(mins / 60)} h ago`;
-  return `${Math.round(mins / 1440)} days ago`;
-}
 
 function activityLine(a: AthleteSummary["lastActivity"], timeZone: string) {
   if (!a) return "No activities yet";
@@ -85,12 +79,12 @@ export default async function TodayPage() {
 
   return (
     <DashboardShell tone={tone}>
-      <p className="text-sm uppercase tracking-[0.25em] text-white/35">{today}</p>
+      <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
 
-      <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="stagger mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(["red", "yellow", "green", "unknown"] as Flag[]).map((f) => (
-          <div key={f} className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4 backdrop-blur-2xl">
+          <div key={f} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-2xl">
             <p className="text-3xl font-semibold">{counts[f]}</p>
             <div className="mt-1">
               <FlagBadge flag={f} />
@@ -109,14 +103,14 @@ export default async function TodayPage() {
       />
 
       {roster.length === 0 ? (
-        <div className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.03] p-8 text-white/60">
+        <div className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.055] p-8 text-white/60">
           No athletes yet.{" "}
           <Link href="/athletes" className="text-emerald-200 hover:underline">
             Invite your first athlete →
           </Link>
         </div>
       ) : (
-        <section className="mt-8 grid gap-4 lg:grid-cols-2">
+        <section className="stagger mt-8 grid gap-4 lg:grid-cols-2">
           {sorted.map((a) => {
             const flag = flagOf(a);
             const r = a.readiness;
@@ -124,17 +118,21 @@ export default async function TodayPage() {
               <Link
                 key={a.id}
                 href={`/athlete/${a.id}`}
-                className="group block rounded-[28px] border border-white/10 bg-black/30 p-5 backdrop-blur-xl transition-colors hover:border-white/20 hover:bg-black/40 sm:p-6"
+                className="lift group block rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl hover:bg-white/[0.075] sm:p-6"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h2 className="truncate text-xl font-semibold tracking-tight">
-                      {a.name} {a.isCoach && <span className="text-sm font-normal text-white/35">(you)</span>}
+                      {a.name} {a.isCoach && <span className="text-sm font-normal text-white/50">(you)</span>}
                     </h2>
-                    <p className="mt-1 text-xs text-white/40">
-                      {a.device
-                        ? `${a.device.source === "garmin" ? "Garmin" : "Apple Watch"} · synced ${ago(a.device.last_synced_at)}`
-                        : "No device connected"}
+                    <p className="mt-1 text-xs text-white/55">
+                      {a.device ? (
+                        <>
+                          {a.device.source === "garmin" ? "Garmin" : "Apple Watch"} · <SyncedAgo at={a.device.last_synced_at} />
+                        </>
+                      ) : (
+                        "No device connected"
+                      )}
                     </p>
                   </div>
                   <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${FLAG_STYLE[flag].dot} ${FLAG_STYLE[flag].glow}`} aria-hidden />
@@ -153,21 +151,21 @@ export default async function TodayPage() {
                   </div>
                 )}
 
-                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/[0.06] pt-4">
+                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/[0.09] pt-4">
                   <Sparkline label="HRV" points={lastNDays(a.trend, "hrv_ms")} format={fmt.hrv} />
                   <Sparkline label="Resting HR" points={lastNDays(a.trend, "resting_hr")} format={fmt.rhr} />
                   <Sparkline label="Sleep" points={lastNDays(a.trend, "sleep_seconds")} format={fmt.sleep} />
                   <Sparkline label="Stress" points={lastNDays(a.trend, "stress_avg")} format={fmt.stress} />
                 </div>
 
-                <p className="mt-4 text-xs text-white/40">Last activity: {activityLine(a.lastActivity, a.timezone)}</p>
+                <p className="mt-4 text-xs text-white/55">Last activity: {activityLine(a.lastActivity, a.timezone)}</p>
               </Link>
             );
           })}
         </section>
       )}
 
-      <p className="mt-10 text-xs text-white/30">
+      <p className="mt-10 text-xs text-white/45">
         Flags compare each athlete to their own last 28 days. Training guidance, not medical advice.
       </p>
     </DashboardShell>

@@ -68,7 +68,7 @@ function Card({ s }: { s: SuggestionView }) {
     .join("\n");
 
   return (
-    <article className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+    <article className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={`/athlete/${s.athleteId}`} className="font-semibold hover:underline">
           {s.athleteName}
@@ -79,16 +79,16 @@ function Card({ s }: { s: SuggestionView }) {
       </div>
       <p className="mt-2 text-sm leading-relaxed text-white/70">{s.summary}</p>
 
-      <div className="mt-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-sm">
+      <div className="mt-3 rounded-2xl border border-white/[0.09] bg-white/[0.055] p-3 text-sm">
         <p className="font-medium">{ACTION_LABEL[s.action]}</p>
         <p className="mt-1 text-white/55">{s.rationale}</p>
         {s.target && s.action !== "keep" && (
-          <p className="mt-2 text-white/45">
+          <p className="mt-2 text-white/60">
             Changes: <span className="text-white/70">{s.target.title}</span> ({day(s.target.date)})
           </p>
         )}
         {s.proposed && s.action !== "keep" && s.action !== "rest" && (
-          <p className="mt-2 text-white/45">
+          <p className="mt-2 text-white/60">
             New: <span className="text-white/70">{s.proposed.title}</span> ({day(s.proposed.scheduled_date)}, {s.proposed.sport}) —{" "}
             {s.proposed.steps.map(stepLine).join(" → ")}
           </p>
@@ -113,12 +113,12 @@ function Card({ s }: { s: SuggestionView }) {
               Edit
             </button>
           )}
-          <button disabled={pending} onClick={() => run(() => dismissSuggestion(s.id))} className="px-2 text-sm text-white/40 hover:text-white">
+          <button disabled={pending} onClick={() => run(() => dismissSuggestion(s.id))} className="px-2 text-sm text-white/55 hover:text-white">
             Dismiss
           </button>
         </div>
       ) : (
-        <p className="mt-3 text-xs uppercase tracking-wider text-white/35">{s.status}</p>
+        <p className="mt-3 text-xs uppercase tracking-wider text-white/50">{s.status}</p>
       )}
       {msg && <p className={`mt-2 text-sm ${msg.ok ? "text-emerald-200" : "text-red-300"}`}>{msg.text}</p>}
     </article>
@@ -142,11 +142,11 @@ export default function AiSuggestions({
 }) {
   const { pending, msg, run } = useRun();
   return (
-    <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.035] p-5 backdrop-blur-2xl sm:p-6">
+    <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-2xl sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-medium">Coaching assistant</h2>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-white/55">
             {modelLabel} · ${spent.toFixed(2)} of ${cap.toFixed(2)} this month · suggestions only, nothing changes until you approve
           </p>
         </div>
@@ -160,10 +160,10 @@ export default function AiSuggestions({
       </div>
       {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-emerald-200" : "text-red-300"}`}>{msg.text}</p>}
       {!hasKey && <p className="mt-3 text-sm text-amber-200/80">Add an Anthropic API key to turn this on.</p>}
-      {hasKey && !enabled && <p className="mt-3 text-sm text-white/45">Turned off in Settings.</p>}
+      {hasKey && !enabled && <p className="mt-3 text-sm text-white/60">Turned off in Settings.</p>}
 
       {suggestions.length === 0 ? (
-        <p className="mt-4 text-sm text-white/45">No suggestions today. The assistant only reviews athletes flagged yellow or red, each morning around 5–6 am.</p>
+        <p className="mt-4 text-sm text-white/60">No suggestions today. The assistant only reviews athletes flagged yellow or red, each morning around 5–6 am.</p>
       ) : (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {suggestions.map((s) => (
@@ -171,7 +171,7 @@ export default function AiSuggestions({
           ))}
         </div>
       )}
-      <p className="mt-4 text-[11px] text-white/30">AI suggestions are training guidance for the coach, not medical advice.</p>
+      <p className="mt-4 text-[11px] text-white/45">AI suggestions are training guidance for the coach, not medical advice.</p>
     </section>
   );
 }

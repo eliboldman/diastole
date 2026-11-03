@@ -15,7 +15,7 @@ const US_ZONES = [
 ];
 
 const input =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none";
+  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white placeholder:text-white/45 focus:border-emerald-300/40 focus:outline-none";
 
 export default function SettingsForm({ fullName, timezone }: { fullName: string; timezone: string }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettings, {});
@@ -31,12 +31,12 @@ export default function SettingsForm({ fullName, timezone }: { fullName: string;
         Timezone
         <select name="timezone" defaultValue={timezone} className={input}>
           {zones.map(([z, label]) => (
-            <option key={z} value={z} className="bg-neutral-900">
+            <option key={z} value={z} className="bg-panel">
               {label}
             </option>
           ))}
         </select>
-        <span className="text-xs text-white/35">Decides which day a late-evening workout counts toward.</span>
+        <span className="text-xs text-white/50">Decides which day a late-evening workout counts toward.</span>
       </label>
       <div className="flex items-center gap-4">
         <button

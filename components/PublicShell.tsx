@@ -7,8 +7,8 @@ import { SITE } from "@/lib/site";
 
 export default function PublicShell({ children }: { children: ReactNode }) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 text-white">
-      <PhysiologyBackground variant="atmosphere" systemTone="green" stressOpacity={0.1} />
+    <main className="relative min-h-screen overflow-hidden app-canvas text-white">
+      <PhysiologyBackground variant="atmosphere" systemTone="green" stressOpacity={0.15} />
 
       <div className="page-breathe-in relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6 sm:px-8 sm:py-8">
         <header className="flex items-center justify-between">
@@ -35,7 +35,7 @@ export default function PublicShell({ children }: { children: ReactNode }) {
 
         <div className="flex-1">{children}</div>
 
-        <footer className="mt-20 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/40 sm:flex-row sm:justify-between">
+        <footer className="mt-20 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/55 sm:flex-row sm:justify-between">
           <span>
             © {new Date().getFullYear()} {SITE.owner}. {SITE.name} is a coaching tool, not a medical device.
           </span>

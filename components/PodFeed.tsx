@@ -26,10 +26,10 @@ export default function PodFeed({ feed, timeZone }: { feed: PodFeedData; timeZon
       {feed.members.map((m) => {
         const flag = m.readiness?.overall ?? "unknown";
         return (
-          <article key={m.id} className="rounded-[28px] border border-white/10 bg-black/30 p-5 backdrop-blur-xl sm:p-6">
+          <article key={m.id} className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-xl font-semibold tracking-tight">
-                {m.name} {m.is_me && <span className="text-sm font-normal text-white/35">(you)</span>}
+                {m.name} {m.is_me && <span className="text-sm font-normal text-white/50">(you)</span>}
               </h2>
               <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${FLAG_STYLE[flag].dot} ${FLAG_STYLE[flag].glow}`} aria-hidden />
             </div>
@@ -45,23 +45,23 @@ export default function PodFeed({ feed, timeZone }: { feed: PodFeedData; timeZon
               </>
             )}
 
-            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-4">
+            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.09] pt-4">
               <Sparkline label="HRV" points={lastNDays(m.wellness, "hrv_ms")} format={fmt.hrv} />
               <Sparkline label="Resting HR" points={lastNDays(m.wellness, "resting_hr")} format={fmt.rhr} />
               <Sparkline label="Sleep" points={lastNDays(m.wellness, "sleep_seconds")} format={fmt.sleep} />
               <Sparkline label="Stress" points={lastNDays(m.wellness, "stress_avg")} format={fmt.stress} />
             </div>
 
-            <div className="mt-5 border-t border-white/[0.06] pt-4">
-              <p className="text-[11px] uppercase tracking-[0.15em] text-white/35">Recent training</p>
+            <div className="mt-5 border-t border-white/[0.09] pt-4">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">Recent training</p>
               {m.activities.length === 0 ? (
-                <p className="mt-2 text-sm text-white/40">No activities yet.</p>
+                <p className="mt-2 text-sm text-white/55">No activities yet.</p>
               ) : (
                 <ul className="mt-2 space-y-1 text-sm">
                   {m.activities.slice(0, 5).map((a) => (
                     <li key={a.start_time} className="flex justify-between gap-3 text-white/70">
                       <span>
-                        <span className="text-white/45">
+                        <span className="text-white/60">
                           {new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone })}
                         </span>{" "}
                         {cap(a.sport?.replaceAll("_", " ") ?? "Activity")}
