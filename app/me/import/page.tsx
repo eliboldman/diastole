@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import HistoryImport from "@/components/HistoryImport";
 import WorkoutFilesImport from "@/components/WorkoutFilesImport";
 import LastImport from "@/components/LastImport";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Import Garmin history · Diastole" };
 export const maxDuration = 120; // recomputing baselines at the end takes a few seconds
@@ -23,9 +23,7 @@ export default async function MyImportPage() {
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/me" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
-        ← My Diastole
-      </Link>
+      <BackLink href="/account" label="Me" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Import your Garmin history</h1>
       <p className="mt-2 max-w-xl text-white/60">
         Garmin only shares new data with Diastole. Bring in your past months so your baseline is ready today instead of in a week.

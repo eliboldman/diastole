@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Garmin deliveries · Diastole" };
 
@@ -82,9 +82,7 @@ export default async function GarminLogPage() {
 
   return (
     <DashboardShell>
-      <Link href="/settings" className="text-sm text-white/55 hover:text-white">
-        ← Settings
-      </Link>
+      <BackLink href="/account" label="Me" />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Garmin deliveries</h1>
       <p className="mt-2 max-w-prose text-sm text-white/55">
         Every push Garmin sends, kept for 90 days. If nothing has arrived for half a day, check the sharing toggles in Garmin

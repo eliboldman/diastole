@@ -13,6 +13,7 @@ import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { getAthleteDetail } from "@/lib/coach-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
+import BackLink from "@/components/layout/BackLink";
 
 const AREA_HELP: Record<string, string> = {
   recovery: "HRV and resting heart rate vs. the athlete's last 28 days",
@@ -92,9 +93,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   return (
     <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"}>
-      <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
-        ← Today
-      </Link>
+      <BackLink href="/athletes" label="Athletes" />
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>

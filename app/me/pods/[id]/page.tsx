@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AthleteShell from "@/components/AthleteShell";
 import { LeavePod } from "@/components/PodButtons";
 import PodFeed, { type PodFeedData, type PodPropsData } from "@/components/PodFeed";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export default async function AthletePodPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireUser();
@@ -20,9 +20,7 @@ export default async function AthletePodPage({ params }: { params: Promise<{ id:
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/me/pods" className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
-        ← My pods
-      </Link>
+      <BackLink href="/me/pods" label="My pods" />
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{feed.pod.name}</h1>
         <LeavePod podId={id} name={feed.pod.name} />

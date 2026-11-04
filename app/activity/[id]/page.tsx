@@ -17,6 +17,7 @@ import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 import { clock as dclock, describe, swimDistance } from "@/lib/workouts/describe";
 import { hundredMeters, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -178,7 +179,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const planSwim = plan?.sport === "swim";
   const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr, planPool) : null;
   const canEditZones = isCoach; // a coach only ever sees their own athletes here
-  const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/me", label: "Today" } : { href: "/me/pods", label: "Pods" };
+  const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/training", label: "Training" } : { href: "/me/pods", label: "Pods" };
 
   const when = new Date(act.start_time);
   const tiles = [
@@ -213,9 +214,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
   return (
     <DashboardShell role={isCoach ? "coach" : "athlete"}>
-      <Link href={back.href} className="text-sm text-white/55 hover:text-white">
-        ← {back.label}
-      </Link>
+      <BackLink href={back.href} label={back.label} />
       <p className="mt-4 text-sm uppercase tracking-[0.25em] text-white/50">{sportLabel(act.sport)}</p>
       <h1 className="mt-2 break-words text-3xl font-bold tracking-tight sm:text-4xl">{act.name || sportLabel(act.sport)}</h1>
       <p className="mt-2 text-sm text-white/55">

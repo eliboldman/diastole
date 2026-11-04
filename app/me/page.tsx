@@ -6,6 +6,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 import AthleteShell from "@/components/AthleteShell";
 import { FlagBadge, FlagRow } from "@/components/coach/Flags";
 import { RespondToInvite } from "@/components/PodButtons";
+import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import type { Flag } from "@/lib/readiness/engine";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -22,11 +23,12 @@ export default async function MePage() {
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
 
-  const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }] = await Promise.all([
+  const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
+    supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
   ]);
 
   const invites = (memberships ?? []).filter((m) => m.status === "invited");
@@ -88,14 +90,16 @@ export default async function MePage() {
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {workouts.map((w) => (
-              <li key={w.id} className="flex justify-between gap-3 border-t border-white/[0.09] pt-2">
-                <span>
-                  <span className="text-white/50">
-                    {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  </span>{" "}
-                  {w.title}
-                </span>
-                <span className="text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
+              <li key={w.id} className="border-t border-white/[0.09]">
+                <Link href={`/training/workouts/${w.id}`} className="flex min-h-11 items-center justify-between gap-3 rounded-lg py-1 hover:bg-white/[0.04]">
+                  <span className="min-w-0 truncate">
+                    <span className="text-white/50">
+                      {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </span>{" "}
+                    {w.title}
+                  </span>
+                  <span className="shrink-0 text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
+                </Link>
               </li>
             ))}
           </ul>
@@ -104,6 +108,32 @@ export default async function MePage() {
           <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
         ) : null}
       </section>
+
+      {(recent?.length ?? 0) > 0 && (
+        <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-medium">Recent workouts</h2>
+            <Link href="/training" className="text-sm text-emerald-200 hover:underline">
+              All training →
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-1 text-sm">
+            {recent!.map((a) => (
+              <li key={a.id} className="border-t border-white/[0.09]">
+                <Link href={`/activity/${a.id}`} className="flex min-h-11 items-center justify-between gap-3 rounded-lg py-1 hover:bg-white/[0.04]">
+                  <span className="min-w-0 truncate">
+                    <span className="text-white/50">
+                      {new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: me.timezone })}
+                    </span>{" "}
+                    {a.name || sportLabel(a.sport)}
+                  </span>
+                  <span className="shrink-0 text-xs text-white/55">{[clock(a.duration_s), shortDistance(a.distance_m, me.units)].filter(Boolean).join(" · ")}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {pods.length > 0 && (
         <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>

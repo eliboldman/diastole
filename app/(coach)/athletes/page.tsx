@@ -1,6 +1,9 @@
 import Link from "next/link";
 
+import { CalendarRange, Orbit } from "lucide-react";
+
 import DashboardShell from "@/components/layout/DashboardShell";
+import QuickLinks from "@/components/layout/QuickLinks";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
@@ -22,6 +25,12 @@ export default async function AthletesPage() {
       <div className="relative z-10">
         <p className="text-sm uppercase tracking-[0.25em] text-white/50">Roster</p>
         <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Athletes</h1>
+        <QuickLinks
+          links={[
+            { href: "/pods", label: "Pods", icon: <Orbit size={16} aria-hidden /> },
+            { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
+          ]}
+        />
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/55">
           Invite an athlete by email. They&apos;ll get a sign-in link, then connect their Garmin or Apple Watch.
         </p>

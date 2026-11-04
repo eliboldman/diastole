@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import HistoryImport from "@/components/HistoryImport";
@@ -7,6 +6,7 @@ import WorkoutFilesImport from "@/components/WorkoutFilesImport";
 import LastImport from "@/components/LastImport";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Import Garmin history · Diastole" };
 export const maxDuration = 120;
@@ -30,9 +30,7 @@ export default async function CoachImportPage({ params }: { params: Promise<{ id
 
   return (
     <DashboardShell>
-      <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
-        ← {name}
-      </Link>
+      <BackLink href={`/athlete/${id}`} label={name} />
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Import Garmin history</h1>
       <p className="mt-2 max-w-xl text-white/60">
         Upload {name.split(" ")[0]}&apos;s Garmin account export on their behalf. The import reads only health and activity summaries; the optional second step adds their workout files.

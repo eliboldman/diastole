@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CalendarDays, CalendarRange, Plus } from "lucide-react";
+
+import QuickLinks from "@/components/layout/QuickLinks";
 import SyncedAgo from "@/components/SyncedAgo";
 
 import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggestions";
@@ -86,6 +89,13 @@ export default async function TodayPage() {
     <DashboardShell tone={tone}>
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
+      <QuickLinks
+        links={[
+          { href: "/endurance-lab", label: "Build a workout", icon: <Plus size={16} aria-hidden /> },
+          { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
+          { href: "/workouts", label: "All workouts", icon: <CalendarDays size={16} aria-hidden /> },
+        ]}
+      />
 
       <section className="stagger mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(["red", "yellow", "green", "unknown"] as Flag[]).map((f) => (

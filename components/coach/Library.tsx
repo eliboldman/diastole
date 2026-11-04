@@ -32,13 +32,15 @@ export default function Library({
   items,
   athletes,
   units = "mi",
+  initialQuery = "",
 }: {
+  initialQuery?: string;
   items: Item[];
   athletes: { id: string; name: string }[];
   units?: "mi" | "km";
 }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [sport, setSport] = useState<string>("");
   const [type, setType] = useState<string>("");
   const [open, setOpen] = useState<string | null>(null);

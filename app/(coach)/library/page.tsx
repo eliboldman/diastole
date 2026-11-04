@@ -8,7 +8,8 @@ import type { Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Library · Diastole" };
 
-export default async function LibraryPage() {
+export default async function LibraryPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q } = await searchParams;
   const coach = await requireCoach();
   const supabase = await createClient();
   const [{ data: items }, { data: athletes }] = await Promise.all([
@@ -32,6 +33,7 @@ export default async function LibraryPage() {
         items={(items ?? []).map((i) => ({ ...i, steps: i.steps as Step[] }))}
         athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.full_name || a.email || "Athlete" }))}
         units={coach.units}
+        initialQuery={typeof q === "string" ? q.slice(0, 100) : ""}
       />
     </DashboardShell>
   );

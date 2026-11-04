@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import VersionHistory, { type Version } from "@/components/coach/VersionHistory";
@@ -8,6 +7,7 @@ import WorkoutTools from "@/components/coach/WorkoutTools";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -87,9 +87,7 @@ export default async function WorkoutPage({
 
   return (
     <DashboardShell>
-      <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center text-sm text-white/60 hover:text-white">
-        ← {name}
-      </Link>
+      <BackLink href={`/athlete/${id}`} label={name} />
       <h1 className={`mt-2 text-3xl font-bold tracking-tight sm:text-4xl ${w?.deleted_at ? "text-white/50 line-through decoration-white/20" : ""}`}>
         {w ? w.title : "New workout"}
       </h1>

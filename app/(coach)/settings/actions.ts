@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient, requireCoach } from "@/lib/supabase/server";
+import { createClient, requireUser } from "@/lib/supabase/server";
 
 export type SettingsState = { ok?: boolean; error?: string };
 
 export async function saveSettings(_prev: SettingsState, form: FormData): Promise<SettingsState> {
-  const me = await requireCoach();
+  const me = await requireUser();
   const fullName = String(form.get("full_name") ?? "").trim();
   const timezone = String(form.get("timezone") ?? "");
   if (!Intl.supportedValuesOf("timeZone").includes(timezone)) return { error: "Pick a valid timezone." };
