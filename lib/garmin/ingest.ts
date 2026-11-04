@@ -1,5 +1,6 @@
 import "server-only";
 
+import { linkPlannedWorkout, saveFitActivity } from "@/lib/activity/store";
 import { forgetGarmin, garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -80,6 +81,37 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
       let item = stripLocation(rawItem);
       const athleteId = await athleteFor(item.userId);
 
+      // Activity files: the watch's original FIT file, fetched from the callback URL. Gives the
+      // second-by-second streams, laps and route behind the activity view.
+      if (type === "activityFiles") {
+        await admin.from("garmin_raw").insert({ summary_type: type, garmin_user: item.userId ?? null, payload: item });
+        if (!athleteId || !item.callbackURL || String(item.fileType ?? "").toUpperCase() !== "FIT") continue;
+        const externalId = String(item.activityId ?? "");
+        if (!externalId) continue;
+        const url = new URL(item.callbackURL);
+        const res = await garminFetch(athleteId, url.pathname + url.search);
+        if (res.status >= 500) throw new Error(`Garmin activity file download failed: ${res.status}`); // retry later
+        if (!res.ok) {
+          console.warn("Garmin activity file not available", res.status, externalId);
+          continue;
+        }
+        try {
+          await saveFitActivity(admin, {
+            athleteId,
+            source: "garmin",
+            externalId,
+            bytes: new Uint8Array(await res.arrayBuffer()),
+            name: typeof item.activityName === "string" ? item.activityName.slice(0, 200) : null,
+          });
+        } catch (e) {
+          // A file we can't read won't improve on retry; the summary still stands.
+          console.error("Garmin activity file could not be parsed", externalId, e);
+          continue;
+        }
+        touched.add(athleteId);
+        continue;
+      }
+
       // Ping mode: Garmin sends a URL to fetch the data from instead of the data itself.
       if (item.callbackURL && athleteId) {
         const url = new URL(item.callbackURL);
@@ -115,10 +147,24 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
             distance_m: num(item.distanceInMeters),
             avg_hr: num(item.averageHeartRateInBeatsPerMinute),
             max_hr: num(item.maxHeartRateInBeatsPerMinute),
+            ...present({
+              name: typeof item.activityName === "string" ? item.activityName.slice(0, 200) : null,
+              calories: num(item.activeKilocalories),
+              elevation_gain_m: num(item.totalElevationGainInMeters),
+              elevation_loss_m: num(item.totalElevationLossInMeters),
+              avg_speed_mps: num(item.averageSpeedInMetersPerSecond),
+              max_speed_mps: num(item.maxSpeedInMetersPerSecond),
+              avg_power: num(item.averagePowerInWatts),
+              max_power: num(item.maxPowerInWatts),
+              avg_cadence: num(item.averageRunCadenceInStepsPerMinute) ?? num(item.averageBikeCadenceInRoundsPerMinute),
+              device: typeof item.deviceName === "string" ? item.deviceName.slice(0, 100) : null,
+            }),
             raw: item,
           },
           { onConflict: "source,external_id" },
         );
+        const { data: saved } = await admin.from("activities").select("id").eq("source", "garmin").eq("external_id", externalId).maybeSingle();
+        if (saved) await linkPlannedWorkout(admin, saved.id);
       } else {
         const fields = wellnessFields(type, item);
         const date = typeof item.calendarDate === "string" ? item.calendarDate : null;

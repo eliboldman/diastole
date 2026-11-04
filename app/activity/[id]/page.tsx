@@ -1,0 +1,353 @@
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
+
+import ActivityCharts from "@/components/activity/ActivityCharts";
+import RouteMap from "@/components/activity/RouteMap";
+import DashboardShell from "@/components/layout/DashboardShell";
+import { compareWorkout, type ComparedStep } from "@/lib/activity/compare";
+import type { Lap, Streams } from "@/lib/activity/fit";
+import { clock, isFootSport, km, sportLabel, speedText, whole } from "@/lib/activity/format";
+import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
+import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
+import type { Step } from "@/lib/workouts/garmin-format";
+
+export const metadata: Metadata = { title: "Workout · Diastole" };
+
+// Ordinal ramp for zones 1-5, validated against the card surface (one hue, light end clears 2:1).
+const ZONE_COLORS = ["#1c5cab", "#2a78d6", "#5598e7", "#86b6ef", "#b7d3f6"];
+
+type Activity = {
+  id: string;
+  athlete_id: string;
+  sport: string | null;
+  name: string | null;
+  start_time: string;
+  duration_s: number | null;
+  distance_m: number | null;
+  avg_hr: number | null;
+  max_hr: number | null;
+  calories: number | null;
+  elevation_gain_m: number | null;
+  avg_speed_mps: number | null;
+  max_speed_mps: number | null;
+  avg_power: number | null;
+  max_power: number | null;
+  normalized_power: number | null;
+  avg_cadence: number | null;
+  training_load: number | null;
+  device: string | null;
+  planned_workout_id: string | null;
+};
+
+function Card({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
+  return (
+    <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-2xl sm:p-6">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-medium">{title}</h2>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ZoneBars({ title, zones, secs, label, note }: { title: string; zones: Zone[]; secs: number[]; label: (z: Zone) => string; note: string }) {
+  const total = secs.reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  return (
+    <div className="mb-6 last:mb-0">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-medium text-white/80">{title}</h3>
+        <span className="text-xs text-white/45">{note}</span>
+      </div>
+      <div className="flex h-3 overflow-hidden rounded-full" aria-hidden>
+        {secs.map((s, i) =>
+          s ? <span key={i} style={{ width: `${(s / total) * 100}%`, background: ZONE_COLORS[i] }} className="h-full border-r-2 border-panel last:border-r-0" /> : null,
+        )}
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {zones.map((z, i) => (
+          <li key={z.n} className="flex items-center gap-3">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: ZONE_COLORS[i] }} aria-hidden />
+            <span className="w-6 shrink-0 text-white/50">Z{z.n}</span>
+            <span className="min-w-0 flex-1 truncate text-white/75">
+              {z.name} <span className="text-white/40">{label(z)}</span>
+            </span>
+            <span className="shrink-0 tabular-nums text-white/80">{secs[i] ? clock(secs[i]) : "–"}</span>
+            <span className="w-10 shrink-0 text-right tabular-nums text-white/45">{Math.round((secs[i] / total) * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const VERDICT = {
+  on: { text: "On target", icon: Check, cls: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100" },
+  over: { text: "Over", icon: ChevronUp, cls: "border-amber-300/30 bg-amber-300/10 text-amber-100" },
+  under: { text: "Under", icon: ChevronDown, cls: "border-sky-300/30 bg-sky-300/10 text-sky-100" },
+} as const;
+
+function plannedText(p: ComparedStep["planned"]) {
+  const d = p.duration;
+  const dur = d.type === "time" ? clock(d.seconds) : d.type === "distance" ? (km(d.meters) ?? `${d.meters} m`) : "Lap button";
+  const t = p.target;
+  const target = !t
+    ? null
+    : t.type === "hr_zone"
+      ? `HR zone ${t.zone}`
+      : t.type === "hr_range"
+        ? `${t.low}–${t.high} bpm`
+        : t.type === "pace_range"
+          ? `${speedText(1000 / t.slowSecPerKm, "run")?.replace(" /km", "")}–${speedText(1000 / t.fastSecPerKm, "run")}`
+          : `${t.low}–${t.high} W`;
+  return [dur, target].filter(Boolean).join(" · ");
+}
+
+function actualText(c: ComparedStep, sport: string | null) {
+  const a = c.actual;
+  const t = c.planned.target;
+  const measured =
+    t?.type === "pace_range" ? speedText(a.avg_speed, sport) : t?.type === "power_range" ? whole(a.avg_power, "W") : t ? whole(a.avg_hr, "bpm") : null;
+  return [clock(a.duration_s), km(a.distance_m), measured].filter(Boolean).join(" · ") || "–";
+}
+
+export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const me = await requireUser();
+  const supabase = await createClient();
+
+  // Row-level security decides visibility: own, coach, or an opted-in pod mate.
+  const { data: act } = await supabase.from("activities").select("*").eq("id", id).maybeSingle<Activity>();
+  if (!act) notFound();
+
+  const isOwn = act.athlete_id === me.id;
+  const isCoach = me.role === "coach";
+  const since = daysBackIso(180);
+
+  const [{ data: detail }, { data: zonesRow }, { data: recent }, { data: plan }, { data: owner }] = await Promise.all([
+    supabase.from("activity_details").select("streams, laps, route").eq("activity_id", id).maybeSingle(),
+    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", act.athlete_id).maybeSingle(),
+    supabase.from("activities").select("max_hr").eq("athlete_id", act.athlete_id).gte("start_time", since).not("max_hr", "is", null).limit(500),
+    act.planned_workout_id
+      ? supabase.from("planned_workouts").select("id, title, steps, scheduled_date").eq("id", act.planned_workout_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Name only, after the visibility check above passed (pod mates can't read profiles directly).
+    createAdminClient().from("profiles").select("full_name, timezone").eq("id", act.athlete_id).maybeSingle(),
+  ]);
+
+  const streams = (detail?.streams ?? null) as Streams | null;
+  const laps = ((detail?.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0);
+  const route = (detail?.route ?? null) as [number, number][] | null;
+  const tz = owner?.timezone ?? me.timezone;
+  const foot = isFootSport(act.sport);
+
+  // Zones: the coach's numbers, otherwise an estimate for max HR.
+  const setMax = zonesRow?.max_hr ?? null;
+  const estMax = setMax ? null : estimateMaxHr((recent ?? []).map((r) => r.max_hr));
+  const maxHr = setMax ?? estMax;
+  const hrNote = setMax ? `Max HR ${setMax} (set by coach)` : estMax ? `Max HR ~${estMax} (estimated)` : "";
+
+  const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr) : null;
+  const canEditZones = isCoach; // a coach only ever sees their own athletes here
+  const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/me", label: "Today" } : { href: "/me/pods", label: "Pods" };
+
+  const when = new Date(act.start_time);
+  const tiles = [
+    ["Time", clock(act.duration_s)],
+    ["Distance", km(act.distance_m)],
+    [foot ? "Avg pace" : "Avg speed", speedText(act.avg_speed_mps, act.sport)],
+    ["Avg HR", whole(act.avg_hr, "bpm")],
+    ["Max HR", whole(act.max_hr, "bpm")],
+    ["Avg power", whole(act.avg_power, "W")],
+    ["Normalized power", whole(act.normalized_power, "W")],
+    ["Max power", whole(act.max_power, "W")],
+    ["Cadence", whole(act.avg_cadence, foot ? "spm" : "rpm")],
+    ["Elevation gain", whole(act.elevation_gain_m, "m")],
+    ["Calories", whole(act.calories, "kcal")],
+    ["Training load", whole(act.training_load, "")],
+  ].filter((x): x is [string, string] => Boolean(x[1]));
+
+  const lapCols = [
+    { key: "time", head: "Time", get: (l: Lap) => clock(l.duration_s) },
+    { key: "dist", head: "Distance", get: (l: Lap) => km(l.distance_m) },
+    { key: "pace", head: foot ? "Pace" : "Speed", get: (l: Lap) => speedText(l.avg_speed, act.sport) },
+    { key: "hr", head: "Avg HR", get: (l: Lap) => whole(l.avg_hr, "") },
+    { key: "power", head: "Power", get: (l: Lap) => whole(l.avg_power, "") },
+    { key: "cad", head: "Cadence", get: (l: Lap) => whole(l.avg_cadence, "") },
+  ].filter((c) => laps.some((l) => c.get(l)));
+
+  const interval = streams?.interval_s ?? 5;
+  const hrSecs = streams?.hr && maxHr ? timeInZones(hrZones(maxHr), streams.hr, interval) : null;
+  const paceSecs = foot && streams?.speed && zonesRow?.threshold_speed_mps ? timeInZones(paceZones(Number(zonesRow.threshold_speed_mps)), streams.speed, interval, 0.5) : null;
+  const powerSecs = streams?.power && zonesRow?.ftp_w ? timeInZones(powerZones(zonesRow.ftp_w), streams.power, interval) : null;
+  const hasZones = [hrSecs, paceSecs, powerSecs].some((s) => s?.some(Boolean));
+
+  return (
+    <DashboardShell role={isCoach ? "coach" : "athlete"}>
+      <Link href={back.href} className="text-sm text-white/55 hover:text-white">
+        ← {back.label}
+      </Link>
+      <p className="mt-4 text-sm uppercase tracking-[0.25em] text-white/50">{sportLabel(act.sport)}</p>
+      <h1 className="mt-2 break-words text-3xl font-bold tracking-tight sm:text-4xl">{act.name || sportLabel(act.sport)}</h1>
+      <p className="mt-2 text-sm text-white/55">
+        {[
+          !isOwn && owner?.full_name,
+          when.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }),
+          when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz }),
+          act.device && act.device.replaceAll("_", " "),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
+
+      {tiles.length > 0 && (
+        <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {tiles.map(([label, value]) => (
+            <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+              <p className="truncate text-xs uppercase tracking-[0.15em] text-white/45">{label}</p>
+              <p className="mt-1 truncate text-xl font-semibold tabular-nums">{value}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {plan && (
+        <Card
+          title="Planned vs completed"
+          aside={
+            isCoach ? (
+              <Link href={`/athlete/${act.athlete_id}/workouts/${plan.id}`} className="truncate text-sm text-emerald-200 hover:underline">
+                {plan.title} →
+              </Link>
+            ) : (
+              <span className="truncate text-sm text-white/55">{plan.title}</span>
+            )
+          }
+        >
+          {!comparison ? (
+            <p className="text-sm text-white/55">
+              {laps.length
+                ? "The laps from this session don't line up with the planned steps (for example, the workout was run without the watch's workout screen), so they can't be compared step by step."
+                : "Step-by-step comparison appears once the watch's detailed file arrives."}
+            </p>
+          ) : (
+            <ol className="divide-y divide-white/10">
+              {comparison.map((c, i) => {
+                const v = c.verdict ? VERDICT[c.verdict] : null;
+                return (
+                  <li key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="text-sm font-medium">
+                        {c.planned.label}
+                        {c.planned.rep && <span className="text-white/45"> · {c.planned.rep}</span>}
+                      </p>
+                      <p className="text-xs text-white/50">Plan: {plannedText(c.planned)}</p>
+                    </div>
+                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport)}</p>
+                    {v ? (
+                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${v.cls}`}>
+                        <v.icon className="h-3.5 w-3.5" aria-hidden />
+                        {v.text}
+                      </span>
+                    ) : (
+                      <span className="w-[5.5rem] shrink-0" aria-hidden />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </Card>
+      )}
+
+      {streams && streams.t.length > 1 && (
+        <Card title="Over the session">
+          <ActivityCharts streams={streams} sport={act.sport} />
+        </Card>
+      )}
+
+      {(hasZones || canEditZones) && (
+        <Card
+          title="Zones"
+          aside={
+            canEditZones ? (
+              <Link href={`/athlete/${act.athlete_id}#zones`} className="text-sm text-emerald-200 hover:underline">
+                Edit zones →
+              </Link>
+            ) : null
+          }
+        >
+          {hasZones ? (
+            <>
+              {hrSecs && <ZoneBars title="Heart rate" zones={hrZones(maxHr!)} secs={hrSecs} note={hrNote} label={(z) => (z.high ? `< ${z.high}` : `${z.low}+`)} />}
+              {paceSecs && (
+                <ZoneBars
+                  title="Pace"
+                  zones={paceZones(Number(zonesRow!.threshold_speed_mps))}
+                  secs={paceSecs}
+                  note={`Threshold ${speedText(Number(zonesRow!.threshold_speed_mps), "run")}`}
+                  label={(z) => (z.high ? `slower than ${speedText(z.high, "run")}` : `${speedText(z.low, "run")} or faster`)}
+                />
+              )}
+              {powerSecs && (
+                <ZoneBars title="Power" zones={powerZones(zonesRow!.ftp_w!)} secs={powerSecs} note={`FTP ${zonesRow!.ftp_w} W`} label={(z) => (z.high ? `< ${z.high} W` : `${z.low} W+`)} />
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-white/55">
+              {streams ? "Set max heart rate, threshold pace or FTP to see time in each zone." : "Zones appear once the watch's detailed file arrives."}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {laps.length > 1 && lapCols.length > 0 && (
+        <Card title="Laps">
+          <div className="-mx-2 overflow-x-auto px-2">
+            <table className="w-full min-w-[22rem] text-sm tabular-nums">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-white/45">
+                  <th className="py-2 pr-3 font-normal">#</th>
+                  {lapCols.map((c) => (
+                    <th key={c.key} className="py-2 pr-3 text-right font-normal last:pr-0">
+                      {c.head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {laps.map((l, i) => (
+                  <tr key={i} className="border-t border-white/[0.08]">
+                    <td className="py-2 pr-3 text-white/50">{i + 1}</td>
+                    {lapCols.map((c) => (
+                      <td key={c.key} className="whitespace-nowrap py-2 pr-3 text-right text-white/80 last:pr-0">
+                        {c.get(l) ?? ""}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {route && route.length > 1 && (
+        <Card title="Route">
+          <RouteMap route={route} />
+        </Card>
+      )}
+
+      {!streams && (
+        <p className="mt-6 text-sm text-white/45">
+          Charts, laps and the route appear when the watch&apos;s detailed activity file arrives. Activities from before the file sync was turned on
+          show the summary only.
+        </p>
+      )}
+    </DashboardShell>
+  );
+}

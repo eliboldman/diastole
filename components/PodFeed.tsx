@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import PodProps, { type PropSend, type PropTotal } from "@/components/PodProps";
@@ -31,7 +32,9 @@ export type PodFeedData = {
       sleep_seconds: number | null;
       stress_avg: number | null;
     }[];
+    details?: boolean;
     activities: {
+      id?: string;
       sport: string | null;
       start_time: string;
       duration_s: number | null;
@@ -224,7 +227,13 @@ export default function PodFeed({
                               },
                             )}
                           </span>{" "}
-                          {cap(a.sport?.replaceAll("_", " ") ?? "Activity")}
+                          {m.details && a.id ? (
+                            <Link href={`/activity/${a.id}`} className="text-emerald-100 underline-offset-2 hover:underline">
+                              {cap(a.sport?.replaceAll("_", " ") ?? "Activity")}
+                            </Link>
+                          ) : (
+                            cap(a.sport?.replaceAll("_", " ") ?? "Activity")
+                          )}
                         </span>
                         <span className="text-white/50">
                           {[

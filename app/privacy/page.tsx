@@ -53,7 +53,8 @@ export default function PrivacyPage() {
             <li>
               <strong className="text-white/80">From Garmin Connect</strong> (after the athlete
               authorizes access): daily wellness summaries such as heart rate variability (HRV),
-              resting heart rate, sleep, stress and Body Battery, and completed activities.
+              resting heart rate, sleep, stress and Body Battery, and completed activities, including
+              the activity file from the watch (heart rate, pace, power, cadence, laps and route over the session).
             </li>
             <li>
               <strong className="text-white/80">From Apple Health</strong> (through our iPhone app,
@@ -65,8 +66,10 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p>
-            We collect data from the date an athlete connects onward. We do not collect location
-            history, contacts, or any data the athlete has not authorized.
+            We collect data from the date an athlete connects onward. For completed outdoor workouts we
+            keep the route so the coach can review the session, with the first and last 200 m removed so
+            start and finish locations (such as a home address) are never stored. We do not collect
+            location history outside workouts, contacts, or any data the athlete has not authorized.
           </p>
         </Section>
 
@@ -107,8 +110,10 @@ export default function PrivacyPage() {
             small group of athletes who see each other&apos;s training. Nothing is shared unless you
             accept the invite. Once you accept, other members who have also accepted can see your
             readiness flag and note, your HRV, resting heart rate, sleep and stress for the last 14
-            days, and your recent activities. They see your name, not your email. You can leave a pod
-            at any time, and sharing stops immediately.
+            days, and a summary of your recent activities. They see your name, not your email. Full
+            workout details (charts, laps, zones and route) are shared only if you turn on &ldquo;Share
+            workout details&rdquo;, and only with pod members who have turned it on too; it is off by
+            default. You can leave a pod or turn sharing off at any time, and sharing stops immediately.
           </p>
           <p> We use a small
             number of service providers to run {SITE.name}, who process data on our behalf and
@@ -117,6 +122,7 @@ export default function PrivacyPage() {
           <ul>
             <li>Supabase: secure database and account sign-in.</li>
             <li>Vercel: website hosting.</li>
+            <li>OpenFreeMap: map images behind workout routes. Your browser requests the map area being viewed; the route itself is drawn in your browser and never sent to them.</li>
             <li>Anthropic: AI summaries for the coach, as described above.</li>
           </ul>
           <p>We may disclose data if required by law.</p>

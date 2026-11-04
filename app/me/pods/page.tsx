@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import { RespondToInvite } from "@/components/PodButtons";
+import ShareDetailsToggle from "@/components/ShareDetailsToggle";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "My pods · Diastole" };
@@ -10,6 +11,7 @@ export const metadata: Metadata = { title: "My pods · Diastole" };
 export default async function MyPodsPage() {
   const me = await requireUser();
   const supabase = await createClient();
+  const { data: mine } = await supabase.from("profiles").select("share_workout_details").eq("id", me.id).maybeSingle();
   const { data } = await supabase
     .from("pod_members")
     .select("pod_id, status, pods(name)")
@@ -49,6 +51,12 @@ export default async function MyPodsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {active.length > 0 && (
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6">
+          <ShareDetailsToggle initial={Boolean(mine?.share_workout_details)} />
+        </section>
       )}
     </AthleteShell>
   );

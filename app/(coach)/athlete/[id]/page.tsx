@@ -4,8 +4,12 @@ import { notFound } from "next/navigation";
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import WorkoutList from "@/components/coach/WorkoutList";
+import ZonesForm from "@/components/coach/ZonesForm";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { paceOf } from "@/lib/activity/format";
+import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { getAthleteDetail } from "@/lib/coach-data";
+import { createClient } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 
 const AREA_HELP: Record<string, string> = {
@@ -48,6 +52,18 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   if (!data) notFound();
 
   const { profile, device, readiness, trend, activities, workouts, removed } = data;
+
+  const supabase = await createClient();
+  const [{ data: zones }, { data: recentMax }] = await Promise.all([
+    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", id).maybeSingle(),
+    supabase
+      .from("activities")
+      .select("max_hr")
+      .eq("athlete_id", id)
+      .gte("start_time", daysBackIso(180))
+      .not("max_hr", "is", null)
+      .limit(500),
+  ]);
   const today = readiness[0];
   const overall: Flag = today?.overall ?? "unknown";
 
@@ -119,11 +135,16 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             <table className="mt-3 w-full text-sm">
               <tbody>
                 {activities.map((a) => (
-                  <tr key={a.id} className="border-t border-white/[0.09]">
+                  <tr key={a.id} className="relative border-t border-white/[0.09] transition hover:bg-white/[0.04]">
                     <td className="py-2 pr-3 text-white/50">
                       {new Date(a.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: profile.timezone })}
                     </td>
-                    <td className="py-2 pr-3 capitalize">{a.sport?.replaceAll("_", " ") ?? "Activity"}</td>
+                    <td className="py-2 pr-3 capitalize">
+                      {/* The link covers the whole row */}
+                      <Link href={`/activity/${a.id}`} className="after:absolute after:inset-0 hover:underline">
+                        {a.sport?.replaceAll("_", " ") ?? "Activity"}
+                      </Link>
+                    </td>
                     <td className="py-2 pr-3 text-right text-white/70">{a.duration_s ? `${Math.round(a.duration_s / 60)} min` : ""}</td>
                     <td className="py-2 pr-3 text-right text-white/70">
                       {a.distance_m && a.distance_m > 100 ? `${(a.distance_m / 1000).toFixed(1)} km` : ""}
@@ -147,6 +168,18 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             </Link>
           </div>
           <WorkoutList athleteId={profile.id} workouts={workouts} removed={removed} device={device?.source ?? null} />
+        </section>
+
+        <section id="zones" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Training zones</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">Used for time in zones and to judge zone targets on the workout view.</p>
+          <ZonesForm
+            athleteId={profile.id}
+            maxHr={zones?.max_hr ?? null}
+            thresholdPace={zones?.threshold_speed_mps ? paceOf(Number(zones.threshold_speed_mps)) : null}
+            ftp={zones?.ftp_w ?? null}
+            estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
+          />
         </section>
       </div>
     </DashboardShell>

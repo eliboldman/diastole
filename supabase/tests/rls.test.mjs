@@ -163,5 +163,51 @@ check("coach can re-invite", !r.error && (await db.query(`select status from pub
 r = await as(A1, `select public.reinvite_to_pod('${POD}', '${A2}') as ok`);
 check("athlete cannot re-invite", r.rows?.[0]?.ok === false);
 
+// ---------------------------------------------------------------- workout details (opt-in pod sharing)
+const ACT1 = "00000000-0000-0000-0000-0000000001a1";
+const ACT2 = "00000000-0000-0000-0000-0000000001a2";
+await db.exec(`
+  update public.pod_members set status = 'active' where pod_id = '${POD}' and athlete_id in ('${A1}', '${A2}');
+  insert into public.activities (id, athlete_id, source, external_id, sport, start_time) values
+    ('${ACT1}', '${A1}', 'garmin', 'x1', 'running', now()), ('${ACT2}', '${A2}', 'garmin', 'x2', 'running', now());
+  insert into public.activity_details (activity_id, athlete_id, source, streams) values
+    ('${ACT1}', '${A1}', 'garmin_fit', '{"t":[0]}'), ('${ACT2}', '${A2}', 'garmin_fit', '{"t":[0]}');
+`);
+const seesA2 = async (user) => {
+  const d = await as(user, `select activity_id from public.activity_details where athlete_id = '${A2}'`);
+  const a = await as(user, `select id from public.activities where id = '${ACT2}'`);
+  return d.rows?.length === 1 && a.rows?.length === 1;
+};
+check("pod mates can't see each other's details by default", !(await seesA2(A1)));
+r = await as(A2, "select public.set_share_workout_details(true)");
+check("only one side opted in: still hidden", !r.error && !(await seesA2(A1)));
+await as(A1, "select public.set_share_workout_details(true)");
+check("both opted in: pod mate sees details", await seesA2(A1));
+const feedA2 = async () => (await as(A1, `select public.get_pod_feed('${POD}') as f`)).rows?.[0]?.f?.members?.find((m) => m.id === A2);
+check("feed marks A2's details as openable and includes activity ids", (await feedA2())?.details === true && (await feedA2())?.activities?.[0]?.id === ACT2);
+await as(STRANGER, "select public.set_share_workout_details(true)");
+check("opted-in stranger outside the pod sees nothing", !(await seesA2(STRANGER)));
+check("coach always sees details", await seesA2(COACH));
+r = await as(A1, `select activity_id from public.activity_details`);
+check("athlete sees own details too", r.rows?.some((x) => x.activity_id === ACT1));
+check("share switch only changes the caller", (await db.query(`select count(*)::int c from public.profiles where share_workout_details`)).rows[0].c === 3);
+r = await as(A1, `insert into public.activity_details (activity_id, athlete_id, source, streams) values ('${ACT1}', '${A1}', 'apple', '{}')`);
+check("athletes cannot write activity details", !!r.error);
+await as(A2, "select public.set_share_workout_details(false)");
+check("turning sharing off hides details again", !(await seesA2(A1)));
+check("feed no longer marks details as openable", (await feedA2())?.details === false);
+await as(A2, "select public.set_share_workout_details(true)");
+await as(A2, `select public.respond_to_pod('${POD}', 'leave')`);
+check("after leaving the pod, details are hidden", !(await seesA2(A1)));
+
+r = await as(COACH, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A1}', 195)`);
+check("coach can set an athlete's zones", !r.error);
+r = await as(A1, `update public.athlete_zones set max_hr = 230 where athlete_id = '${A1}' returning max_hr`);
+check("athlete cannot change their zones", !!r.error || r.rows?.length === 0);
+r = await as(A1, `select max_hr from public.athlete_zones where athlete_id = '${A1}'`);
+check("athlete can read their zones", r.rows?.[0]?.max_hr === 195);
+r = await as(STRANGER, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A2}', 150)`);
+check("stranger cannot set zones", !!r.error);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

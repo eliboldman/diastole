@@ -227,7 +227,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
               );
             })}
             {dayDone.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.06] p-4">
+              <li key={a.id}>
+                <Link href={`/activity/${a.id}`} className="lift flex items-center justify-between gap-3 rounded-2xl bg-white/[0.06] p-4">
                 <span>
                   <span className="block font-medium">
                     {isCoach && !focus && <span className="text-white/55">{nameOf(a.athlete_id)} · </span>}
@@ -245,6 +246,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   </span>
                 </span>
                 <span className="shrink-0 text-[11px] uppercase tracking-wider text-white/50">Completed</span>
+                </Link>
               </li>
             ))}
           </ul>
