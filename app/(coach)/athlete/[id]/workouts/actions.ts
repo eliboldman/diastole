@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { sendWorkoutToGarmin } from "@/lib/garmin/training";
 import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
 import { createClient, requireCoach } from "@/lib/supabase/server";
-import { validateSteps, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 
 export type WorkoutInput = {
   id?: string;
@@ -15,6 +15,7 @@ export type WorkoutInput = {
   scheduledDate: string;
   description: string;
   steps: Step[];
+  pool?: Pool; // swims only; null = any pool
 };
 
 export type ActionResult = { ok: true; id: string; message?: string } | { ok: false; error: string };
@@ -22,9 +23,11 @@ export type ActionResult = { ok: true; id: string; message?: string } | { ok: fa
 function check(input: WorkoutInput): string | null {
   if (!input.title.trim()) return "Give the workout a title.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledDate)) return "Pick a date.";
-  if (!["run", "bike"].includes(input.sport)) return "Pick a sport.";
-  const errors = validateSteps(input.steps);
-  return errors.length ? errors.join(" ") : null;
+  if (!["run", "bike", "swim"].includes(input.sport)) return "Pick a sport.";
+  const pool = input.sport === "swim" ? (input.pool ?? null) : null;
+  if (pool && (!(pool.length >= 10 && pool.length <= 100) || !["METER", "YARD"].includes(pool.unit))) return "Pick a pool length.";
+  const errors = validateSteps(input.steps, 0, input.sport, pool);
+  return errors.length ? [...new Set(errors)].join(" ") : null;
 }
 
 /** Create or update a draft. Row-level security limits this to the coach's own athletes. */
@@ -42,6 +45,8 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     scheduled_date: input.scheduledDate,
     description: input.description.trim() || null,
     steps: input.steps,
+    pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
+    pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,
   };
 
   if (input.id) {

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { removeWorkoutFromGarmin, resendWorkoutToGarmin } from "@/lib/garmin/training";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts/adjust";
-import { validateSteps, type Step } from "@/lib/workouts/garmin-format";
+import { fromConnectWorkout } from "@/lib/workouts/connect-import";
+import { validateSteps, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
 
@@ -23,9 +24,13 @@ type WorkoutRow = {
   external_id: string | null;
   deleted_at: string | null;
   library_id: string | null;
+  pool_length: number | null;
+  pool_unit: PoolUnit | null;
 };
 
-const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id";
+const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id, pool_length, pool_unit";
+const poolOf = (w: { pool_length: number | null; pool_unit: PoolUnit | null }): Pool =>
+  w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit } : null;
 
 async function load(supabase: Supa, id: string): Promise<WorkoutRow | null> {
   // Row-level security limits this to the signed-in coach's own athletes.
@@ -63,6 +68,8 @@ async function snapshot(supabase: Supa, w: WorkoutRow, change: string, by: strin
     scheduled_date: w.scheduled_date,
     description: w.description,
     steps: w.steps,
+    pool_length: w.pool_length,
+    pool_unit: w.pool_unit,
     created_by: by,
   });
 }
@@ -77,7 +84,7 @@ export async function recordVersion(workoutId: string, change: string): Promise<
     // Only record an edit when something actually changed since the last version.
     const { data: last } = await supabase
       .from("workout_versions")
-      .select("title, sport, scheduled_date, description, steps")
+      .select("title, sport, scheduled_date, description, steps, pool_length, pool_unit")
       .eq("workout_id", w.id)
       .order("version", { ascending: false })
       .limit(1)
@@ -87,6 +94,8 @@ export async function recordVersion(workoutId: string, change: string): Promise<
       last.title === w.title &&
       last.sport === w.sport &&
       last.scheduled_date === w.scheduled_date &&
+      Number(last.pool_length ?? 0) === Number(w.pool_length ?? 0) &&
+      (last.pool_unit ?? null) === (w.pool_unit ?? null) &&
       (last.description ?? null) === (w.description ?? null) &&
       JSON.stringify(last.steps) === JSON.stringify(w.steps)
     )
@@ -101,7 +110,7 @@ export async function syncToLibrary(workoutId: string): Promise<void> {
   const supabase = await createClient();
   const w = await load(supabase, workoutId);
   if (!w) return;
-  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps };
+  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps, pool_length: w.pool_length, pool_unit: w.pool_unit };
 
   const { data: existing } = await supabase
     .from("workout_library")
@@ -265,8 +274,8 @@ export async function adjustWorkout(id: string, a: Adjustment): Promise<Result> 
   if (!w || w.deleted_at) return { ok: false, error: "Workout not found." };
   if (w.status === "completed" || w.status === "skipped") return { ok: false, error: `Can't adjust a ${w.status} workout.` };
 
-  const steps = adjustSteps(w.steps, a);
-  const errors = validateSteps(steps);
+  const steps = adjustSteps(w.steps, a, { swim: w.sport === "swim", pool: poolOf(w) });
+  const errors = validateSteps(steps, 0, w.sport as Sport, poolOf(w));
   if (errors.length) return { ok: false, error: errors.join(" ") };
   if (JSON.stringify(steps) === JSON.stringify(w.steps)) return { ok: false, error: "That adjustment wouldn't change anything in this workout." };
 
@@ -321,6 +330,8 @@ export async function duplicateWorkout(id: string, date?: string): Promise<Resul
       scheduled_date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : w.scheduled_date,
       description: w.description,
       steps: w.steps,
+      pool_length: w.pool_length,
+      pool_unit: w.pool_unit,
       status: "draft",
       library_id: w.library_id,
     })
@@ -373,7 +384,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("workout_library")
-    .select("id, title, sport, description, steps, use_count")
+    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit")
     .eq("id", libraryId)
     .maybeSingle();
   if (!item) return { ok: false, error: "Library workout not found." };
@@ -390,6 +401,8 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
         scheduled_date: date,
         description: item.description,
         steps: item.steps,
+        pool_length: item.pool_length,
+        pool_unit: item.pool_unit,
         status: "draft",
         library_id: item.id,
       })
@@ -410,4 +423,42 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
     ids,
     message: `Added as a draft for ${athleteIds.length} athlete${athleteIds.length === 1 ? "" : "s"}. Review and send from each athlete's page.`,
   };
+}
+
+// ---------------------------------------------------------------- import from Garmin Connect
+
+export type ImportedItem = { file: string; ok: boolean; title?: string; notes?: string[]; error?: string };
+
+/** Adds workouts exported from Garmin Connect (.json) to the coach's library. */
+export async function importConnectWorkouts(files: { name: string; text: string }[]): Promise<{ results: ImportedItem[] }> {
+  const coach = await requireCoach();
+  const supabase = await createClient();
+  const results: ImportedItem[] = [];
+  for (const f of files.slice(0, 20)) {
+    const name = String(f.name).slice(0, 120);
+    if (typeof f.text !== "string" || f.text.length > 300_000) {
+      results.push({ file: name, ok: false, error: "File is too large to be a workout." });
+      continue;
+    }
+    try {
+      const w = fromConnectWorkout(JSON.parse(f.text));
+      const { error } = await supabase.from("workout_library").insert({
+        coach_id: coach.id,
+        title: w.title,
+        sport: w.sport,
+        description: w.description,
+        steps: w.steps,
+        pool_length: w.pool?.length ?? null,
+        pool_unit: w.pool?.unit ?? null,
+        workout_type: guessType(w.title),
+        tags: ["imported"],
+      });
+      if (error) throw new Error(error.message);
+      results.push({ file: name, ok: true, title: w.title, notes: w.skipped });
+    } catch (e) {
+      results.push({ file: name, ok: false, error: e instanceof SyntaxError ? "Not a valid JSON file." : (e as Error).message });
+    }
+  }
+  revalidatePath("/library");
+  return { results };
 }

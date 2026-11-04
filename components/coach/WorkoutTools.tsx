@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { adjustmentNotes, adjustSteps, describeAdjustment, type Adjustment, type AdjustScope } from "@/lib/workouts/adjust";
 import { adjustWorkout, deleteWorkout, duplicateWorkout, rescheduleWorkout, retryRemoval, undoDelete } from "@/lib/workouts/actions";
 import { describe } from "@/lib/workouts/describe";
-import type { Step } from "@/lib/workouts/garmin-format";
+import type { Pool, Step } from "@/lib/workouts/garmin-format";
 
 import { useToast } from "./Toast";
 import { removalLabel } from "./WorkoutList";
@@ -25,6 +25,8 @@ export default function WorkoutTools({
     id: string;
     title: string;
     scheduledDate: string;
+    sport: string;
+    pool: Pool;
     steps: Step[];
     status: string;
     deletedAt: string | null;
@@ -79,9 +81,10 @@ export default function WorkoutTools({
     );
   }
 
-  const adjusted = preview ? adjustSteps(workout.steps, preview) : null;
-  const before = describe(workout.steps);
-  const after = adjusted ? describe(adjusted) : [];
+  const swim = workout.sport === "swim";
+  const adjusted = preview ? adjustSteps(workout.steps, preview, { swim, pool: workout.pool }) : null;
+  const before = describe(workout.steps, "mi", workout.pool, swim);
+  const after = adjusted ? describe(adjusted, "mi", workout.pool, swim) : [];
 
   return (
     <div className="grid gap-4">
@@ -156,7 +159,7 @@ export default function WorkoutTools({
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
           <div className="toast-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white/10 bg-panel p-6">
             <h3 className="text-lg font-medium capitalize">{describeAdjustment(preview)}</h3>
-            <p className="mt-1 text-sm text-white/50">Only Active and Interval steps change.</p>
+            <p className="mt-1 text-sm text-white/50">Only Active, Interval and Main steps change.</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="mb-1 text-xs uppercase tracking-wider text-white/55">Now</p>

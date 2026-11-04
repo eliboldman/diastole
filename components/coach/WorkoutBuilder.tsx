@@ -5,7 +5,24 @@ import { useState, useTransition } from "react";
 
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { describe } from "@/lib/workouts/describe";
-import type { Duration, Intensity, Sport, Step, Target } from "@/lib/workouts/garmin-format";
+import {
+  DRILLS,
+  EQUIPMENT,
+  hundredMeters,
+  STROKES,
+  SWIM_EFFORTS,
+  YARD,
+  type Drill,
+  type Duration,
+  type Equipment,
+  type Intensity,
+  type Pool,
+  type Sport,
+  type Step,
+  type Stroke,
+  type SwimEffort,
+  type Target,
+} from "@/lib/workouts/garmin-format";
 
 // ---------- unit helpers (UI works in minutes:seconds, miles/km; storage is seconds, meters, sec/km)
 const MI = 1609.344;
@@ -16,7 +33,7 @@ const parseClock = (s: string) => {
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
 
 type UiStep = { uid: string } & (
-  | { kind: "step"; intensity: Intensity; duration: Duration; target?: Target; note?: string }
+  | { kind: "step"; intensity: Intensity; duration: Duration; target?: Target; note?: string; stroke?: Stroke; drill?: Drill; equipment?: Equipment }
   | { kind: "repeat"; times: number; steps: UiStep[] }
 );
 
@@ -51,6 +68,45 @@ const DEFAULT_STEPS: Step[] = [
   { kind: "step", intensity: "COOLDOWN", duration: { type: "open" } },
 ];
 
+// Swims: distance-based, freestyle by default; 100 of the pool's unit.
+const newSwimStep = (intensity: Intensity, pool: Pool): UiStep =>
+  intensity === "REST"
+    ? { uid: uid(), kind: "step", intensity, duration: { type: "time", seconds: 20 } }
+    : { uid: uid(), kind: "step", intensity, duration: { type: "distance", meters: hundredMeters(pool) }, stroke: "FREESTYLE" };
+
+const swimDefault = (pool: Pool): Step[] => {
+  const u = hundredMeters(pool) / 100; // metres per pool unit
+  return [
+    { kind: "step", intensity: "WARMUP", duration: { type: "distance", meters: 300 * u }, stroke: "CHOICE", target: { type: "swim_effort", level: 3 } },
+    {
+      kind: "repeat",
+      times: 4,
+      steps: [
+        { kind: "step", intensity: "MAIN", duration: { type: "distance", meters: 100 * u }, stroke: "FREESTYLE", target: { type: "swim_effort", level: 4 } },
+        { kind: "step", intensity: "REST", duration: { type: "time", seconds: 20 } },
+      ],
+    },
+    { kind: "step", intensity: "COOLDOWN", duration: { type: "distance", meters: 200 * u }, stroke: "CHOICE", target: { type: "swim_effort", level: 2 } },
+  ];
+};
+
+const POOLS: { key: string; label: string; pool: Pool }[] = [
+  { key: "25YARD", label: "25 yd pool", pool: { length: 25, unit: "YARD" } },
+  { key: "25METER", label: "25 m pool", pool: { length: 25, unit: "METER" } },
+  { key: "50METER", label: "50 m pool", pool: { length: 50, unit: "METER" } },
+  { key: "any", label: "Any pool", pool: null },
+];
+const poolKey = (p: Pool) => (p ? `${p.length}${p.unit}` : "any");
+
+const SWIM_INTENSITIES: [Intensity, string][] = [
+  ["WARMUP", "Warm-up"],
+  ["MAIN", "Main"],
+  ["INTERVAL", "Interval"],
+  ["RECOVERY", "Recovery"],
+  ["REST", "Rest"],
+  ["COOLDOWN", "Cool-down"],
+];
+
 const INTENSITIES: [Intensity, string][] = [
   ["WARMUP", "Warm-up"],
   ["ACTIVE", "Active"],
@@ -70,15 +126,20 @@ function StepEditor({
   onChange,
   onRemove,
   paceUnit,
+  swim,
+  pool,
 }: {
   step: Extract<UiStep, { kind: "step" }>;
   onChange: (s: UiStep) => void;
   onRemove: () => void;
   paceUnit: "mi" | "km";
+  swim?: boolean;
+  pool?: Pool;
 }) {
   const d = step.duration;
   const t = step.target;
   const set = (patch: Partial<Extract<UiStep, { kind: "step" }>>) => onChange({ ...step, ...patch });
+  if (swim) return <SwimStepEditor step={step} set={set} onRemove={onRemove} pool={pool ?? null} />;
 
   return (
     <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-3 sm:grid-cols-[auto_auto_1fr_auto]">
@@ -191,6 +252,203 @@ function StepEditor({
   );
 }
 
+function ClockInput({ seconds, onChange, label }: { seconds: number; onChange: (s: number) => void; label: string }) {
+  return (
+    <input
+      key={seconds}
+      className={`${field} w-20`}
+      defaultValue={clock(seconds)}
+      placeholder="m:ss"
+      aria-label={label}
+      onBlur={(e) => {
+        const s = parseClock(e.target.value);
+        if (s > 0) onChange(s);
+        else e.target.value = clock(seconds);
+      }}
+    />
+  );
+}
+
+/** Swim distance in the pool's unit (yd or m); stored in metres. */
+function SwimDistanceInput({ meters, pool, onChange }: { meters: number; pool: Pool; onChange: (m: number) => void }) {
+  const perUnit = pool?.unit === "YARD" ? YARD : 1;
+  const unit = pool?.unit === "YARD" ? "yd" : "m";
+  return (
+    <div className="flex items-center gap-1 text-sm text-white/50">
+      <input
+        key={`${meters}${unit}`}
+        className={`${field} w-20`}
+        defaultValue={Math.round(meters / perUnit)}
+        inputMode="numeric"
+        aria-label={`Distance in ${unit}`}
+        onBlur={(e) => {
+          const v = Number(e.target.value);
+          if (v > 0) onChange(Number((v * perUnit).toFixed(2)));
+        }}
+      />
+      {unit}
+    </div>
+  );
+}
+
+function SwimStepEditor({
+  step,
+  set,
+  onRemove,
+  pool,
+}: {
+  step: Extract<UiStep, { kind: "step" }>;
+  set: (patch: Partial<Extract<UiStep, { kind: "step" }>>) => void;
+  onRemove: () => void;
+  pool: Pool;
+}) {
+  const d = step.duration;
+  const t = step.target;
+  const rest = step.intensity === "REST";
+  const per = pool?.unit === "YARD" ? "yd" : "m";
+
+  return (
+    <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          className={sel}
+          value={step.intensity}
+          aria-label="Step type"
+          onChange={(e) => {
+            const intensity = e.target.value as Intensity;
+            if ((intensity === "REST") === rest) return set({ intensity });
+            // Switching between rest and swimming changes what the step needs.
+            const fresh = newSwimStep(intensity, pool) as Extract<UiStep, { kind: "step" }>;
+            set({ intensity, duration: fresh.duration, stroke: fresh.stroke, drill: undefined, equipment: undefined, target: undefined });
+          }}
+        >
+          {SWIM_INTENSITIES.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+
+        {rest ? (
+          <>
+            <select
+              className={sel}
+              aria-label="Rest type"
+              value={d.type}
+              onChange={(e) => {
+                const v = e.target.value;
+                set({ duration: v === "sendoff" ? { type: "sendoff", seconds: 105 } : v === "open" ? { type: "open" } : { type: "time", seconds: 20 } });
+              }}
+            >
+              <option value="time">Rest at the wall</option>
+              <option value="sendoff" disabled={!pool}>
+                Send-off{pool ? "" : " (pick a pool)"}
+              </option>
+              <option value="open">Until lap</option>
+            </select>
+            {(d.type === "time" || d.type === "sendoff") && (
+              <ClockInput seconds={d.seconds} label={d.type === "sendoff" ? "Send-off (m:ss)" : "Rest (m:ss)"} onChange={(sec) => set({ duration: { ...d, seconds: sec } })} />
+            )}
+          </>
+        ) : (
+          <>
+            <select
+              className={sel}
+              aria-label="Length of step"
+              value={d.type === "sendoff" ? "distance" : d.type}
+              onChange={(e) => {
+                const v = e.target.value;
+                set({ duration: v === "time" ? { type: "time", seconds: 300 } : v === "open" ? { type: "open" } : { type: "distance", meters: hundredMeters(pool) } });
+              }}
+            >
+              <option value="distance">Distance</option>
+              <option value="time">Time (1–59 min)</option>
+              <option value="open">Until lap</option>
+            </select>
+            {d.type === "distance" && <SwimDistanceInput meters={d.meters} pool={pool} onChange={(m) => set({ duration: { type: "distance", meters: m } })} />}
+            {d.type === "time" && <ClockInput seconds={d.seconds} label="Time (m:ss)" onChange={(sec) => set({ duration: { type: "time", seconds: sec } })} />}
+          </>
+        )}
+
+        <button type="button" onClick={onRemove} className="ml-auto min-h-11 px-2 text-sm text-white/50 hover:text-red-300" aria-label="Remove step">
+          Remove
+        </button>
+      </div>
+
+      {!rest && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={sel} aria-label="Stroke" value={step.stroke ?? "CHOICE"} onChange={(e) => set({ stroke: e.target.value as Stroke })}>
+            {Object.entries(STROKES).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <select className={sel} aria-label="Drill" value={step.drill ?? ""} onChange={(e) => set({ drill: (e.target.value || undefined) as Drill | undefined })}>
+            <option value="">Full stroke</option>
+            {Object.entries(DRILLS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <select
+            className={sel}
+            aria-label="Equipment"
+            value={step.equipment ?? ""}
+            onChange={(e) => set({ equipment: (e.target.value || undefined) as Equipment | undefined })}
+          >
+            <option value="">No equipment</option>
+            {Object.entries(EQUIPMENT).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <select
+            className={sel}
+            aria-label="Target"
+            value={t?.type ?? "none"}
+            onChange={(e) => {
+              const v = e.target.value;
+              set({ target: v === "swim_effort" ? { type: "swim_effort", level: 4 } : v === "swim_pace" ? { type: "swim_pace", secPer100: 105 } : undefined });
+            }}
+          >
+            <option value="none">No target</option>
+            <option value="swim_effort">Effort</option>
+            <option value="swim_pace" disabled={!pool}>
+              Pace per 100{pool ? "" : " (pick a pool)"}
+            </option>
+          </select>
+          {t?.type === "swim_effort" && (
+            <select className={sel} aria-label="Effort" value={t.level} onChange={(e) => set({ target: { type: "swim_effort", level: Number(e.target.value) as SwimEffort } })}>
+              {Object.entries(SWIM_EFFORTS).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          )}
+          {t?.type === "swim_pace" && (
+            <span className="flex items-center gap-1 text-sm text-white/50">
+              <ClockInput seconds={t.secPer100} label={`Pace per 100 ${per} (m:ss)`} onChange={(sec) => set({ target: { type: "swim_pace", secPer100: sec } })} />
+              /100{per}
+            </span>
+          )}
+        </div>
+      )}
+
+      <input
+        className={field}
+        placeholder="Note shown on the watch (optional)"
+        defaultValue={step.note ?? ""}
+        maxLength={512}
+        onBlur={(e) => set({ note: e.target.value.trim() || undefined })}
+      />
+    </div>
+  );
+}
+
 function DistanceInput({ meters, onChange }: { meters: number; onChange: (m: number) => void }) {
   const [unit, setUnit] = useState<"m" | "km" | "mi">(meters % 1000 === 0 && meters >= 1000 ? "km" : meters < 1000 ? "m" : "mi");
   const factor = unit === "m" ? 1 : unit === "km" ? 1000 : MI;
@@ -249,7 +507,7 @@ export default function WorkoutBuilder({
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
-  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string };
+  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool };
 }) {
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
@@ -260,12 +518,22 @@ export default function WorkoutBuilder({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [steps, setSteps] = useState<UiStep[]>(() => withIds(initial?.steps ?? DEFAULT_STEPS));
   const [paceUnit, setPaceUnit] = useState<"mi" | "km">("mi");
+  const [pool, setPool] = useState<Pool>(initial ? (initial.pool ?? null) : { length: 25, unit: "YARD" });
+  const swim = sport === "swim";
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
   const editable = !initial || initial.status === "draft";
-  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps) });
+  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null });
+
+  // Switching sport on an untouched starter workout swaps in that sport's starter.
+  const changeSport = (next: Sport) => {
+    const current = JSON.stringify(stripIds(steps));
+    const untouched = current === JSON.stringify(DEFAULT_STEPS) || current === JSON.stringify(swimDefault(pool));
+    setSport(next);
+    if (untouched) setSteps(withIds(next === "swim" ? swimDefault(pool) : DEFAULT_STEPS));
+  };
 
   const updateAt = (list: UiStep[], i: number, s: UiStep) => list.map((x, j) => (j === i ? s : x));
 
@@ -285,9 +553,10 @@ export default function WorkoutBuilder({
     <div className="grid gap-5">
       <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
         <input className={field} placeholder="Workout title, e.g. 4 × 3 min threshold" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!editable} maxLength={100} />
-        <select className={sel} value={sport} onChange={(e) => setSport(e.target.value as Sport)} disabled={!editable}>
+        <select className={sel} value={sport} onChange={(e) => changeSport(e.target.value as Sport)} disabled={!editable} aria-label="Sport">
           <option value="run">Run</option>
           <option value="bike">Bike</option>
+          <option value="swim">Swim</option>
         </select>
         <input className={field} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!editable} />
       </div>
@@ -302,6 +571,37 @@ export default function WorkoutBuilder({
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Steps</h2>
+        {swim && (
+          <label className="flex items-center gap-2 text-xs text-white/60">
+            Pool
+            <select
+              className={sel}
+              value={poolKey(pool)}
+              disabled={!editable}
+              onChange={(e) => {
+                const next = POOLS.find((p) => p.key === e.target.value)?.pool ?? null;
+                // Keep the same number of lengths' worth of distance in the new unit (100 yd -> 100 m).
+                const factor = hundredMeters(next) / hundredMeters(pool);
+                const rescale = (list: UiStep[]): UiStep[] =>
+                  list.map((s) =>
+                    s.kind === "repeat"
+                      ? { ...s, steps: rescale(s.steps) }
+                      : s.duration.type === "distance"
+                        ? { ...s, duration: { type: "distance", meters: Number((s.duration.meters * factor).toFixed(2)) } }
+                        : s,
+                  );
+                if (factor !== 1) setSteps(rescale(steps));
+                setPool(next);
+              }}
+            >
+              {POOLS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {sport === "run" && (
           <label className="flex items-center gap-2 text-xs text-white/60">
             Pace in
@@ -316,7 +616,7 @@ export default function WorkoutBuilder({
       <fieldset disabled={!editable} className="grid gap-3">
         {steps.map((s, i) =>
           s.kind === "step" ? (
-            <StepEditor key={s.uid} step={s} paceUnit={paceUnit} onChange={(n) => setSteps(updateAt(steps, i, n))} onRemove={() => setSteps(steps.filter((_, j) => j !== i))} />
+            <StepEditor key={s.uid} step={s} paceUnit={paceUnit} swim={swim} pool={pool} onChange={(n) => setSteps(updateAt(steps, i, n))} onRemove={() => setSteps(steps.filter((_, j) => j !== i))} />
           ) : (
             <div key={s.uid} className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.03] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -343,6 +643,8 @@ export default function WorkoutBuilder({
                       key={c.uid}
                       step={c}
                       paceUnit={paceUnit}
+                      swim={swim}
+                      pool={pool}
                       onChange={(n) => setSteps(updateAt(steps, i, { ...s, steps: updateAt(s.steps, k, n) }))}
                       onRemove={() => setSteps(updateAt(steps, i, { ...s, steps: s.steps.filter((_, j) => j !== k) }))}
                     />
@@ -351,7 +653,7 @@ export default function WorkoutBuilder({
                 <button
                   type="button"
                   className="min-h-11 justify-self-start text-sm text-emerald-200/80 hover:underline"
-                  onClick={() => setSteps(updateAt(steps, i, { ...s, steps: [...s.steps, newStep("RECOVERY")] }))}
+                  onClick={() => setSteps(updateAt(steps, i, { ...s, steps: [...s.steps, swim ? newSwimStep("REST", pool) : newStep("RECOVERY")] }))}
                 >
                   + Step inside repeat
                 </button>
@@ -360,13 +662,23 @@ export default function WorkoutBuilder({
           ),
         )}
         <div className="flex gap-4">
-          <button type="button" className="min-h-11 text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, newStep()])}>
+          <button type="button" className="min-h-11 text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, swim ? newSwimStep("MAIN", pool) : newStep()])}>
             + Step
           </button>
           <button
             type="button"
             className="min-h-11 text-sm text-emerald-200/80 hover:underline"
-            onClick={() => setSteps([...steps, { uid: uid(), kind: "repeat", times: 4, steps: [newStep("INTERVAL"), newStep("RECOVERY")] }])}
+            onClick={() =>
+              setSteps([
+                ...steps,
+                {
+                  uid: uid(),
+                  kind: "repeat",
+                  times: 4,
+                  steps: swim ? [newSwimStep("MAIN", pool), newSwimStep("REST", pool)] : [newStep("INTERVAL"), newStep("RECOVERY")],
+                },
+              ])
+            }
           >
             + Repeat
           </button>
@@ -425,10 +737,13 @@ export default function WorkoutBuilder({
               {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} → {destination}
             </p>
             <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-white/70">
-              {describe(stripIds(steps), paceUnit).map((l, i) => (
+              {describe(stripIds(steps), paceUnit, swim ? pool : null, swim).map((l, i) => (
                 <li key={i}>{l}</li>
               ))}
             </ol>
+            {swim && steps.some((s) => s.kind === "repeat" && s.steps.some((c) => c.kind === "step" && c.intensity === "REST")) && (
+              <p className="mt-3 text-xs text-white/50">On the watch, the rest after the last rep of each repeat is skipped (Garmin&apos;s swim default).</p>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setConfirming(false)} className="min-h-12 rounded-2xl px-4 text-sm text-white/60 hover:text-white">
                 Cancel

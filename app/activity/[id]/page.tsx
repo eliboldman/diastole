@@ -12,7 +12,8 @@ import type { Lap, Streams } from "@/lib/activity/fit";
 import { clock, isFootSport, km, sportLabel, speedText, whole } from "@/lib/activity/format";
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
-import type { Step } from "@/lib/workouts/garmin-format";
+import { clock as dclock, describe, swimDistance } from "@/lib/workouts/describe";
+import { hundredMeters, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -91,29 +92,33 @@ const VERDICT = {
   under: { text: "Under", icon: ChevronDown, cls: "border-sky-300/30 bg-sky-300/10 text-sky-100" },
 } as const;
 
-function plannedText(p: ComparedStep["planned"]) {
-  const d = p.duration;
-  const dur = d.type === "time" ? clock(d.seconds) : d.type === "distance" ? (km(d.meters) ?? `${d.meters} m`) : "Lap button";
-  const t = p.target;
-  const target = !t
-    ? null
-    : t.type === "hr_zone"
-      ? `HR zone ${t.zone}`
-      : t.type === "hr_range"
-        ? `${t.low}–${t.high} bpm`
-        : t.type === "pace_range"
-          ? `${speedText(1000 / t.slowSecPerKm, "run")?.replace(" /km", "")}–${speedText(1000 / t.fastSecPerKm, "run")}`
-          : `${t.low}–${t.high} W`;
-  return [dur, target].filter(Boolean).join(" · ");
+function plannedText(p: ComparedStep["planned"], pool: Pool, swim: boolean) {
+  // Same wording as the builder's send confirmation, minus the intensity (shown as the row label).
+  const line = describe([{ kind: "step", ...p }], "km", pool, swim)[0] ?? "";
+  return line.replace(/^\S+\s/, "").replace(/ @ /, " · ").replace("until lap", "Lap button");
 }
 
-function actualText(c: ComparedStep, sport: string | null) {
+function actualText(c: ComparedStep, sport: string | null, pool: Pool) {
   const a = c.actual;
   const t = c.planned.target;
+  const per100 = hundredMeters(pool);
   const measured =
-    t?.type === "pace_range" ? speedText(a.avg_speed, sport) : t?.type === "power_range" ? whole(a.avg_power, "W") : t ? whole(a.avg_hr, "bpm") : null;
-  return [clock(a.duration_s), km(a.distance_m), measured].filter(Boolean).join(" · ") || "–";
+    t?.type === "swim_pace"
+      ? a.avg_speed
+        ? `${dclock(per100 / a.avg_speed)}/100${pool?.unit === "YARD" ? "yd" : "m"}`
+        : null
+      : t?.type === "pace_range"
+        ? speedText(a.avg_speed, sport)
+        : t?.type === "power_range"
+          ? whole(a.avg_power, "W")
+          : t?.type === "hr_zone" || t?.type === "hr_range"
+            ? whole(a.avg_hr, "bpm")
+            : null;
+  const dist = a.distance_m ? (isSwim(sport) ? swimDistance(a.distance_m, pool) : km(a.distance_m)) : null;
+  return [clock(a.duration_s), dist, measured].filter(Boolean).join(" · ") || "–";
 }
+
+const isSwim = (sport: string | null) => /swim/i.test(sport ?? "");
 
 export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -133,7 +138,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", act.athlete_id).maybeSingle(),
     supabase.from("activities").select("max_hr").eq("athlete_id", act.athlete_id).gte("start_time", since).not("max_hr", "is", null).limit(500),
     act.planned_workout_id
-      ? supabase.from("planned_workouts").select("id, title, steps, scheduled_date").eq("id", act.planned_workout_id).maybeSingle()
+      ? supabase.from("planned_workouts").select("id, title, sport, steps, scheduled_date, pool_length, pool_unit").eq("id", act.planned_workout_id).maybeSingle()
       : Promise.resolve({ data: null }),
     // Name only, after the visibility check above passed (pod mates can't read profiles directly).
     createAdminClient().from("profiles").select("full_name, timezone").eq("id", act.athlete_id).maybeSingle(),
@@ -151,7 +156,9 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const maxHr = setMax ?? estMax;
   const hrNote = setMax ? `Max HR ${setMax} (set by coach)` : estMax ? `Max HR ~${estMax} (estimated)` : "";
 
-  const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr) : null;
+  const planPool: Pool = plan?.pool_length && plan.pool_unit ? { length: Number(plan.pool_length), unit: plan.pool_unit as PoolUnit } : null;
+  const planSwim = plan?.sport === "swim";
+  const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr, planPool) : null;
   const canEditZones = isCoach; // a coach only ever sees their own athletes here
   const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/me", label: "Today" } : { href: "/me/pods", label: "Pods" };
 
@@ -245,9 +252,9 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
                         {c.planned.label}
                         {c.planned.rep && <span className="text-white/45"> · {c.planned.rep}</span>}
                       </p>
-                      <p className="text-xs text-white/50">Plan: {plannedText(c.planned)}</p>
+                      <p className="text-xs text-white/50">Plan: {plannedText(c.planned, planPool, planSwim)}</p>
                     </div>
-                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport)}</p>
+                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport, planPool)}</p>
                     {v ? (
                       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${v.cls}`}>
                         <v.icon className="h-3.5 w-3.5" aria-hidden />

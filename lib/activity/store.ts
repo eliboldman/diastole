@@ -13,6 +13,7 @@ const present = (o: Record<string, unknown>) =>
 const FAMILY: Record<string, RegExp> = {
   run: /run|treadmill|track/i,
   bike: /cycl|bike|biking|ride|spin/i,
+  swim: /swim/i,
 };
 
 /** treadmill + running -> treadmill_running; lap_swimming + swimming -> lap_swimming. */

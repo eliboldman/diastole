@@ -1,5 +1,5 @@
 // Planned vs completed, per interval. Pure module (testable with `node`).
-import type { Duration, Intensity, Step, Target } from "../workouts/garmin-format.ts";
+import { hundredMeters, type Duration, type Intensity, type Pool, type Step, type Target } from "../workouts/garmin-format.ts";
 import type { Lap } from "./fit.ts";
 import { hrZones, type Zone } from "./zones.ts";
 
@@ -23,6 +23,7 @@ const INTENSITY_LABEL: Record<Intensity, string> = {
   RECOVERY: "Recover",
   REST: "Rest",
   COOLDOWN: "Cool down",
+  MAIN: "Main set",
 };
 
 /** Repeats unrolled into the steps as an athlete runs them. */
@@ -72,7 +73,11 @@ export function alignLaps(planned: PlannedStep[], laps: Lap[]): ComparedStep["ac
 }
 
 /** The target as a range in a measurable unit (bpm, m/s, W). */
-export function targetRange(t: Target | undefined, maxHr: number | null): { kind: "hr" | "pace" | "power"; range: [number, number] } | null {
+export function targetRange(
+  t: Target | undefined,
+  maxHr: number | null,
+  pool: Pool = null,
+): { kind: "hr" | "pace" | "power"; range: [number, number] } | null {
   if (!t) return null;
   switch (t.type) {
     case "hr_range":
@@ -86,6 +91,12 @@ export function targetRange(t: Target | undefined, maxHr: number | null): { kind
       return { kind: "pace", range: [1000 / t.slowSecPerKm, 1000 / t.fastSecPerKm] };
     case "power_range":
       return { kind: "power", range: [t.low, t.high] };
+    case "swim_pace": {
+      const speed = hundredMeters(pool) / t.secPer100;
+      return { kind: "pace", range: [speed, speed] };
+    }
+    case "swim_effort":
+      return null; // an effort word can't be measured
   }
 }
 
@@ -98,12 +109,12 @@ export function judge(value: number | null, range: [number, number] | null): Ver
   return "on";
 }
 
-export function compareWorkout(steps: Step[], laps: Lap[], maxHr: number | null): ComparedStep[] | null {
+export function compareWorkout(steps: Step[], laps: Lap[], maxHr: number | null, pool: Pool = null): ComparedStep[] | null {
   const planned = expandSteps(steps);
   const actual = alignLaps(planned, laps);
   if (!actual) return null;
   return planned.map((p, i) => {
-    const t = targetRange(p.target, maxHr);
+    const t = targetRange(p.target, maxHr, pool);
     const a = actual[i];
     const measured = !t ? null : t.kind === "hr" ? a.avg_hr : t.kind === "pace" ? a.avg_speed : a.avg_power;
     return { planned: p, actual: a, measured, range: t?.range ?? null, verdict: judge(measured, t?.range ?? null) };

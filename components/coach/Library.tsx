@@ -6,7 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { assignFromLibrary, deleteLibraryItem, updateLibraryItem } from "@/lib/workouts/actions";
 import { describe } from "@/lib/workouts/describe";
-import type { Step } from "@/lib/workouts/garmin-format";
+import type { PoolUnit, Step } from "@/lib/workouts/garmin-format";
 
 import { useToast } from "./Toast";
 
@@ -18,6 +18,8 @@ type Item = {
   tags: string[];
   description: string | null;
   steps: Step[];
+  pool_length?: number | null;
+  pool_unit?: PoolUnit | null;
   use_count: number;
   last_used_at: string | null;
 };
@@ -67,7 +69,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
         />
       </div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {["", "run", "bike"].map((s) => (
+        {["", "run", "bike", "swim"].map((s) => (
           <button key={s || "all"} onClick={() => setSport(s)} className={`${chip} shrink-0 ${sport === s ? "border-emerald-300/30 bg-emerald-300/15 text-emerald-50" : "border-white/10 text-white/55"}`}>
             {s || "All sports"}
           </button>
@@ -119,7 +121,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
               {open === i.id && (
                 <div className="mt-4 grid gap-3 border-t border-white/[0.09] pt-4 text-sm">
                   <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
-                    {describe(i.steps).map((l, k) => (
+                    {describe(i.steps, "mi", i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim").map((l, k) => (
                       <li key={k}>{l}</li>
                     ))}
                   </ol>

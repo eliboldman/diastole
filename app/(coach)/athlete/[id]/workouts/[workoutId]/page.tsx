@@ -7,7 +7,7 @@ import WorkoutBuilder from "@/components/coach/WorkoutBuilder";
 import WorkoutTools from "@/components/coach/WorkoutTools";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient } from "@/lib/supabase/server";
-import type { Sport, Step } from "@/lib/workouts/garmin-format";
+import type { Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -22,6 +22,8 @@ type Row = {
   deleted_at: string | null;
   removal_status: string | null;
   removal_error: string | null;
+  pool_length: number | null;
+  pool_unit: PoolUnit | null;
 };
 
 
@@ -41,13 +43,13 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
     const [{ data }, { data: v }] = await Promise.all([
       supabase
         .from("planned_workouts")
-        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error")
+        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit")
         .eq("id", workoutId)
         .eq("athlete_id", id)
         .maybeSingle(),
       supabase
         .from("workout_versions")
-        .select("version, change, title, scheduled_date, steps, created_at")
+        .select("version, change, title, sport, scheduled_date, steps, created_at, pool_length, pool_unit")
         .eq("workout_id", workoutId)
         .order("version", { ascending: false }),
     ]);
@@ -56,6 +58,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
     versions = (v ?? []) as Version[];
   }
 
+  const pool: Pool = w?.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit } : null;
   const initial = w
     ? {
         id: w.id,
@@ -65,6 +68,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         description: w.description,
         steps: w.steps,
         status: w.status,
+        pool,
       }
     : undefined;
 
@@ -92,6 +96,8 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
               id: w.id,
               title: w.title,
               scheduledDate: w.scheduled_date,
+              sport: w.sport,
+              pool,
               steps: w.steps,
               status: w.status,
               deletedAt: w.deleted_at,

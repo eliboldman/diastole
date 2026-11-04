@@ -1,5 +1,5 @@
 import { describe } from "@/lib/workouts/describe";
-import type { Step } from "@/lib/workouts/garmin-format";
+import type { PoolUnit, Step } from "@/lib/workouts/garmin-format";
 
 export type Version = {
   version: number;
@@ -8,6 +8,9 @@ export type Version = {
   scheduled_date: string;
   steps: Step[];
   created_at: string;
+  sport?: string;
+  pool_length?: number | null;
+  pool_unit?: PoolUnit | null;
 };
 
 export default function VersionHistory({ versions }: { versions: Version[] }) {
@@ -37,7 +40,12 @@ export default function VersionHistory({ versions }: { versions: Version[] }) {
                   {v.title} · {new Date(`${v.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 </p>
                 <ol className="mt-2 list-decimal space-y-0.5 pl-5">
-                  {describe(v.steps).map((l, k) => (
+                  {describe(
+                    v.steps,
+                    "mi",
+                    v.pool_length && v.pool_unit ? { length: Number(v.pool_length), unit: v.pool_unit } : null,
+                    v.sport === "swim",
+                  ).map((l, k) => (
                     <li key={k}>{l}</li>
                   ))}
                 </ol>
