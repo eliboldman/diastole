@@ -227,3 +227,39 @@ export function parseFit(bytes: Uint8Array): FitActivity {
 
   return { summary, streams, laps, route: trimRoute(gps), record_fields: [...fields].sort() };
 }
+
+const STOP = new Error("stop");
+
+/**
+ * Cheap look at a FIT file: its type, and for activities the start time. Non-activity files
+ * (all-day monitoring, settings) stop decoding after the first message, so scanning thousands
+ * of export files stays fast.
+ */
+export function fitFileInfo(bytes: Uint8Array): { type: string | null; start: string | null } {
+  let type: string | null = null;
+  try {
+    const decoder = new Decoder(Stream.fromByteArray(bytes));
+    if (!decoder.isFIT()) return { type: null, start: null };
+    decoder.read({
+      mesgListener: (num, mesg) => {
+        if (num === 0) {
+          // file_id
+          const t = (mesg as unknown as Rec).type;
+          type = typeof t === "string" ? t : String(t ?? "");
+          throw STOP;
+        }
+      },
+    });
+  } catch (e) {
+    if (e !== STOP) return { type: null, start: null };
+  }
+  if (type !== "activity") return { type, start: null };
+  try {
+    const { messages } = new Decoder(Stream.fromByteArray(bytes)).read({ mergeHeartRates: false });
+    const s = ((messages.sessionMesgs ?? []) as Rec[])[0];
+    const ms = time(s?.startTime) ?? time(((messages.recordMesgs ?? []) as Rec[])[0]?.timestamp);
+    return { type, start: ms === null ? null : new Date(ms).toISOString() };
+  } catch {
+    return { type, start: null };
+  }
+}

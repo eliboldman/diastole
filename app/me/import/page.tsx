@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import HistoryImport from "@/components/HistoryImport";
+import WorkoutFilesImport from "@/components/WorkoutFilesImport";
 import LastImport from "@/components/LastImport";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -35,6 +36,11 @@ export default async function MyImportPage() {
       <div className="mt-8 max-w-2xl">
         <HistoryImport athleteId={me.id} />
       </div>
+      <section className="mt-10 max-w-2xl">
+        <h2 className="text-xl font-medium tracking-tight">Add workout details</h2>
+        <p className="mb-4 mt-1 text-sm text-white/55">Optional, after the import above. Uses the same ZIP.</p>
+        <WorkoutFilesImport athleteId={me.id} />
+      </section>
     </AthleteShell>
   );
 }

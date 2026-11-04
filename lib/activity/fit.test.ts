@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 
 import { Encoder, Profile } from "@garmin/fitsdk";
 
-import { haversine, parseFit, trimRoute } from "./fit.ts";
+import { fitFileInfo, haversine, parseFit, trimRoute } from "./fit.ts";
 
 // The SDK's message types are narrower than what it accepts; tests write plain objects.
 const mesg = (o: Record<string, unknown>) => o as never;
@@ -124,5 +124,14 @@ assert.equal(trimRoute(tiny), null);
 
 // Garbage in: a clear error, not a crash
 assert.throws(() => parseFit(new Uint8Array([1, 2, 3, 4])), /Not a FIT file/);
+
+// Quick file info for the export scan
+assert.deepEqual(fitFileInfo(encodeRun()), { type: "activity", start: t0.toISOString() });
+{
+  const enc = new Encoder();
+  enc.onMesg(Profile.MesgNum.FILE_ID, mesg({ type: "monitoringB", manufacturer: "garmin", product: 0, timeCreated: t0, serialNumber: 1 }));
+  assert.deepEqual(fitFileInfo(enc.close()), { type: "monitoringB", start: null });
+}
+assert.deepEqual(fitFileInfo(new Uint8Array([9, 9, 9])), { type: null, start: null });
 
 console.log("fit: all passed");

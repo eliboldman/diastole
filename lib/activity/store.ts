@@ -63,11 +63,6 @@ export async function saveFitActivity(
 
   let activityId: string;
   if (existing) {
-    const gaps = Object.fromEntries(
-      Object.entries(present(summaryColumns(fit))).filter(([k]) => existing[k] === null || existing[k] === undefined),
-    );
-    if (!existing.name && opts.name) gaps.name = opts.name;
-    if (Object.keys(gaps).length) await admin.from("activities").update(gaps).eq("id", existing.id);
     activityId = existing.id;
   } else {
     const { data, error } = await admin
@@ -87,11 +82,33 @@ export async function saveFitActivity(
     activityId = data.id;
   }
 
+  await saveFitDetail(admin, existing ?? { id: activityId, athlete_id: opts.athleteId }, fit, opts.source === "garmin" ? "garmin_fit" : "garmin_export_fit", opts.name);
+  await linkPlannedWorkout(admin, activityId);
+  return activityId;
+}
+
+/**
+ * Stores parsed FIT detail against an existing activity row. Summary values already on the row
+ * (from Garmin's own summary) are kept; the file only fills gaps.
+ */
+export async function saveFitDetail(
+  admin: Admin,
+  activity: Record<string, unknown> & { id: string; athlete_id: string },
+  fit: FitActivity,
+  source: "garmin_fit" | "garmin_export_fit",
+  name?: string | null,
+) {
+  const gaps = Object.fromEntries(
+    Object.entries(present(summaryColumns(fit))).filter(([k]) => activity[k] === null || activity[k] === undefined),
+  );
+  if (!activity.name && name) gaps.name = name;
+  if (Object.keys(gaps).length) await admin.from("activities").update(gaps).eq("id", activity.id);
+
   const { error } = await admin.from("activity_details").upsert(
     {
-      activity_id: activityId,
-      athlete_id: opts.athleteId,
-      source: opts.source === "garmin" ? "garmin_fit" : "garmin_export_fit",
+      activity_id: activity.id,
+      athlete_id: activity.athlete_id,
+      source,
       streams: fit.streams,
       laps: fit.laps,
       route: fit.route,
@@ -101,9 +118,6 @@ export async function saveFitActivity(
     { onConflict: "activity_id" },
   );
   if (error) throw new Error(`Saving activity detail failed: ${error.message}`);
-
-  await linkPlannedWorkout(admin, activityId);
-  return activityId;
 }
 
 /**

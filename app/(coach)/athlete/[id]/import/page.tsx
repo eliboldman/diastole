@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import HistoryImport from "@/components/HistoryImport";
+import WorkoutFilesImport from "@/components/WorkoutFilesImport";
 import LastImport from "@/components/LastImport";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
@@ -34,7 +35,7 @@ export default async function CoachImportPage({ params }: { params: Promise<{ id
       </Link>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Import Garmin history</h1>
       <p className="mt-2 max-w-xl text-white/60">
-        Upload {name.split(" ")[0]}&apos;s Garmin account export on their behalf. Only health and activity summaries are read.
+        Upload {name.split(" ")[0]}&apos;s Garmin account export on their behalf. The import reads only health and activity summaries; the optional second step adds their workout files.
       </p>
       <div className="mt-3">
         <LastImport row={last} />
@@ -42,6 +43,11 @@ export default async function CoachImportPage({ params }: { params: Promise<{ id
       <div className="mt-8 max-w-2xl">
         <HistoryImport athleteId={id} forName={name.split(" ")[0]} />
       </div>
+      <section className="mt-10 max-w-2xl">
+        <h2 className="text-xl font-medium tracking-tight">Add workout details</h2>
+        <p className="mb-4 mt-1 text-sm text-white/55">Optional, after the import above. Uses the same ZIP.</p>
+        <WorkoutFilesImport athleteId={id} />
+      </section>
     </DashboardShell>
   );
 }
