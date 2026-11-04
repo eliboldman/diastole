@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { runCoachAssistant } from "@/lib/ai/coach";
+import { runFormInsights } from "@/lib/ai/form-insights";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Vercel Cron calls this once each morning (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
   const results: Record<string, unknown> = {};
   for (const c of coaches ?? []) {
     results[c.id] = await runCoachAssistant(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // Form insights only call Claude when a new pattern shows up across several runs.
+    results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   }
   console.info("Morning coach assistant", results);
   return NextResponse.json({ ok: true, results });

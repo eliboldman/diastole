@@ -42,6 +42,17 @@ function clockLabel(s: number) {
 
 const int = (v: number) => String(Math.round(v));
 
+/** Running-dynamics charts for the Form section. */
+function formSeries(streams: Streams): ChartSeries[] {
+  const out: ChartSeries[] = [];
+  if (streams.gct) out.push({ key: "gct", title: "Ground contact", unit: "ms", values: streams.gct, format: int });
+  if (streams.vo) out.push({ key: "vo", title: "Vertical oscillation", unit: "cm", values: streams.vo.map((v) => (v === null ? null : v / 10)), format: (v) => v.toFixed(1) });
+  if (streams.vr) out.push({ key: "vr", title: "Vertical ratio", unit: "%", values: streams.vr, format: (v) => v.toFixed(1) });
+  if (streams.stride) out.push({ key: "stride", title: "Stride length", unit: "m", values: streams.stride, format: (v) => v.toFixed(2) });
+  if (streams.gct_bal) out.push({ key: "gct_bal", title: "GCT balance", unit: "% left", values: streams.gct_bal, format: (v) => v.toFixed(1) });
+  return out;
+}
+
 /** The charts to draw, in reading order, from whatever streams this activity has. */
 function seriesFor(streams: Streams, sport: string | null): ChartSeries[] {
   const foot = isFootSport(sport);
@@ -68,9 +79,9 @@ function seriesFor(streams: Streams, sport: string | null): ChartSeries[] {
   return out;
 }
 
-export default function ActivityCharts({ streams, sport }: { streams: Streams; sport: string | null }) {
+export default function ActivityCharts({ streams, sport, set = "session" }: { streams: Streams; sport: string | null; set?: "session" | "form" }) {
   const t = streams.t;
-  const series = useMemo(() => seriesFor(streams, sport), [streams, sport]);
+  const series = useMemo(() => (set === "form" ? formSeries(streams) : seriesFor(streams, sport)), [streams, sport, set]);
   const [idx, setIdx] = useState<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const end = t[t.length - 1] || 1;

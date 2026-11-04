@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import WorkoutList from "@/components/coach/WorkoutList";
+import FormInsights, { type InsightView } from "@/components/coach/FormInsights";
 import ZonesForm from "@/components/coach/ZonesForm";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { paceOf } from "@/lib/activity/format";
+import { FORM, type FormMetric } from "@/lib/activity/form";
 import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { getAthleteDetail } from "@/lib/coach-data";
 import { createClient } from "@/lib/supabase/server";
@@ -54,7 +56,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const { profile, device, readiness, trend, activities, workouts, removed } = data;
 
   const supabase = await createClient();
-  const [{ data: zones }, { data: recentMax }] = await Promise.all([
+  const [{ data: zones }, { data: recentMax }, { data: insightRows }] = await Promise.all([
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", id).maybeSingle(),
     supabase
       .from("activities")
@@ -63,7 +65,27 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
       .gte("start_time", daysBackIso(180))
       .not("max_hr", "is", null)
       .limit(500),
+    supabase
+      .from("form_insights")
+      .select("id, issue_key, summary, evidence, drills, picks, status, created_at")
+      .eq("athlete_id", id)
+      .gte("created_at", daysBackIso(60))
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
+  const insights: InsightView[] = (insightRows ?? []).map((r) => {
+    const [metric, kind] = r.issue_key.split(":");
+    return {
+      id: r.id,
+      issue: `${FORM[metric as FormMetric]?.label ?? metric} · ${kind === "fatigue" ? "drifts late in runs" : "across recent runs"}`,
+      summary: r.summary,
+      evidence: r.evidence,
+      drills: r.drills ?? [],
+      picks: (r.picks ?? []) as InsightView["picks"],
+      status: r.status as InsightView["status"],
+      created_at: r.created_at,
+    };
+  });
   const today = readiness[0];
   const overall: Flag = today?.overall ?? "unknown";
 
@@ -168,6 +190,12 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             </Link>
           </div>
           <WorkoutList athleteId={profile.id} workouts={workouts} removed={removed} device={device?.source ?? null} />
+        </section>
+
+        <section id="form" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Form insights</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">Only you see these. Suggested workouts are added as drafts for you to approve and send.</p>
+          <FormInsights athleteId={profile.id} insights={insights} tomorrow={daysBackIso(-1).slice(0, 10)} />
         </section>
 
         <section id="zones" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">

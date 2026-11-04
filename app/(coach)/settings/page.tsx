@@ -34,8 +34,9 @@ export default async function SettingsPage() {
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="mb-1 text-lg font-medium">Coaching assistant</h2>
         <p className="mb-4 text-sm text-white/50">
-          Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. Their
-          readiness, wellness and training data is sent to Anthropic for this.
+          Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. When a
+          running-form issue shows up across several runs, Claude also suggests drills or library workouts. Their readiness,
+          wellness, training and running-form data (never routes) is sent to Anthropic for this.
         </p>
         <AiSettingsForm enabled={ai.ai_enabled} model={ai.ai_model} cap={Number(ai.ai_monthly_cap_usd)} spent={spent} />
       </section>

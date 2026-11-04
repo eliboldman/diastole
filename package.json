@@ -20,7 +20,8 @@
     "test:stickers": "node lib/pod-stickers.test.ts",
     "test:fit": "node lib/activity/fit.test.ts",
     "test:compare": "node lib/activity/compare.test.ts",
-    "test:connect": "node lib/workouts/connect-import.test.ts"
+    "test:connect": "node lib/workouts/connect-import.test.ts",
+    "test:form": "node lib/activity/form.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",

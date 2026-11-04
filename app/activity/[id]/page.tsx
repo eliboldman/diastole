@@ -5,10 +5,13 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import ActivityCharts from "@/components/activity/ActivityCharts";
+import FormSection from "@/components/activity/FormSection";
 import RouteMap from "@/components/activity/RouteMap";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { compareWorkout, type ComparedStep } from "@/lib/activity/compare";
 import type { Lap, Streams } from "@/lib/activity/fit";
+import { RUN_SPORT, type FormSummary } from "@/lib/activity/form";
+import { formToStore, recentFormRuns } from "@/lib/activity/form-store";
 import { clock, isFootSport, km, sportLabel, speedText, whole } from "@/lib/activity/format";
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
@@ -134,7 +137,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const since = daysBackIso(180);
 
   const [{ data: detail }, { data: zonesRow }, { data: recent }, { data: plan }, { data: owner }] = await Promise.all([
-    supabase.from("activity_details").select("streams, laps, route").eq("activity_id", id).maybeSingle(),
+    supabase.from("activity_details").select("streams, laps, route, form").eq("activity_id", id).maybeSingle(),
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", act.athlete_id).maybeSingle(),
     supabase.from("activities").select("max_hr").eq("athlete_id", act.athlete_id).gte("start_time", since).not("max_hr", "is", null).limit(500),
     act.planned_workout_id
@@ -148,6 +151,20 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const laps = ((detail?.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0);
   const route = (detail?.route ?? null) as [number, number][] | null;
   const tz = owner?.timezone ?? me.timezone;
+
+  // Running form: this run's summary (computed once if missing) and the athlete's earlier runs.
+  // Visibility was settled above: whoever can open this run may see this athlete's workout details.
+  const isRun = RUN_SPORT.test(act.sport ?? "");
+  let form: FormSummary | null = (detail?.form as FormSummary | null) ?? null;
+  let formHistory: Awaited<ReturnType<typeof recentFormRuns>> = [];
+  if (isRun && streams) {
+    const admin = createAdminClient();
+    if (!form) {
+      form = formToStore(streams, act.sport);
+      if (form) await admin.from("activity_details").update({ form }).eq("activity_id", id);
+    }
+    formHistory = await recentFormRuns(admin, act.athlete_id, { before: act.start_time, timeZone: tz, limit: 25 });
+  }
   const foot = isFootSport(act.sport);
 
   // Zones: the coach's numbers, otherwise an estimate for max HR.
@@ -275,6 +292,15 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
         <Card title="Over the session">
           <ActivityCharts streams={streams} sport={act.sport} />
         </Card>
+      )}
+
+      {isRun && form && (
+        <FormSection
+          form={form}
+          history={formHistory}
+          streams={streams}
+          date={new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(act.start_time))}
+        />
       )}
 
       {(hasZones || canEditZones) && (

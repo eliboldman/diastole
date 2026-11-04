@@ -209,5 +209,20 @@ check("athlete can read their zones", r.rows?.[0]?.max_hr === 195);
 r = await as(STRANGER, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A2}', 150)`);
 check("stranger cannot set zones", !!r.error);
 
+// ---------------------------------------------------------------- form insights (coach-only)
+await db.exec(`insert into public.form_insights (coach_id, athlete_id, issue_key, summary) values ('${COACH}', '${A1}', 'gct:level', 'Long ground contact')`);
+r = await as(COACH, "select issue_key from public.form_insights");
+check("coach reads their form insights", r.rows?.length === 1);
+r = await as(A1, "select * from public.form_insights");
+check("athletes never see form insights, even about themselves", r.rows?.length === 0);
+r = await as(A1, `update public.form_insights set status = 'dismissed' returning id`);
+check("athletes cannot change form insights", !!r.error || r.rows?.length === 0);
+r = await as(COACH, `update public.form_insights set status = 'dismissed' returning status`);
+check("coach can dismiss", r.rows?.[0]?.status === "dismissed");
+r = await as(COACH, `insert into public.form_insights (coach_id, athlete_id, issue_key, summary) values ('${COACH}', '${A1}', 'x', 'y')`);
+check("only the server writes form insights", !!r.error);
+await db.exec(`insert into public.ai_usage (coach_id, model, athletes, input_tokens, output_tokens, cost_usd, trigger) values ('${COACH}', 'm', 1, 1, 1, 0, 'form')`);
+check("ai_usage accepts form runs", true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { parseFit, type FitActivity } from "@/lib/activity/fit";
+import { formToStore } from "@/lib/activity/form-store";
 
 type Admin = SupabaseClient;
 
@@ -83,7 +84,7 @@ export async function saveFitActivity(
     activityId = data.id;
   }
 
-  await saveFitDetail(admin, existing ?? { id: activityId, athlete_id: opts.athleteId }, fit, opts.source === "garmin" ? "garmin_fit" : "garmin_export_fit", opts.name);
+  await saveFitDetail(admin, existing ?? { id: activityId, athlete_id: opts.athleteId, sport: sportName(fit) }, fit, opts.source === "garmin" ? "garmin_fit" : "garmin_export_fit", opts.name);
   await linkPlannedWorkout(admin, activityId);
   return activityId;
 }
@@ -114,6 +115,7 @@ export async function saveFitDetail(
       laps: fit.laps,
       route: fit.route,
       record_fields: fit.record_fields,
+      form: formToStore(fit.streams, (activity.sport as string | null) ?? sportName(fit)),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "activity_id" },

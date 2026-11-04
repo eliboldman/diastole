@@ -84,8 +84,9 @@ export default function PrivacyPage() {
           </ul>
           <p>
             The coach may use an AI assistant (Claude, provided by Anthropic) to summarize athlete
-            data and suggest training adjustments. Suggestions are reviewed by the coach before
-            anything is changed or sent to an athlete.
+            data, including running-form measurements like cadence and ground contact time, and to
+            suggest training adjustments or drills. Suggestions are reviewed by the coach before
+            anything is changed or sent to an athlete. Routes and location are never sent.
           </p>
         </Section>
 
