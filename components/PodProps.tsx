@@ -5,9 +5,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { useToast } from "@/components/coach/Toast";
-import { hideProps, sendProps } from "@/lib/pod-props-actions";
-import { ALL_STICKERS, ALWAYS_STICKERS, MAX_SEND, milestone, rampStep, unlockedFor, type MemberData, type Sticker } from "@/lib/pod-stickers";
+import { hideOneProp, hideProps, sendProps } from "@/lib/pod-props-actions";
+import { ALL_STICKERS, ALWAYS_STICKERS, MAX_SEND, NOTE_MAX, milestone, rampStep, unlockedFor, type MemberData, type Sticker } from "@/lib/pod-stickers";
 
+export type PropSend = {
+  id: string;
+  to_id: string;
+  sticker: string;
+  count: number;
+  note: string | null;
+  hidden: boolean;
+  created_at: string;
+  to_me: boolean;
+  from_me: boolean;
+  from_name: string;
+};
 export type PropTotal = { to_id: string; sticker: string; total: number; senders: number; from_me: boolean; hidden: boolean };
 
 const fmt = (n: number) => (n >= 10_000 ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n) : n.toLocaleString());
@@ -21,10 +33,12 @@ export default function PodProps({
   podId,
   member,
   totals,
+  notes,
 }: {
   podId: string;
   member: MemberData & { id: string; name: string; is_me: boolean };
   totals: PropTotal[];
+  notes: PropSend[];
 }) {
   const router = useRouter();
   const { show, element: toast } = useToast(4500);
@@ -50,6 +64,8 @@ export default function PodProps({
   }, [totals, extra, member.id]);
 
   const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const noteRef = useRef("");
   const [peek, setPeek] = useState<string | null>(null);
   const [wiggle, setWiggle] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
@@ -80,11 +96,16 @@ export default function PodProps({
     setBursts((b) => [...b, { id, emoji: c.sticker.emoji, n: Math.min(28, 6 + Math.round(Math.log10(c.n) * 5)) }]);
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 1400);
     bump(c.sticker.key, c.n);
-    const r = await sendProps(podId, member.id, c.sticker.key, c.n);
+    const sentNote = noteRef.current.trim();
+    const r = await sendProps(podId, member.id, c.sticker.key, c.n, sentNote);
     if (!r.ok) {
       bump(c.sticker.key, -c.n);
       show(r.error, { ok: false });
       return;
+    }
+    if (sentNote) {
+      noteRef.current = "";
+      setNote("");
     }
     const m = milestone(c.n);
     show(`${c.n.toLocaleString()} × ${c.sticker.emoji} sent to ${first}${m && c.n >= 100 ? `. ${m.charAt(0).toUpperCase()}${m.slice(1)}.` : ""}`);
@@ -168,6 +189,13 @@ export default function PodProps({
     setOpen(true);
   }
 
+  async function hideNote(id: string) {
+    const r = await hideOneProp(id);
+    if (!r.ok) return show(r.error, { ok: false });
+    show("Note hidden. Nobody saw anything.");
+    router.refresh();
+  }
+
   async function hide(key: string) {
     setPeek(null);
     const r = await hideProps(podId, key);
@@ -239,6 +267,24 @@ export default function PodProps({
         </div>
       )}
 
+      {notes.length > 0 && (
+        <ul className="mb-3 grid gap-1.5">
+          {notes.slice(0, 3).map((n) => (
+            <li key={n.id} className={`flex items-start gap-2 rounded-2xl bg-white/[0.04] px-3 py-2 text-sm ${n.hidden ? "opacity-45" : ""}`}>
+              <span aria-hidden>{ALL_STICKERS[n.sticker]?.emoji}</span>
+              <span className="min-w-0 flex-1 break-words text-white/75">
+                &ldquo;{n.note}&rdquo; <span className="text-white/45">— {n.from_me ? "you" : n.from_name}</span>
+              </span>
+              {n.to_me && !n.hidden && (
+                <button onClick={() => hideNote(n.id)} className="shrink-0 text-xs text-white/45 hover:text-red-200">
+                  Hide
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <button
         key={wiggle}
         type="button"
@@ -285,6 +331,21 @@ export default function PodProps({
                 <X size={18} />
               </button>
             </div>
+
+            <label className="mt-3 block">
+              <span className="sr-only">Add a note</span>
+              <input
+                value={note}
+                maxLength={NOTE_MAX}
+                onChange={(e) => {
+                  setNote(e.target.value);
+                  noteRef.current = e.target.value;
+                }}
+                placeholder="Add a note (optional), then pick a sticker"
+                className="min-h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-base text-white placeholder:text-white/40 focus:border-emerald-300/40 focus:outline-none sm:text-sm"
+              />
+              {note.length > NOTE_MAX - 30 && <span className="mt-1 block text-right text-xs text-white/45">{NOTE_MAX - note.length} left</span>}
+            </label>
 
             {/* The counter climbs while a sticker is held */}
             <div className="flex h-20 flex-col items-center justify-center">

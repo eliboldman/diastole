@@ -1,20 +1,12 @@
 import { FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
-import PodProps, { type PropTotal } from "@/components/PodProps";
+import PodProps, { type PropSend, type PropTotal } from "@/components/PodProps";
 import { ALL_STICKERS, podAwards } from "@/lib/pod-stickers";
 import type { Flag } from "@/lib/readiness/engine";
 
 export type PodPropsData = {
   totals: PropTotal[];
-  recent: {
-    id: string;
-    to_id: string;
-    sticker: string;
-    count: number;
-    created_at: string;
-    from_me: boolean;
-    from_name: string;
-  }[];
+  recent: PropSend[];
 };
 
 export type PodFeedData = {
@@ -117,9 +109,9 @@ export default function PodFeed({
                 {recent.map((r) => (
                   <li
                     key={r.id}
-                    className="flex items-center justify-between gap-3"
+                    className={`flex items-start justify-between gap-3 ${r.hidden ? "opacity-45" : ""}`}
                   >
-                    <span className="min-w-0 truncate">
+                    <span className="min-w-0">
                       <span className="text-white/80">
                         {r.from_me ? "You" : r.from_name}
                       </span>
@@ -130,6 +122,11 @@ export default function PodFeed({
                       {ALL_STICKERS[r.sticker].emoji}
                       <span className="text-white/50"> to </span>
                       {firstName(r.to_id)}
+                      {r.note && (
+                        <span className="block break-words text-white/65">
+                          &ldquo;{r.note}&rdquo;
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 text-xs text-white/45">
                       {ago(r.created_at)}
@@ -250,6 +247,9 @@ export default function PodFeed({
                   podId={feed.pod.id}
                   member={m}
                   totals={props.totals.filter((t) => t.to_id === m.id)}
+                  notes={props.recent.filter(
+                    (r) => r.to_id === m.id && r.note,
+                  )}
                 />
               )}
             </article>

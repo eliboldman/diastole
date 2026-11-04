@@ -105,6 +105,7 @@ export function rampStep(heldMs: number): number {
   return 4_999;
 }
 export const MAX_SEND = 1_000_000;
+export const NOTE_MAX = 120; // matches the database check
 
 // ---------------------------------------------------------------- weekly pod awards
 

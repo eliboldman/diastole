@@ -1,5 +1,5 @@
 -- Pod props & heckles: pod members (and the pod's coach) send stickers to each other, in bulk.
--- No free text: the sticker is a key from the app's catalog, so nothing typed can turn mean.
+-- The sticker is a key from the app's catalog; an optional short note rides along.
 -- The table has no client policies; everything goes through the functions below.
 
 create table public.pod_props (
@@ -9,6 +9,7 @@ create table public.pod_props (
   to_id       uuid not null references public.profiles (id) on delete cascade,
   sticker     text not null check (sticker ~ '^[a-z0-9_]{1,40}$'),
   count       integer not null check (count between 1 and 1000000),
+  note        text check (note is null or length(note) between 1 and 120),
   hidden      boolean not null default false, -- the recipient waved it away
   created_at  timestamptz not null default now(),
   check (from_id <> to_id)
@@ -20,12 +21,13 @@ alter table public.pod_props enable row level security;
 
 -- Send. The sender must be an active member or the pod's coach; the recipient an active member.
 -- Light rate limit so a stuck finger can't flood the table.
-create or replace function public.send_pod_props(p_pod uuid, p_to uuid, p_sticker text, p_count integer)
+create or replace function public.send_pod_props(p_pod uuid, p_to uuid, p_sticker text, p_count integer, p_note text default null)
 returns text
 language plpgsql security definer set search_path = ''
 as $$
 declare
   me uuid := auth.uid();
+  clean_note text := nullif(btrim(regexp_replace(coalesce(p_note, ''), '\s+', ' ', 'g')), '');
 begin
   if me is null then return 'Sign in first.'; end if;
   if p_to = me then return 'self'; end if;
@@ -42,7 +44,9 @@ begin
     return 'slow';
   end if;
 
-  insert into public.pod_props (pod_id, from_id, to_id, sticker, count) values (p_pod, me, p_to, p_sticker, p_count);
+  if length(clean_note) > 120 then return 'Keep the note to 120 characters.'; end if;
+
+  insert into public.pod_props (pod_id, from_id, to_id, sticker, count, note) values (p_pod, me, p_to, p_sticker, p_count, clean_note);
   return null; -- null = sent
 end;
 $$;
@@ -53,6 +57,14 @@ returns void
 language sql security definer set search_path = ''
 as $$
   update public.pod_props set hidden = true where pod_id = p_pod and to_id = auth.uid() and sticker = p_sticker;
+$$;
+
+-- The recipient hides one send (say, a note they didn't love).
+create or replace function public.hide_pod_prop(p_id uuid)
+returns void
+language sql security definer set search_path = ''
+as $$
+  update public.pod_props set hidden = true where id = p_id and to_id = auth.uid();
 $$;
 
 -- What a pod sees: totals per recipient and sticker, plus the latest sends with sender names.
@@ -76,18 +88,20 @@ begin
         group by to_id, sticker) t), '[]'::jsonb),
     'recent', coalesce((
       select jsonb_agg(r order by r.created_at desc) from (
-        select pp.id, pp.to_id, pp.sticker, pp.count, pp.created_at, pp.from_id = auth.uid() as from_me,
+        select pp.id, pp.to_id, pp.sticker, pp.count, pp.note, pp.hidden, pp.created_at, pp.to_id = auth.uid() as to_me, pp.from_id = auth.uid() as from_me,
                coalesce(nullif(split_part(p.full_name, ' ', 1), ''), case when p.role = 'coach' then 'Coach' else 'Someone' end) as from_name
         from public.pod_props pp join public.profiles p on p.id = pp.from_id
         where pp.pod_id = p_pod and (coach or not pp.hidden)
-        order by pp.created_at desc limit 20) r), '[]'::jsonb)
+        order by pp.created_at desc limit 40) r), '[]'::jsonb)
   );
 end;
 $$;
 
-revoke all on function public.send_pod_props(uuid, uuid, text, integer) from public, anon;
+revoke all on function public.send_pod_props(uuid, uuid, text, integer, text) from public, anon;
+revoke all on function public.hide_pod_prop(uuid) from public, anon;
 revoke all on function public.hide_pod_props(uuid, text) from public, anon;
 revoke all on function public.get_pod_props(uuid) from public, anon;
-grant execute on function public.send_pod_props(uuid, uuid, text, integer) to authenticated;
+grant execute on function public.send_pod_props(uuid, uuid, text, integer, text) to authenticated;
+grant execute on function public.hide_pod_prop(uuid) to authenticated;
 grant execute on function public.hide_pod_props(uuid, text) to authenticated;
 grant execute on function public.get_pod_props(uuid) to authenticated;
