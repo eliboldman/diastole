@@ -13,7 +13,9 @@
     "test:adjust": "node lib/workouts/adjust.test.ts",
     "test:scenarios": "node lib/ai/scenarios.test.ts",
     "test:export": "node lib/garmin/export-parse.test.ts",
-    "test:source": "node lib/readiness/source.test.ts"
+    "test:source": "node lib/readiness/source.test.ts",
+    "test:calendar": "node lib/calendar.test.ts",
+    "test:stickers": "node lib/pod-stickers.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",

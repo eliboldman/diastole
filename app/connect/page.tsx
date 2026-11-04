@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import OnboardingProgress from "@/components/OnboardingProgress";
+import AthleteShell from "@/components/AthleteShell";
 import PublicShell from "@/components/PublicShell";
 import { garminConfigured } from "@/lib/garmin/client";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -116,9 +118,10 @@ export default async function ConnectPage({
   }
   const onboarding = isAthlete && connected.size === 0;
 
+  // Onboarding stays a focused, menu-free screen; afterwards this is the Device page in the app.
   return (
-    <PublicShell signedIn>
-      <div className="mx-auto max-w-xl pt-16">
+    <DeviceShell onboarding={onboarding} isCoach={!isAthlete}>
+      <div className={`mx-auto max-w-xl ${onboarding ? "pt-16" : ""}`}>
         {onboarding && <OnboardingProgress step={2} />}
         <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">
           Welcome{firstName ? `, ${firstName}` : ""}
@@ -210,8 +213,12 @@ export default async function ConnectPage({
           </form>
         </div>
       </div>
-    </PublicShell>
+    </DeviceShell>
   );
+}
+
+function DeviceShell({ onboarding, isCoach, children }: { onboarding: boolean; isCoach: boolean; children: ReactNode }) {
+  return onboarding ? <PublicShell signedIn>{children}</PublicShell> : <AthleteShell isCoach={isCoach}>{children}</AthleteShell>;
 }
 
 const buttonClass =
