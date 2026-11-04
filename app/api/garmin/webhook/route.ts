@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ingestGarminPayload } from "@/lib/garmin/ingest";
+import { logWebhook, summarizePush } from "@/lib/garmin/webhook-log";
 import { refreshReadiness } from "@/lib/readiness/run";
 
 // One endpoint for every Garmin push type (dailies, sleeps, hrv, stressDetails, activities,
@@ -15,12 +16,15 @@ function keyMatches(given: string | null | undefined) {
 }
 
 export async function handleGarminPush(request: NextRequest, given: string | null | undefined) {
+  const startedAt = Date.now();
+  const host = request.headers.get("host");
   if (!keyMatches(given)) {
     console.warn("Garmin webhook rejected: bad key", {
       keyPresent: Boolean(given),
       keyLength: given?.length ?? 0,
       path: request.nextUrl.pathname.replace(/\/webhook\/.+$/, "/webhook/<key>"),
     });
+    await logWebhook({ host, outcome: "bad_key", startedAt });
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -29,12 +33,11 @@ export async function handleGarminPush(request: NextRequest, given: string | nul
     body = await request.json();
   } catch {
     console.warn("Garmin webhook: body was not JSON");
+    await logWebhook({ host, outcome: "bad_json", startedAt });
     return new NextResponse("Bad JSON", { status: 400 });
   }
 
-  const counts = Object.fromEntries(
-    Object.entries(body as Record<string, unknown>).map(([k, v]) => [k, Array.isArray(v) ? v.length : typeof v]),
-  );
+  const { counts, garminUsers } = summarizePush(body);
   console.info("Garmin webhook received", counts);
 
   let touched: Set<string>;
@@ -42,9 +45,12 @@ export async function handleGarminPush(request: NextRequest, given: string | nul
     touched = await ingestGarminPayload(body as Parameters<typeof ingestGarminPayload>[0]);
   } catch (e) {
     console.error("Garmin webhook ingest failed", e);
+    await logWebhook({ host, outcome: "ingest_error", counts, garminUsers, error: e instanceof Error ? e.message : String(e), startedAt });
     // Non-200 makes Garmin retry later.
     return new NextResponse("Ingest failed", { status: 500 });
   }
+
+  await logWebhook({ host, outcome: "ok", counts, garminUsers, athletesTouched: touched.size, startedAt });
 
   // Data is stored; a readiness failure shouldn't make Garmin resend it.
   for (const athleteId of touched) {

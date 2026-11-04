@@ -47,6 +47,14 @@ export default async function SettingsPage() {
           Manage device connection →
         </Link>
       </section>
+
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
+        <h2 className="text-lg font-medium">Garmin feed</h2>
+        <p className="mt-2 text-sm text-white/55">Every delivery Garmin sends, including rejected or failed ones.</p>
+        <Link href="/garmin-log" className="mt-4 inline-block text-sm text-emerald-200 hover:underline">
+          View Garmin deliveries →
+        </Link>
+      </section>
     </DashboardShell>
   );
 }
