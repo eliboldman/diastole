@@ -21,7 +21,7 @@ export default function AiSettingsForm({ enabled, model, cap, spent }: { enabled
   const [pending, start] = useTransition();
 
   return (
-    <div className="grid max-w-md gap-4">
+    <div className="grid w-full max-w-md grid-cols-[minmax(0,1fr)] gap-4">
       <label className="flex items-center gap-3 text-sm">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="h-5 w-5 accent-emerald-400" />
         Run the coaching assistant each morning

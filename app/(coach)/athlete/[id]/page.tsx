@@ -7,11 +7,11 @@ import WorkoutList from "@/components/coach/WorkoutList";
 import FormInsights, { type InsightView } from "@/components/coach/FormInsights";
 import ZonesForm from "@/components/coach/ZonesForm";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { paceOf } from "@/lib/activity/format";
+import { paceOf, shortDistance } from "@/lib/activity/format";
 import { FORM, type FormMetric } from "@/lib/activity/form";
 import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { getAthleteDetail } from "@/lib/coach-data";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 
 const AREA_HELP: Record<string, string> = {
@@ -55,6 +55,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   const { profile, device, readiness, trend, activities, workouts, removed } = data;
 
+  const me = await requireCoach();
   const supabase = await createClient();
   const [{ data: zones }, { data: recentMax }, { data: insightRows }] = await Promise.all([
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", id).maybeSingle(),
@@ -169,7 +170,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
                     </td>
                     <td className="py-2 pr-3 text-right text-white/70">{a.duration_s ? `${Math.round(a.duration_s / 60)} min` : ""}</td>
                     <td className="py-2 pr-3 text-right text-white/70">
-                      {a.distance_m && a.distance_m > 100 ? `${(a.distance_m / 1000).toFixed(1)} km` : ""}
+                      {shortDistance(a.distance_m, me.units) ?? ""}
                     </td>
                     <td className="py-2 text-right text-white/50">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : ""}</td>
                   </tr>
@@ -204,7 +205,8 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           <ZonesForm
             athleteId={profile.id}
             maxHr={zones?.max_hr ?? null}
-            thresholdPace={zones?.threshold_speed_mps ? paceOf(Number(zones.threshold_speed_mps)) : null}
+            thresholdPace={zones?.threshold_speed_mps ? paceOf(Number(zones.threshold_speed_mps), me.units) : null}
+            units={me.units}
             ftp={zones?.ftp_w ?? null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />

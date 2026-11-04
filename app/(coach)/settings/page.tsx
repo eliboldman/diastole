@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const me = await requireCoach();
   const supabase = await createClient();
   const [{ data: profile }, { data: aiRow }, spent] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone").eq("id", me.id).single(),
+    supabase.from("profiles").select("full_name, timezone, units").eq("id", me.id).single(),
     supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle(),
     monthToDateSpend(me.id),
   ]);
@@ -28,7 +28,7 @@ export default async function SettingsPage() {
 
       <section className="mt-8 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
         <h2 className="mb-4 text-lg font-medium">Profile</h2>
-        <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} />
+        <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} units={profile?.units === "km" ? "km" : "mi"} />
       </section>
 
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">

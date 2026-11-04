@@ -27,6 +27,7 @@ export default function WorkoutTools({
     scheduledDate: string;
     sport: string;
     pool: Pool;
+    units?: "mi" | "km";
     steps: Step[];
     status: string;
     deletedAt: string | null;
@@ -83,8 +84,8 @@ export default function WorkoutTools({
 
   const swim = workout.sport === "swim";
   const adjusted = preview ? adjustSteps(workout.steps, preview, { swim, pool: workout.pool }) : null;
-  const before = describe(workout.steps, "mi", workout.pool, swim);
-  const after = adjusted ? describe(adjusted, "mi", workout.pool, swim) : [];
+  const before = describe(workout.steps, workout.units ?? "mi", workout.pool, swim);
+  const after = adjusted ? describe(adjusted, workout.units ?? "mi", workout.pool, swim) : [];
 
   return (
     <div className="grid gap-4">

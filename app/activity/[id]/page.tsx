@@ -12,7 +12,7 @@ import { compareWorkout, type ComparedStep } from "@/lib/activity/compare";
 import type { Lap, Streams } from "@/lib/activity/fit";
 import { RUN_SPORT, type FormSummary } from "@/lib/activity/form";
 import { formToStore, recentFormRuns } from "@/lib/activity/form-store";
-import { clock, isFootSport, km, sportLabel, speedText, whole } from "@/lib/activity/format";
+import { clock, distance, isFootSport, sportLabel, speedText, whole, type Units } from "@/lib/activity/format";
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 import { clock as dclock, describe, swimDistance } from "@/lib/workouts/describe";
@@ -95,13 +95,13 @@ const VERDICT = {
   under: { text: "Under", icon: ChevronDown, cls: "border-sky-300/30 bg-sky-300/10 text-sky-100" },
 } as const;
 
-function plannedText(p: ComparedStep["planned"], pool: Pool, swim: boolean) {
+function plannedText(p: ComparedStep["planned"], pool: Pool, swim: boolean, u: Units) {
   // Same wording as the builder's send confirmation, minus the intensity (shown as the row label).
-  const line = describe([{ kind: "step", ...p }], "km", pool, swim)[0] ?? "";
+  const line = describe([{ kind: "step", ...p }], u, pool, swim)[0] ?? "";
   return line.replace(/^\S+\s/, "").replace(/ @ /, " · ").replace("until lap", "Lap button");
 }
 
-function actualText(c: ComparedStep, sport: string | null, pool: Pool) {
+function actualText(c: ComparedStep, sport: string | null, pool: Pool, u: Units) {
   const a = c.actual;
   const t = c.planned.target;
   const per100 = hundredMeters(pool);
@@ -111,13 +111,13 @@ function actualText(c: ComparedStep, sport: string | null, pool: Pool) {
         ? `${dclock(per100 / a.avg_speed)}/100${pool?.unit === "YARD" ? "yd" : "m"}`
         : null
       : t?.type === "pace_range"
-        ? speedText(a.avg_speed, sport)
+        ? speedText(a.avg_speed, sport, u)
         : t?.type === "power_range"
           ? whole(a.avg_power, "W")
           : t?.type === "hr_zone" || t?.type === "hr_range"
             ? whole(a.avg_hr, "bpm")
             : null;
-  const dist = a.distance_m ? (isSwim(sport) ? swimDistance(a.distance_m, pool) : km(a.distance_m)) : null;
+  const dist = a.distance_m ? (isSwim(sport) ? swimDistance(a.distance_m, pool) : distance(a.distance_m, u)) : null;
   return [clock(a.duration_s), dist, measured].filter(Boolean).join(" · ") || "–";
 }
 
@@ -151,6 +151,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const laps = ((detail?.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0);
   const route = (detail?.route ?? null) as [number, number][] | null;
   const tz = owner?.timezone ?? me.timezone;
+  const u: Units = me.units ?? "mi";
 
   // Running form: this run's summary (computed once if missing) and the athlete's earlier runs.
   // Visibility was settled above: whoever can open this run may see this athlete's workout details.
@@ -182,8 +183,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const when = new Date(act.start_time);
   const tiles = [
     ["Time", clock(act.duration_s)],
-    ["Distance", km(act.distance_m)],
-    [foot ? "Avg pace" : "Avg speed", speedText(act.avg_speed_mps, act.sport)],
+    ["Distance", distance(act.distance_m, u)],
+    [foot ? "Avg pace" : "Avg speed", speedText(act.avg_speed_mps, act.sport, u)],
     ["Avg HR", whole(act.avg_hr, "bpm")],
     ["Max HR", whole(act.max_hr, "bpm")],
     ["Avg power", whole(act.avg_power, "W")],
@@ -197,8 +198,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
   const lapCols = [
     { key: "time", head: "Time", get: (l: Lap) => clock(l.duration_s) },
-    { key: "dist", head: "Distance", get: (l: Lap) => km(l.distance_m) },
-    { key: "pace", head: foot ? "Pace" : "Speed", get: (l: Lap) => speedText(l.avg_speed, act.sport) },
+    { key: "dist", head: "Distance", get: (l: Lap) => distance(l.distance_m, u) },
+    { key: "pace", head: foot ? "Pace" : "Speed", get: (l: Lap) => speedText(l.avg_speed, act.sport, u) },
     { key: "hr", head: "Avg HR", get: (l: Lap) => whole(l.avg_hr, "") },
     { key: "power", head: "Power", get: (l: Lap) => whole(l.avg_power, "") },
     { key: "cad", head: "Cadence", get: (l: Lap) => whole(l.avg_cadence, "") },
@@ -269,9 +270,9 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
                         {c.planned.label}
                         {c.planned.rep && <span className="text-white/45"> · {c.planned.rep}</span>}
                       </p>
-                      <p className="text-xs text-white/50">Plan: {plannedText(c.planned, planPool, planSwim)}</p>
+                      <p className="text-xs text-white/50">Plan: {plannedText(c.planned, planPool, planSwim, u)}</p>
                     </div>
-                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport, planPool)}</p>
+                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport, planPool, u)}</p>
                     {v ? (
                       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${v.cls}`}>
                         <v.icon className="h-3.5 w-3.5" aria-hidden />
@@ -290,7 +291,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
       {streams && streams.t.length > 1 && (
         <Card title="Over the session">
-          <ActivityCharts streams={streams} sport={act.sport} />
+          <ActivityCharts streams={streams} sport={act.sport} units={u} />
         </Card>
       )}
 
@@ -322,8 +323,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
                   title="Pace"
                   zones={paceZones(Number(zonesRow!.threshold_speed_mps))}
                   secs={paceSecs}
-                  note={`Threshold ${speedText(Number(zonesRow!.threshold_speed_mps), "run")}`}
-                  label={(z) => (z.high ? `slower than ${speedText(z.high, "run")}` : `${speedText(z.low, "run")} or faster`)}
+                  note={`Threshold ${speedText(Number(zonesRow!.threshold_speed_mps), "run", u)}`}
+                  label={(z) => (z.high ? `slower than ${speedText(z.high, "run", u)}` : `${speedText(z.low, "run", u)} or faster`)}
                 />
               )}
               {powerSecs && (

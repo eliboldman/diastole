@@ -40,6 +40,7 @@ export type Profile = {
   full_name: string | null;
   email: string | null;
   timezone: string;
+  units: "mi" | "km";
 };
 
 /** The signed-in user's profile, or null when signed out. */
@@ -50,7 +51,7 @@ export async function getProfile(): Promise<Profile | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, coach_id, full_name, email, timezone")
+    .select("id, role, coach_id, full_name, email, timezone, units")
     .eq("id", data.user.id)
     .single();
   return profile;

@@ -6,7 +6,7 @@ import VersionHistory, { type Version } from "@/components/coach/VersionHistory"
 import WorkoutBuilder from "@/components/coach/WorkoutBuilder";
 import WorkoutTools from "@/components/coach/WorkoutTools";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
@@ -27,8 +27,17 @@ type Row = {
 };
 
 
-export default async function WorkoutPage({ params }: { params: Promise<{ id: string; workoutId: string }> }) {
+export default async function WorkoutPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string; workoutId: string }>;
+  searchParams: Promise<{ sport?: string }>;
+}) {
   const { id, workoutId } = await params;
+  const { sport: sportParam } = await searchParams;
+  const me = await requireCoach();
+  const startSport: Sport = sportParam === "bike" || sportParam === "swim" ? sportParam : "run";
   const supabase = await createClient();
 
   const [{ data: athlete }, { data: device }] = await Promise.all([
@@ -98,6 +107,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
               scheduledDate: w.scheduled_date,
               sport: w.sport,
               pool,
+              units: me.units,
               steps: w.steps,
               status: w.status,
               deletedAt: w.deleted_at,
@@ -110,13 +120,13 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
 
       {!w?.deleted_at && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:p-6">
-          <WorkoutBuilder athleteId={id} athleteName={firstName} device={source} initial={initial} />
+          <WorkoutBuilder athleteId={id} athleteName={firstName} device={source} initial={initial} startSport={startSport} units={me.units} />
         </section>
       )}
 
       {versions.length > 0 && (
         <div className="mt-6">
-          <VersionHistory versions={versions} />
+          <VersionHistory versions={versions} units={me.units} />
         </div>
       )}
     </DashboardShell>

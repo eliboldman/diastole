@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { Streams } from "@/lib/activity/fit";
-import { isFootSport, paceOf } from "@/lib/activity/format";
+import { isFootSport, MILE, paceOf, type Units } from "@/lib/activity/format";
 
 type ChartSeries = {
   key: string;
@@ -54,7 +54,8 @@ function formSeries(streams: Streams): ChartSeries[] {
 }
 
 /** The charts to draw, in reading order, from whatever streams this activity has. */
-function seriesFor(streams: Streams, sport: string | null): ChartSeries[] {
+function seriesFor(streams: Streams, sport: string | null, u: Units): ChartSeries[] {
+  const per = u === "mi" ? MILE : 1000;
   const foot = isFootSport(sport);
   const out: ChartSeries[] = [];
   if (streams.hr) out.push({ key: "hr", title: "Heart rate", unit: "bpm", values: streams.hr, format: int });
@@ -64,13 +65,19 @@ function seriesFor(streams: Streams, sport: string | null): ChartSeries[] {
         ? {
             key: "pace",
             title: "Pace",
-            unit: "/km",
-            // seconds per km; standing still is a gap, not an off-the-chart value
-            values: streams.speed.map((v) => (v !== null && v >= 0.5 ? 1000 / v : null)),
-            format: (v) => paceOf(1000 / v) ?? "–",
+            unit: `/${u}`,
+            // seconds per mile or km; standing still is a gap, not an off-the-chart value
+            values: streams.speed.map((v) => (v !== null && v >= 0.5 ? per / v : null)),
+            format: (v) => paceOf(per / v, u) ?? "–",
             invert: true,
           }
-        : { key: "speed", title: "Speed", unit: "km/h", values: streams.speed.map((v) => (v === null ? null : v * 3.6)), format: (v) => v.toFixed(1) },
+        : {
+            key: "speed",
+            title: "Speed",
+            unit: u === "mi" ? "mph" : "km/h",
+            values: streams.speed.map((v) => (v === null ? null : v * (u === "mi" ? 2.236936 : 3.6))),
+            format: (v) => v.toFixed(1),
+          },
     );
   }
   if (streams.power) out.push({ key: "power", title: "Power", unit: "W", values: streams.power, format: int });
@@ -79,9 +86,19 @@ function seriesFor(streams: Streams, sport: string | null): ChartSeries[] {
   return out;
 }
 
-export default function ActivityCharts({ streams, sport, set = "session" }: { streams: Streams; sport: string | null; set?: "session" | "form" }) {
+export default function ActivityCharts({
+  streams,
+  sport,
+  set = "session",
+  units = "mi",
+}: {
+  streams: Streams;
+  sport: string | null;
+  set?: "session" | "form";
+  units?: Units;
+}) {
   const t = streams.t;
-  const series = useMemo(() => (set === "form" ? formSeries(streams) : seriesFor(streams, sport)), [streams, sport, set]);
+  const series = useMemo(() => (set === "form" ? formSeries(streams) : seriesFor(streams, sport, units)), [streams, sport, set, units]);
   const [idx, setIdx] = useState<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const end = t[t.length - 1] || 1;

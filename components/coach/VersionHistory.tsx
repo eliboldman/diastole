@@ -13,7 +13,7 @@ export type Version = {
   pool_unit?: PoolUnit | null;
 };
 
-export default function VersionHistory({ versions }: { versions: Version[] }) {
+export default function VersionHistory({ versions, units = "mi" }: { versions: Version[]; units?: "mi" | "km" }) {
   if (versions.length === 0) return null;
   return (
     <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:p-5">
@@ -42,7 +42,7 @@ export default function VersionHistory({ versions }: { versions: Version[] }) {
                 <ol className="mt-2 list-decimal space-y-0.5 pl-5">
                   {describe(
                     v.steps,
-                    "mi",
+                    units,
                     v.pool_length && v.pool_unit ? { length: Number(v.pool_length), unit: v.pool_unit } : null,
                     v.sport === "swim",
                   ).map((l, k) => (

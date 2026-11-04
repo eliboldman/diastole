@@ -69,7 +69,12 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
       </div>
 
       {workouts.length === 0 ? (
-        <p className="mt-6 text-sm text-white/55">No workouts match.</p>
+        <p className="mt-6 text-sm text-white/55">
+          No workouts here.{" "}
+          <Link href="/endurance-lab" className="text-emerald-200 hover:underline">
+            Build one in the Endurance Lab →
+          </Link>
+        </p>
       ) : (
         <ul className="mt-2">
           {workouts.map((w) => (

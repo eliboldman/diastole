@@ -1,10 +1,14 @@
 // Display formatting for activities. Every helper returns null for missing data, so callers can
-// hide the field instead of printing a zero.
+// hide the field instead of printing a zero. Distances and paces follow the viewer's units.
+
+export type Units = "mi" | "km";
+export const MILE = 1609.344;
 
 export const FOOT_SPORT = /run|walk|hik|trail|treadmill|track/i;
 export const isFootSport = (sport: string | null | undefined) => FOOT_SPORT.test(sport ?? "");
 
 const has = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+const per = (u: Units) => (u === "mi" ? MILE : 1000);
 
 export function sportLabel(sport: string | null | undefined) {
   if (!sport) return "Activity";
@@ -22,34 +26,45 @@ export function clock(seconds: number | null | undefined) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
-export function km(meters: number | null | undefined, digits = 2) {
+/** "3.11 mi" / "5.00 km". Under 10 m is treated as no distance. */
+export function distance(meters: number | null | undefined, u: Units, digits = 2) {
   if (!has(meters) || meters < 10) return null;
-  return `${(meters / 1000).toFixed(meters >= 100_000 ? 0 : digits)} km`;
+  const v = meters / per(u);
+  return `${v.toFixed(v >= 100 ? 0 : digits)} ${u}`;
 }
 
-/** Minutes per km from m/s; null when standing still. */
-export function paceOf(mps: number | null | undefined) {
+/** Shorter form for lists: "3.1 mi". Hidden under 100 m. */
+export function shortDistance(meters: number | null | undefined, u: Units) {
+  if (!has(meters) || meters < 100) return null;
+  return distance(meters, u, 1);
+}
+
+/** @deprecated use distance(meters, units) */
+export const km = (meters: number | null | undefined, digits = 2) => distance(meters, "km", digits);
+
+/** Minutes per mile or km from m/s; null when standing still. */
+export function paceOf(mps: number | null | undefined, u: Units = "km") {
   if (!has(mps) || mps < 0.5) return null;
-  const secPerKm = 1000 / mps;
-  const m = Math.floor(secPerKm / 60);
-  const s = Math.round(secPerKm % 60);
+  const secPer = per(u) / mps;
+  const m = Math.floor(secPer / 60);
+  const s = Math.round(secPer % 60);
   return s === 60 ? `${m + 1}:00` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function kmh(mps: number | null | undefined) {
+export function speedOf(mps: number | null | undefined, u: Units) {
   if (!has(mps)) return null;
-  return `${(mps * 3.6).toFixed(1)} km/h`;
+  return u === "mi" ? `${(mps * 2.236936).toFixed(1)} mph` : `${(mps * 3.6).toFixed(1)} km/h`;
 }
 
 /** Pace for foot sports, speed for everything else. */
-export function speedText(mps: number | null | undefined, sport: string | null | undefined) {
+export function speedText(mps: number | null | undefined, sport: string | null | undefined, u: Units = "km") {
   if (isFootSport(sport)) {
-    const p = paceOf(mps);
-    return p ? `${p} /km` : null;
+    const p = paceOf(mps, u);
+    return p ? `${p} /${u}` : null;
   }
-  return kmh(mps);
+  return speedOf(mps, u);
 }
 
 export function whole(v: number | null | undefined, unit: string) {
-  return has(v) ? `${Math.round(v).toLocaleString("en-US")} ${unit}` : null;
+  return has(v) ? `${Math.round(v).toLocaleString("en-US")} ${unit}`.trim() : null;
 }

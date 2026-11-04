@@ -42,6 +42,7 @@ export default async function PodsPage() {
       </section>
 
       <div className="mt-6 grid gap-4">
+        {!pods?.length && <p className="text-sm text-white/55">No pods yet. Name one above, then invite athletes to it.</p>}
         {(pods ?? []).map((pod) => {
           const members = pod.pod_members ?? [];
           const inPod = new Set(members.filter((m) => m.status === "active" || m.status === "invited").map((m) => m.athlete_id));

@@ -31,6 +31,7 @@ export default async function LibraryPage() {
       <Library
         items={(items ?? []).map((i) => ({ ...i, steps: i.steps as Step[] }))}
         athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.full_name || a.email || "Athlete" }))}
+        units={coach.units}
       />
     </DashboardShell>
   );

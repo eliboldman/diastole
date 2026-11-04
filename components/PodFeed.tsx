@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { shortDistance, type Units } from "@/lib/activity/format";
 import { FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import PodProps, { type PropSend, type PropTotal } from "@/components/PodProps";
@@ -61,9 +63,11 @@ export default function PodFeed({
   feed,
   timeZone,
   props,
+  units = "mi",
 }: {
   feed: PodFeedData;
   timeZone: string;
+  units?: Units;
   props: PodPropsData | null;
 }) {
   if (!feed.members.length) {
@@ -239,9 +243,7 @@ export default function PodFeed({
                           {[
                             a.duration_s &&
                               `${Math.round(a.duration_s / 60)} min`,
-                            a.distance_m &&
-                              a.distance_m > 100 &&
-                              `${(a.distance_m / 1000).toFixed(1)} km`,
+                            shortDistance(a.distance_m, units),
                           ]
                             .filter(Boolean)
                             .join(" · ")}

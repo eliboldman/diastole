@@ -7,6 +7,7 @@ import CalendarAthletePicker from "@/components/CalendarAthletePicker";
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import { addDays, dayIn, monthGrid, monthKey, parseMonth, shiftMonth } from "@/lib/calendar";
 import type { Flag } from "@/lib/readiness/engine";
+import { shortDistance } from "@/lib/activity/format";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calendar · Diastole" };
@@ -238,7 +239,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     {[
                       new Date(a.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: me.timezone }),
                       a.duration_s && `${Math.round(a.duration_s / 60)} min`,
-                      a.distance_m && a.distance_m > 100 && `${(a.distance_m / 1000).toFixed(1)} km`,
+                      shortDistance(a.distance_m, me.units),
                       a.avg_hr && `${Math.round(a.avg_hr)} bpm avg`,
                     ]
                       .filter(Boolean)

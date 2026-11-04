@@ -37,6 +37,7 @@ export async function addFormPick(insightId: string, libraryId: string, date: st
     .update({ status: "added", added_ids: [...(insight.added_ids ?? []), ...(r.ids ?? [])], decided_at: new Date().toISOString() })
     .eq("id", insightId);
   revalidatePath(`/athlete/${insight.athlete_id}`);
+  revalidatePath("/endurance-lab");
   return { ok: true, message: "Added as a draft. Open it from Planned workouts to approve and send." };
 }
 
@@ -51,5 +52,16 @@ export async function dismissFormInsight(insightId: string): Promise<FormActionR
     .maybeSingle();
   if (error || !data) return { ok: false, error: "Couldn't dismiss." };
   revalidatePath(`/athlete/${data.athlete_id}`);
+  revalidatePath("/endurance-lab");
   return { ok: true, message: "Dismissed." };
+}
+
+/** Look for running-form patterns across all of the coach's athletes now. */
+export async function checkFormAll(): Promise<FormActionResult> {
+  const coach = await requireCoach();
+  const r = await runFormInsights(coach.id, "manual");
+  revalidatePath("/endurance-lab");
+  return r.status === "done"
+    ? { ok: true, message: r.insights ? `${r.insights} new form insight${r.insights === 1 ? "" : "s"} ($${r.costUsd.toFixed(3)}).` : "Claude found nothing worth raising." }
+    : { ok: true, message: r.reason };
 }

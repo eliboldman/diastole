@@ -1,25 +1,26 @@
 "use client";
 
-import { BookOpen, CalendarDays, CalendarRange, Ellipsis, FlaskConical, History, LogOut, Orbit, Settings, Sun, User, Users, Watch, type LucideIcon } from "lucide-react";
+import { BookOpen, Bot, CalendarDays, CalendarRange, Ellipsis, FlaskConical, History, LogOut, Orbit, Settings, Sun, User, Users, Watch, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export type NavRole = "coach" | "athlete";
-type Item = { label: string; href: string; icon: LucideIcon };
+type Item = { label: string; href: string; icon: LucideIcon; short?: string }; // short: bottom-tab label on phones
 
 // Desktop sidebar order. Mobile shows the first four as tabs and the rest under "More".
 const NAV: Record<NavRole, Item[]> = {
   coach: [
     { label: "Today", href: "/dashboard", icon: Sun },
     { label: "Athletes", href: "/athletes", icon: Users },
+    { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical },
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
     { label: "Pods", href: "/pods", icon: Orbit },
     { label: "My athlete view", href: "/me", icon: User },
-    { label: "Test lab", href: "/lab", icon: FlaskConical },
+    { label: "AI test mode", href: "/lab", icon: Bot },
     { label: "Settings", href: "/settings", icon: Settings },
   ],
   athlete: [
@@ -156,14 +157,14 @@ function MobileTabs({ pathname, tabs, more }: { pathname: string; tabs: Item[]; 
         className="fixed inset-x-0 bottom-0 z-[57] border-t border-white/[0.08] bg-canvas/85 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] backdrop-blur-2xl md:hidden"
       >
         <div className="flex">
-          {tabs.map(({ label, href, icon: Icon }) => {
+          {tabs.map(({ label, short, href, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
               <Link key={href} href={href} className={tab(active)} aria-current={active ? "page" : undefined}>
                 <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${active ? "bg-emerald-300/15" : ""}`}>
                   <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                {label}
+                {short ?? label}
               </Link>
             );
           })}

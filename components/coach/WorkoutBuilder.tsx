@@ -503,7 +503,11 @@ export default function WorkoutBuilder({
   athleteName,
   device,
   initial,
+  startSport = "run",
+  units = "mi",
 }: {
+  startSport?: Sport;
+  units?: "mi" | "km";
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
@@ -512,12 +516,14 @@ export default function WorkoutBuilder({
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [sport, setSport] = useState<Sport>(initial?.sport ?? "run");
+  const [sport, setSport] = useState<Sport>(initial?.sport ?? startSport);
   // Tomorrow in the coach's local time (en-CA formats as YYYY-MM-DD).
   const [date, setDate] = useState(() => initial?.scheduledDate ?? new Date(Date.now() + 86400_000).toLocaleDateString("en-CA"));
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [steps, setSteps] = useState<UiStep[]>(() => withIds(initial?.steps ?? DEFAULT_STEPS));
-  const [paceUnit, setPaceUnit] = useState<"mi" | "km">("mi");
+  const [steps, setSteps] = useState<UiStep[]>(() =>
+    withIds(initial?.steps ?? (startSport === "swim" ? swimDefault({ length: 25, unit: "YARD" }) : DEFAULT_STEPS)),
+  );
+  const [paceUnit, setPaceUnit] = useState<"mi" | "km">(units);
   const [pool, setPool] = useState<Pool>(initial ? (initial.pool ?? null) : { length: 25, unit: "YARD" });
   const swim = sport === "swim";
   const [confirming, setConfirming] = useState(false);

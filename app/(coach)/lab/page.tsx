@@ -14,7 +14,7 @@ import type { Step } from "@/lib/workouts/garmin-format";
 // Server actions on this page can run the Claude analysis (tens of seconds).
 export const maxDuration = 120;
 
-export const metadata: Metadata = { title: "Test lab · Diastole" };
+export const metadata: Metadata = { title: "AI test mode · Diastole" };
 
 const NO_ID = "00000000-0000-0000-0000-000000000000"; // matches nothing when there are no test athletes
 const ORDER: Scenario[] = ["poor_sleep", "high_load", "normal", "missing_data"];
@@ -75,8 +75,8 @@ export default async function LabPage() {
 
   return (
     <DashboardShell tone="blue">
-      <p className="text-sm uppercase tracking-[0.25em] text-sky-200/70">AI test mode</p>
-      <h1 className="mt-3 text-4xl font-bold tracking-tight">Test lab</h1>
+      <p className="text-sm uppercase tracking-[0.25em] text-sky-200/70">Coaching assistant</p>
+      <h1 className="mt-3 text-4xl font-bold tracking-tight">AI test mode</h1>
       <p className="mt-3 max-w-2xl text-white/60">
         Fake athletes with set scenarios. Run the morning analysis on them and try Approve, Edit and Dismiss end to end.
         They never have a watch, and nothing is sent to any device. They don&apos;t appear on your dashboard or roster,

@@ -28,7 +28,7 @@ export default async function AthletePodPage({ params }: { params: Promise<{ id:
         <LeavePod podId={id} name={feed.pod.name} />
       </div>
       <div className="mt-8">
-        <PodFeed feed={feed} timeZone={me.timezone} props={props as PodPropsData | null} />
+        <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} />
       </div>
     </AthleteShell>
   );

@@ -10,6 +10,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { getRoster, type AthleteSummary } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
+import { shortDistance, type Units } from "@/lib/activity/format";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
@@ -18,10 +19,10 @@ export const maxDuration = 120;
 
 export const metadata: Metadata = { title: "Today · Diastole" };
 
-function activityLine(a: AthleteSummary["lastActivity"], timeZone: string) {
+function activityLine(a: AthleteSummary["lastActivity"], timeZone: string, units: Units) {
   if (!a) return "No activities yet";
   const mins = a.duration_s ? Math.round(a.duration_s / 60) : null;
-  const km = a.distance_m && a.distance_m > 100 ? `${(a.distance_m / 1000).toFixed(1)} km` : null;
+  const km = shortDistance(a.distance_m, units);
   const when = new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone });
   return [cap(a.sport?.replaceAll("_", " ") ?? "Activity"), mins && `${mins} min`, km, when].filter(Boolean).join(" · ");
 }
@@ -122,7 +123,7 @@ export default async function TodayPage() {
               <Link
                 key={a.id}
                 href={`/athlete/${a.id}`}
-                className="lift group block rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl hover:bg-white/[0.075] sm:p-6"
+                className="lift group block min-w-0 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl hover:bg-white/[0.075] sm:p-6"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -162,7 +163,7 @@ export default async function TodayPage() {
                   <Sparkline label="Stress" points={lastNDays(a.trend, "stress_avg")} format={fmt.stress} />
                 </div>
 
-                <p className="mt-4 text-xs text-white/55">Last activity: {activityLine(a.lastActivity, a.timezone)}</p>
+                <p className="mt-4 text-xs text-white/55">Last activity: {activityLine(a.lastActivity, a.timezone, coach.units)}</p>
               </Link>
             );
           })}

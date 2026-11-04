@@ -52,8 +52,16 @@ export default function Sparkline({
   return (
     <div className="min-w-0">
       <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">{label}</p>
-      <div className="mt-1 flex items-end gap-3">
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}, last ${points.length} days`} className="shrink-0 overflow-visible">
+      <div className="mt-1 flex min-w-0 items-end gap-3">
+        {/* Scales down evenly in narrow cards instead of pushing them wider than the screen. */}
+        <svg
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`${label}, last ${points.length} days`}
+          className="min-w-0 flex-1 overflow-visible"
+          style={{ maxWidth: width }}
+        >
           {segments.map((s) => (
             <polyline key={s} points={s} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           ))}
@@ -69,7 +77,7 @@ export default function Sparkline({
             ),
           )}
         </svg>
-        <span className="text-sm text-white/80">{latest ? format(latest.value) : ""}</span>
+        <span className="shrink-0 whitespace-nowrap text-sm text-white/80">{latest ? format(latest.value) : ""}</span>
       </div>
     </div>
   );

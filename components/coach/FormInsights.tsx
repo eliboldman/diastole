@@ -17,7 +17,18 @@ export type InsightView = {
 };
 
 /** Coach-only AI form insights for one athlete. Nothing reaches the athlete without approve & send. */
-export default function FormInsights({ athleteId, insights, tomorrow }: { athleteId: string; insights: InsightView[]; tomorrow: string }) {
+export default function FormInsights({
+  athleteId,
+  insights,
+  tomorrow,
+  compact = false,
+}: {
+  athleteId: string;
+  insights: InsightView[];
+  tomorrow: string;
+  /** Endurance Lab list: open insights only, no per-athlete check button. */
+  compact?: boolean;
+}) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [dates, setDates] = useState<Record<string, string>>({});
@@ -33,7 +44,7 @@ export default function FormInsights({ athleteId, insights, tomorrow }: { athlet
 
   return (
     <div className="grid gap-3">
-      {open.length === 0 && <p className="text-sm text-white/55">No open form insights. They appear when an issue shows up in 3 of the last 5 runs.</p>}
+      {open.length === 0 && !compact && <p className="text-sm text-white/55">No open form insights. They appear when an issue shows up in 3 of the last 5 runs.</p>}
 
       {open.map((i) => (
         <article key={i.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -93,7 +104,7 @@ export default function FormInsights({ athleteId, insights, tomorrow }: { athlet
         </article>
       ))}
 
-      {done.length > 0 && (
+      {!compact && done.length > 0 && (
         <details className="text-sm text-white/55">
           <summary className="cursor-pointer">Earlier insights ({done.length})</summary>
           <ul className="mt-2 space-y-1">
@@ -108,14 +119,18 @@ export default function FormInsights({ athleteId, insights, tomorrow }: { athlet
 
       {message && <p className={`text-sm ${message.ok ? "text-emerald-100" : "text-red-200"}`}>{message.text}</p>}
 
-      <button
-        disabled={pending}
-        onClick={() => run(() => checkFormNow(athleteId))}
-        className="flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1] disabled:opacity-50"
-      >
-        <Sparkles size={15} aria-hidden /> {pending ? "Checking…" : "Check form now"}
-      </button>
-      <p className="text-xs text-white/40">Runs each morning too. Claude is only asked when a new pattern appears, and it counts toward your monthly AI cap.</p>
+      {!compact && (
+        <>
+          <button
+            disabled={pending}
+            onClick={() => run(() => checkFormNow(athleteId))}
+            className="flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1] disabled:opacity-50"
+          >
+            <Sparkles size={15} aria-hidden /> {pending ? "Checking…" : "Check form now"}
+          </button>
+          <p className="text-xs text-white/40">Runs each morning too. Claude is only asked when a new pattern appears, and it counts toward your monthly AI cap.</p>
+        </>
+      )}
     </div>
   );
 }

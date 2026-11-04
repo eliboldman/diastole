@@ -28,7 +28,15 @@ const TYPES = ["easy", "long", "tempo", "threshold", "intervals", "recovery", "r
 const chip = "min-h-10 rounded-full border px-3 text-sm capitalize transition active:scale-95";
 const tomorrow = () => new Date(Date.now() + 86400_000).toLocaleDateString("en-CA");
 
-export default function Library({ items, athletes }: { items: Item[]; athletes: { id: string; name: string }[] }) {
+export default function Library({
+  items,
+  athletes,
+  units = "mi",
+}: {
+  items: Item[];
+  athletes: { id: string; name: string }[];
+  units?: "mi" | "km";
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<string>("");
@@ -84,7 +92,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
 
       {shown.length === 0 ? (
         <p className="mt-8 text-sm text-white/55">
-          {items.length ? "Nothing matches." : "Your library is empty. Workouts you create in the builder show up here automatically."}
+          {items.length ? "Nothing matches." : "Your library is empty. Workouts you build in the Endurance Lab show up here automatically, or import them from Garmin Connect."}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -121,7 +129,7 @@ export default function Library({ items, athletes }: { items: Item[]; athletes: 
               {open === i.id && (
                 <div className="mt-4 grid gap-3 border-t border-white/[0.09] pt-4 text-sm">
                   <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
-                    {describe(i.steps, "mi", i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim").map((l, k) => (
+                    {describe(i.steps, units, i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim").map((l, k) => (
                       <li key={k}>{l}</li>
                     ))}
                   </ol>

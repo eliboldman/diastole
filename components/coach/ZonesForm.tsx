@@ -13,10 +13,12 @@ export default function ZonesForm({
   thresholdPace,
   ftp,
   estimatedMaxHr,
+  units = "mi",
 }: {
+  units?: "mi" | "km";
   athleteId: string;
   maxHr: number | null;
-  thresholdPace: string | null; // "4:30"
+  thresholdPace: string | null; // "7:15" per mile or km
   ftp: number | null;
   estimatedMaxHr: number | null;
 }) {
@@ -24,14 +26,15 @@ export default function ZonesForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="athlete_id" value={athleteId} />
+      <input type="hidden" name="units" value={units} />
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block min-w-0 text-sm text-white/65">
           Max heart rate
           <input name="max_hr" inputMode="numeric" defaultValue={maxHr ?? ""} placeholder={estimatedMaxHr ? `~${estimatedMaxHr} estimated` : "e.g. 195"} className={`mt-1.5 ${input}`} />
         </label>
         <label className="block min-w-0 text-sm text-white/65">
-          Threshold pace (min/km)
-          <input name="threshold_pace" inputMode="numeric" defaultValue={thresholdPace ?? ""} placeholder="e.g. 4:05" className={`mt-1.5 ${input}`} />
+          Threshold pace (min/{units})
+          <input name="threshold_pace" inputMode="numeric" defaultValue={thresholdPace ?? ""} placeholder={units === "mi" ? "e.g. 6:35" : "e.g. 4:05"} className={`mt-1.5 ${input}`} />
         </label>
         <label className="block min-w-0 text-sm text-white/65">
           FTP (watts)
