@@ -14,11 +14,11 @@ export default async function AthletePodPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string }>; // ?view=feed; members is the default
 }) {
   const me = await requireUser();
   const { id } = await params;
-  const view = (await searchParams).view === "members" ? "members" : "feed";
+  const view = (await searchParams).view === "feed" ? "feed" : "members";
   const supabase = await createClient();
   // Returns null unless I'm an active member — the database enforces this.
   const [{ data }, { data: props }, { data: activities }] = await Promise.all([

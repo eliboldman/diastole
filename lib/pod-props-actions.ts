@@ -49,3 +49,26 @@ export async function loadPodActivities(podId: string, before: string): Promise<
   const { data } = await supabase.rpc("get_pod_activity_feed", { p_pod: podId, p_before: before, p_limit: FEED_PAGE });
   return (data ?? []) as FeedItem[];
 }
+
+/** A free-text comment on an activity in the pod feed (the owner can reply on their own). */
+export async function sendComment(podId: string, toId: string, activityId: string, text: string): Promise<PropsResult> {
+  await requireUser();
+  if (!UUID.test(podId) || !UUID.test(toId) || !UUID.test(activityId)) return { ok: false, error: "That workout doesn't exist." };
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return { ok: false, error: "Write something first." };
+  if (clean.length > NOTE_MAX) return { ok: false, error: `Keep it to ${NOTE_MAX} characters.` };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("send_pod_props", { p_pod: podId, p_to: toId, p_sticker: "comment", p_count: 1, p_note: clean, p_activity: activityId });
+  if (error) return { ok: false, error: "Couldn't post that. Try again." };
+  if (data === "slow") return { ok: false, error: "Easy, menace. Give it a few minutes." };
+  if (data) return { ok: false, error: String(data) };
+  return { ok: true };
+}
+
+export async function deleteComment(id: string): Promise<PropsResult> {
+  await requireUser();
+  if (!UUID.test(id)) return { ok: false, error: "Couldn't delete that." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_pod_comment", { p_id: id });
+  return error ? { ok: false, error: "Couldn't delete that. Try again." } : { ok: true };
+}

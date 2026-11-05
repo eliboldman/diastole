@@ -1,27 +1,41 @@
 "use client";
 
-import { Activity, Bike, Dumbbell, Footprints, Waves } from "lucide-react";
-import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { Activity, ArrowUp, Bike, Dumbbell, Footprints, MessageCircle, Trash2, Waves } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition, type PointerEvent, type RefObject } from "react";
 
+import ActivityTitle from "@/components/activity/ActivityTitle";
+import { useToast } from "@/components/coach/Toast";
 import PodProps from "@/components/PodProps";
 import { clock, distance, speedText, sportLabel, whole, type Units } from "@/lib/activity/format";
 import { swimDist, swimPace, swimPool } from "@/lib/activity/swim";
-import { FEED_PAGE, type FeedItem } from "@/lib/pod-feed-types";
-import { loadPodActivities } from "@/lib/pod-props-actions";
-import { sportGroup } from "@/lib/pod-stickers";
+import { FEED_PAGE, type FeedComment, type FeedItem } from "@/lib/pod-feed-types";
+import { deleteComment, hideOneProp, loadPodActivities, sendComment } from "@/lib/pod-props-actions";
+import { ALL_STICKERS, NOTE_MAX, sportGroup, type SportGroup } from "@/lib/pod-stickers";
 
 const ICONS = { swim: Waves, run: Footprints, bike: Bike, strength: Dumbbell, other: Activity } as const;
+// One accent per sport: icon tint and the soft glow along the card's top edge.
+const ACCENT: Record<SportGroup, { icon: string; glow: string }> = {
+  swim: { icon: "text-sky-200 border-sky-300/25 bg-sky-300/10", glow: "from-sky-300/0 via-sky-300/40 to-sky-300/0" },
+  run: { icon: "text-emerald-200 border-emerald-300/25 bg-emerald-300/10", glow: "from-emerald-300/0 via-emerald-300/40 to-emerald-300/0" },
+  bike: { icon: "text-amber-200 border-amber-300/25 bg-amber-300/10", glow: "from-amber-300/0 via-amber-300/40 to-amber-300/0" },
+  strength: { icon: "text-violet-200 border-violet-300/25 bg-violet-300/10", glow: "from-violet-300/0 via-violet-300/40 to-violet-300/0" },
+  other: { icon: "text-white/70 border-white/10 bg-white/[0.05]", glow: "from-white/0 via-white/20 to-white/0" },
+};
 
-function when(iso: string, timeZone: string) {
+const dayKey = (d: Date, timeZone: string) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(d);
+
+function dayLabel(iso: string, timeZone: string) {
   const d = new Date(iso);
-  const day = (x: Date) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(x);
-  const today = day(new Date());
-  const yesterday = day(new Date(Date.now() - 86_400_000));
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
-  const label =
-    day(d) === today ? "Today" : day(d) === yesterday ? "Yesterday" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone });
-  return `${label} at ${time}`;
+  const k = dayKey(d, timeZone);
+  if (k === dayKey(new Date(), timeZone)) return "Today";
+  if (k === dayKey(new Date(Date.now() - 86_400_000), timeZone)) return "Yesterday";
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone });
+}
+
+function ago(iso: string) {
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  return m < 1 ? "now" : m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
 }
 
 /** Up to three headline numbers, chosen per sport, never showing an empty one. */
@@ -69,16 +83,163 @@ function RouteSketch({ route }: { route: [number, number][] }) {
   );
 }
 
+type LocalComment = FeedComment & { pending?: boolean };
+
+/** The conversation under a workout: sticker notes and comments, plus a reply box. */
+function Comments({
+  a,
+  podId,
+  open,
+  inputRef,
+  onCount,
+}: {
+  a: FeedItem;
+  podId: string;
+  open: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
+  onCount: (n: number) => void;
+}) {
+  const router = useRouter();
+  const { show, element: toast } = useToast(4000);
+  const [added, setAdded] = useState<LocalComment[]>([]);
+  const [gone, setGone] = useState<Set<string>>(new Set());
+  const [all, setAll] = useState(false);
+  const [text, setText] = useState("");
+  const [, start] = useTransition();
+  // Server rows win once they arrive; local ones fill the gap until the refresh.
+  const serverIds = new Set(a.comments.map((c) => c.id));
+  const list: LocalComment[] = [...a.comments, ...added.filter((c) => !serverIds.has(c.id) && !a.comments.some((s) => s.from_me && s.note === c.note))].filter((c) => !gone.has(c.id));
+  const count = Math.max(a.comment_count - [...gone].filter((id) => serverIds.has(id)).length, 0) + list.filter((c) => !serverIds.has(c.id)).length;
+  useEffect(() => onCount(count), [count, onCount]);
+  const visible = all ? list : list.slice(-2);
+
+  const post = () => {
+    const clean = text.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    const temp: LocalComment = {
+      id: `local-${Date.now()}`,
+      sticker: "comment",
+      note: clean,
+      hidden: false,
+      created_at: new Date().toISOString(),
+      from_me: true,
+      to_me: a.is_me,
+      from_name: "You",
+      pending: true,
+    };
+    setAdded((x) => [...x, temp]);
+    setText("");
+    navigator.vibrate?.(8);
+    start(async () => {
+      const r = await sendComment(podId, a.athlete_id, a.id, clean);
+      if (!r.ok) {
+        setAdded((x) => x.filter((c) => c.id !== temp.id));
+        setText(clean);
+        show(r.error, { ok: false });
+        return;
+      }
+      setAdded((x) => x.map((c) => (c.id === temp.id ? { ...c, pending: false } : c)));
+      router.refresh();
+    });
+  };
+
+  const remove = (c: FeedComment) =>
+    start(async () => {
+      setGone((g) => new Set(g).add(c.id));
+      const r = c.sticker === "comment" && c.from_me ? await deleteComment(c.id) : await hideOneProp(c.id);
+      if (!r.ok) {
+        setGone((g) => {
+          const n = new Set(g);
+          n.delete(c.id);
+          return n;
+        });
+        show(r.error, { ok: false });
+        return;
+      }
+      router.refresh();
+    });
+
+  if (!list.length && !open) return toast;
+
+  return (
+    <div className="mt-4 border-t border-white/[0.08] pt-3">
+      {list.length > 2 && !all && (
+        <button type="button" onClick={() => setAll(true)} className="mb-2 min-h-9 text-sm text-white/50 hover:text-white/80">
+          View all {count} comments
+        </button>
+      )}
+      {visible.length > 0 && (
+        <ul className="grid gap-2">
+          {visible.map((c) => {
+            const sticker = c.sticker !== "comment" ? ALL_STICKERS[c.sticker] : null;
+            const canRemove = !c.pending && !c.id.startsWith("local-") && ((c.sticker === "comment" && c.from_me) || (c.to_me && !c.from_me));
+            return (
+              <li key={c.id} className={`row-in group flex items-start gap-2 text-sm ${c.hidden ? "opacity-45" : ""} ${c.pending ? "opacity-70" : ""}`}>
+                <span className="min-w-0 flex-1 break-words">
+                  <span className="font-medium text-white/90">{c.from_me ? "You" : c.from_name}</span>{" "}
+                  {sticker && <span aria-label={sticker.label}>{sticker.emoji} </span>}
+                  <span className="text-white/75">{c.note}</span>
+                  <span className="ml-2 text-xs text-white/35">{c.pending ? "sending…" : ago(c.created_at)}</span>
+                </span>
+                {canRemove && (
+                  <button
+                    type="button"
+                    onClick={() => remove(c)}
+                    aria-label={c.from_me ? "Delete comment" : "Hide comment"}
+                    title={c.from_me ? "Delete" : "Hide"}
+                    className="-my-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.06] hover:text-red-200"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {open && (
+        <form
+          className="mt-3 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            post();
+          }}
+        >
+          <input
+            ref={inputRef}
+            value={text}
+            maxLength={NOTE_MAX}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={a.is_me ? "Reply…" : `Say something to ${a.athlete_name.split(" ")[0]}…`}
+            aria-label="Comment"
+            className="min-h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.04] px-4 text-base text-white placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none sm:text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!text.trim()}
+            aria-label="Post comment"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-300/20 text-emerald-50 transition hover:bg-emerald-300/30 active:scale-90 disabled:bg-white/[0.05] disabled:text-white/30"
+          >
+            <ArrowUp size={18} />
+          </button>
+        </form>
+      )}
+      {toast}
+    </div>
+  );
+}
+
 function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; timeZone: string; units: Units }) {
   const g = sportGroup(a.sport);
   const Icon = ICONS[g];
+  const accent = ACCENT[g];
   const label = sportLabel(a.sport);
-  const title = a.name || label;
   const nums = stats(a, units);
   const first = a.athlete_name.split(" ")[0];
+  const time = new Date(a.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
+
   // Stable between renders: PodProps keeps its instant (optimistic) counts until these change.
   const totals = useMemo(() => a.props.map((p) => ({ ...p, to_id: a.athlete_id })), [a.props, a.athlete_id]);
-  const notes = useMemo(() => [...a.notes].reverse(), [a.notes]);
   const member = useMemo(() => ({ id: a.athlete_id, name: a.athlete_name, is_me: a.is_me }), [a.athlete_id, a.athlete_name, a.is_me]);
   const activity = useMemo(
     () => ({
@@ -92,8 +253,37 @@ function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; t
     }),
     [a.id, label, a.sport, a.local_hour, a.duration_s, a.elevation_gain_m, a.avg_hr],
   );
+
+  // Double-tap the workout for a quick 👏, with a pop where you tapped.
+  const quick = useRef<(() => void) | null>(null);
+  const lastTap = useRef(0);
+  const [pop, setPop] = useState<{ id: number; x: number; y: number } | null>(null);
+  const onTap = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const now = e.timeStamp;
+    if (now - lastTap.current < 300) {
+      lastTap.current = 0;
+      quick.current?.();
+      if (!a.is_me) {
+        const box = e.currentTarget.getBoundingClientRect();
+        const id = now;
+        setPop({ id, x: e.clientX - box.left, y: e.clientY - box.top });
+        setTimeout(() => setPop((p) => (p?.id === id ? null : p)), 700);
+      }
+    } else lastTap.current = now;
+  };
+
+  const [commenting, setCommenting] = useState(false);
+  const [count, setCount] = useState(a.comment_count);
+  const input = useRef<HTMLInputElement>(null);
+  const openComments = () => {
+    setCommenting(true);
+    requestAnimationFrame(() => input.current?.focus());
+  };
+
   return (
-    <article className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6">
+    <article className="relative rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl transition hover:border-white/15 sm:p-6">
+      <span className={`pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r ${accent.glow}`} aria-hidden />
       <header className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300/30 to-sky-300/20 text-sm font-semibold text-emerald-50 ring-1 ring-white/10">
           {first.charAt(0).toUpperCase()}
@@ -103,79 +293,136 @@ function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; t
             {a.athlete_name}
             {a.is_me && <span className="font-normal text-white/50"> (you)</span>}
           </span>
-          <span className="block truncate text-xs text-white/50">{when(a.start_time, timeZone)}</span>
+          <span className="block truncate text-xs text-white/50">{`${time} · ${label}`}</span>
         </span>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70" title={label}>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${accent.icon}`} title={label}>
           <Icon size={17} aria-label={label} />
         </span>
       </header>
 
-      <h3 className="mt-4 break-words text-lg font-semibold tracking-tight">
-        {a.details ? (
-          <Link href={`/activity/${a.id}`} className="hover:text-emerald-100 hover:underline">
-            {title}
-          </Link>
-        ) : (
-          title
+      <ActivityTitle
+        id={a.id}
+        name={a.name}
+        fallback={label}
+        canRename={a.can_rename}
+        href={a.details ? `/activity/${a.id}` : undefined}
+        as="h3"
+        className="mt-4 text-lg font-semibold tracking-tight"
+      />
+
+      {/* The double-tap area: numbers and route */}
+      <div onPointerUp={onTap} className="relative select-none touch-manipulation">
+        {nums.length > 0 && (
+          <dl className="mt-3 grid grid-cols-3 gap-3">
+            {nums.map(([k, v]) => (
+              <div key={k} className="min-w-0">
+                <dt className="truncate text-[11px] uppercase tracking-[0.15em] text-white/45">{k}</dt>
+                <dd className="mt-0.5 truncate text-base font-semibold tabular-nums sm:text-lg">{v}</dd>
+              </div>
+            ))}
+          </dl>
         )}
-      </h3>
+        {a.route && a.route.length > 1 && <RouteSketch route={a.route} />}
+        {pop && (
+          <span key={pop.id} className="success-pop pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-5xl drop-shadow-lg" style={{ left: pop.x, top: pop.y }} aria-hidden>
+            👏
+          </span>
+        )}
+      </div>
 
-      {nums.length > 0 && (
-        <dl className="mt-3 grid grid-cols-3 gap-3">
-          {nums.map(([k, v]) => (
-            <div key={k} className="min-w-0">
-              <dt className="truncate text-[11px] uppercase tracking-[0.15em] text-white/45">{k}</dt>
-              <dd className="mt-0.5 truncate text-base font-semibold tabular-nums sm:text-lg">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      <PodProps
+        podId={podId}
+        member={member}
+        totals={totals}
+        notes={[]}
+        activity={activity}
+        quickRef={quick}
+        actions={
+          <button
+            type="button"
+            onClick={() => (commenting ? setCommenting(false) : openComments())}
+            aria-expanded={commenting}
+            className={`flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm transition active:scale-95 ${
+              commenting ? "border-white/20 bg-white/[0.09] text-white" : "border-white/10 bg-white/[0.05] text-white/75 hover:bg-white/[0.09]"
+            }`}
+          >
+            <MessageCircle size={15} aria-hidden />
+            {count > 0 ? <span className="tabular-nums">{count}</span> : "Comment"}
+          </button>
+        }
+      />
 
-      {a.route && a.route.length > 1 && <RouteSketch route={a.route} />}
-
-      <PodProps podId={podId} member={member} totals={totals} notes={notes} activity={activity} />
+      <Comments a={a} podId={podId} open={commenting} inputRef={input} onCount={setCount} />
     </article>
   );
 }
 
 export default function PodActivityFeed({ podId, initial, timeZone, units = "mi" }: { podId: string; initial: FeedItem[]; timeZone: string; units?: Units }) {
-  // Pages loaded with "Load more"; the first page comes from the server so a refresh (after props) updates it.
+  // Pages loaded while scrolling; the first page comes from the server so a refresh (after props) updates it.
   const [more, setMore] = useState<FeedItem[]>([]);
   const [done, setDone] = useState(initial.length < FEED_PAGE);
   const [pending, start] = useTransition();
   const seen = new Set(initial.map((a) => a.id));
   const items = [...initial, ...more.filter((a) => !seen.has(a.id))];
+  const last = items.at(-1)?.start_time;
+
+  const sentinel = useRef<HTMLDivElement>(null);
+  const loading = useRef(false);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || done || !last) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting || loading.current) return;
+        loading.current = true;
+        start(async () => {
+          const next = await loadPodActivities(podId, last);
+          setMore((m) => [...m, ...next]);
+          if (next.length < FEED_PAGE) setDone(true);
+          loading.current = false;
+        });
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [done, last, podId]);
 
   if (!items.length) {
     return (
-      <p className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 text-sm text-white/55">
-        No workouts from the pod in the last 60 days yet. They&apos;ll show up here as watches sync.
-      </p>
+      <div className="mx-auto max-w-2xl rounded-[28px] border border-white/10 bg-white/[0.04] p-8 text-center">
+        <p className="text-3xl" aria-hidden>
+          🌱
+        </p>
+        <p className="mt-3 font-medium">Quiet in here</p>
+        <p className="mt-1 text-sm text-white/55">Workouts from the pod show up here as watches sync. Then the props start flying.</p>
+      </div>
     );
   }
 
-  const loadMore = () =>
-    start(async () => {
-      const next = await loadPodActivities(podId, items[items.length - 1].start_time);
-      setMore((m) => [...m, ...next]);
-      if (next.length < FEED_PAGE) setDone(true);
-    });
+  // Group by day in the viewer's timezone.
+  const groups: { label: string; items: FeedItem[] }[] = [];
+  for (const a of items) {
+    const label = dayLabel(a.start_time, timeZone);
+    if (groups.at(-1)?.label === label) groups.at(-1)!.items.push(a);
+    else groups.push({ label, items: [a] });
+  }
 
   return (
-    <div className="mx-auto grid max-w-2xl gap-4">
-      {items.map((a) => (
-        <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} />
+    <div className="mx-auto max-w-2xl">
+      {groups.map((grp) => (
+        <section key={grp.label} className="mb-6">
+          <h2 className="mb-3 px-1 text-[11px] uppercase tracking-[0.2em] text-white/45">{grp.label}</h2>
+          <div className="stagger grid gap-4">
+            {grp.items.map((a) => (
+              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} />
+            ))}
+          </div>
+        </section>
       ))}
-      {!done && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={pending}
-          className="mx-auto min-h-11 rounded-2xl border border-white/10 bg-white/[0.05] px-5 text-sm text-white/80 transition hover:bg-white/[0.09] disabled:opacity-50"
-        >
-          {pending ? "Loading…" : "Load more"}
-        </button>
-      )}
+      <div ref={sentinel} aria-hidden />
+      {pending && <p className="py-4 text-center text-sm text-white/45">Loading more…</p>}
+      {done && items.length > 3 && <p className="py-4 text-center text-xs uppercase tracking-[0.2em] text-white/30">That&apos;s the last 60 days</p>}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import ActivityCharts from "@/components/activity/ActivityCharts";
+import ActivityTitle from "@/components/activity/ActivityTitle";
 import FormSection from "@/components/activity/FormSection";
 import RouteMap from "@/components/activity/RouteMap";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -248,7 +249,10 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     <DashboardShell role={isCoach ? "coach" : "athlete"}>
       <BackLink href={back.href} label={back.label} />
       <p className="mt-4 text-sm uppercase tracking-[0.25em] text-white/50">{sportLabel(act.sport)}</p>
-      <h1 className="mt-2 break-words text-3xl font-bold tracking-tight sm:text-4xl">{act.name || sportLabel(act.sport)}</h1>
+      <div className="mt-2">
+        {/* Owner or their coach (a coach only ever sees their own athletes here) can rename. */}
+        <ActivityTitle id={act.id} name={act.name} fallback={sportLabel(act.sport)} canRename={isOwn || isCoach} as="h1" className="text-3xl font-bold tracking-tight sm:text-4xl" />
+      </div>
       <p className="mt-2 text-sm text-white/55">
         {[
           !isOwn && owner?.full_name,

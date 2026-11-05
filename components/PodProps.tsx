@@ -2,7 +2,7 @@
 
 import { Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { useToast } from "@/components/coach/Toast";
@@ -47,6 +47,7 @@ const buzz = (p: number | number[]) => navigator.vibrate?.(p);
 const clock = () => Date.now();
 
 type Burst = { id: number; emoji: string; n: number };
+const QUICK = ALL_STICKERS.clap;
 
 export default function PodProps({
   podId,
@@ -54,12 +55,16 @@ export default function PodProps({
   totals,
   notes,
   activity,
+  actions,
+  quickRef,
 }: {
   podId: string;
   member: Partial<MemberData> & { id: string; name: string; is_me: boolean };
   totals: PropTotal[];
   notes: PropNote[];
   activity?: PropActivity;
+  actions?: ReactNode; // extra buttons in the activity action row (comments)
+  quickRef?: RefObject<(() => void) | null>; // lets the card send a quick 👏 (double-tap)
 }) {
   const router = useRouter();
   const { show, element: toast } = useToast(4500);
@@ -92,6 +97,21 @@ export default function PodProps({
   const [note, setNote] = useState("");
   const noteRef = useRef("");
   const [peek, setPeek] = useState<string | null>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  // An open sticker popover closes on a tap anywhere else, or Escape.
+  useEffect(() => {
+    if (!peek) return;
+    const away = (e: PointerEvent) => {
+      if (!chipsRef.current?.contains(e.target as Node)) setPeek(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setPeek(null);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [peek]);
   const [wiggle, setWiggle] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
 
@@ -196,6 +216,19 @@ export default function PodProps({
     [],
   );
 
+  // Double-tap on the card: one quick 👏, folded into a running combo like taps on the button.
+  useEffect(() => {
+    if (!quickRef) return;
+    quickRef.current = () => {
+      if (member.is_me) return openSheet();
+      press(QUICK);
+      release();
+    };
+    return () => {
+      quickRef.current = null;
+    };
+  });
+
   // Close the sheet: send anything still counting first.
   const close = () => {
     if (comboRef.current) void flush();
@@ -258,7 +291,7 @@ export default function PodProps({
       {/* Received */}
       {!activity && shown.length > 0 && <p className="mb-2 text-[11px] uppercase tracking-[0.15em] text-white/45">Today&apos;s props</p>}
       {shown.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <div ref={chipsRef} className="mb-3 flex flex-wrap gap-1.5">
           {shown.map((t) => {
             const s = ALL_STICKERS[t.sticker];
             return (
@@ -312,15 +345,61 @@ export default function PodProps({
         </ul>
       )}
 
-      <button
-        key={wiggle}
-        type="button"
-        onClick={openSheet}
-        className={`flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.09] ${wiggle ? "prop-wiggle" : ""}`}
-      >
-        <span aria-hidden>{activity ? "👏" : "🐐"}</span> {activity ? "Give props" : "Send props"}
-        {!member.is_me && secrets.length > 0 && <Sparkles size={14} className="text-amber-200/80" aria-label="Something's unlocked" />}
-      </button>
+      {activity ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {!member.is_me && (
+            <button
+              type="button"
+              aria-label="Give a clap. Hold for more."
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                press(QUICK);
+              }}
+              onPointerUp={release}
+              onPointerCancel={cancel}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`flex min-h-11 select-none touch-manipulation items-center gap-2 rounded-full border px-4 text-sm transition active:scale-90 ${
+                combo && !open ? "border-emerald-300/50 bg-emerald-300/15 text-emerald-50" : "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-50/90 hover:bg-emerald-300/[0.14]"
+              }`}
+              style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+            >
+              <span aria-hidden className="text-base leading-none">👏</span> Props
+            </button>
+          )}
+          {actions}
+          {!member.is_me && (
+          <button
+            key={wiggle}
+            type="button"
+            onClick={openSheet}
+            className={`flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 text-sm text-white/75 transition active:scale-95 hover:bg-white/[0.09] ${wiggle ? "prop-wiggle" : ""}`}
+          >
+            <Sparkles size={15} className={secrets.length > 0 ? "text-amber-200" : "text-white/55"} aria-hidden />
+            Stickers
+            {secrets.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-200" aria-label="Something's unlocked" />}
+          </button>
+          )}
+          {/* The quick combo counter, while the sheet is closed */}
+          {combo && !open && (
+            <span key={milestone(combo.n) ?? "x"} className="success-pop pointer-events-none flex items-baseline gap-2 tabular-nums" aria-live="polite">
+              <span className="text-lg font-semibold">
+                {combo.sticker.emoji} ×{combo.n.toLocaleString()}
+              </span>
+              {milestone(combo.n) && <span className="text-[11px] uppercase tracking-[0.2em] text-amber-200/80">{milestone(combo.n)}</span>}
+            </span>
+          )}
+        </div>
+      ) : (
+        <button
+          key={wiggle}
+          type="button"
+          onClick={openSheet}
+          className={`flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.09] ${wiggle ? "prop-wiggle" : ""}`}
+        >
+          <span aria-hidden>🐐</span> Send props
+          {!member.is_me && secrets.length > 0 && <Sparkles size={14} className="text-amber-200/80" aria-label="Something's unlocked" />}
+        </button>
+      )}
 
       {/* Bursts fly off the button after a send */}
       {bursts.map((b) => (

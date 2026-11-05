@@ -4,13 +4,14 @@ import type { PoolUnit } from "@/lib/workouts/garmin-format";
 export const FEED_PAGE = 15;
 
 export type FeedProp = { sticker: string; total: number; senders: number; from_me: boolean; hidden: boolean };
-export type FeedNote = { id: string; sticker: string; note: string; hidden: boolean; created_at: string; from_me: boolean; to_me: boolean; from_name: string };
+export type FeedComment = { id: string; sticker: string; note: string; hidden: boolean; created_at: string; from_me: boolean; to_me: boolean; from_name: string };
 
 export type FeedItem = {
   id: string;
   athlete_id: string;
   athlete_name: string;
   is_me: boolean;
+  can_rename: boolean;
   sport: string | null;
   name: string | null;
   start_time: string;
@@ -26,5 +27,6 @@ export type FeedItem = {
   route: [number, number][] | null;
   pool_unit: PoolUnit | null;
   props: FeedProp[];
-  notes: FeedNote[];
+  comment_count: number;
+  comments: FeedComment[]; // sticker notes + comments, oldest first (latest 30)
 };

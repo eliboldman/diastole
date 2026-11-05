@@ -13,11 +13,11 @@ export default async function CoachPodFeedPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string }>; // ?view=feed; members is the default
 }) {
   const coach = await requireCoach();
   const { id } = await params;
-  const view = (await searchParams).view === "members" ? "members" : "feed";
+  const view = (await searchParams).view === "feed" ? "feed" : "members";
   const supabase = await createClient();
   const [{ data }, { data: props }, { data: activities }] = await Promise.all([
     supabase.rpc("get_pod_feed", { p_pod: id }),
