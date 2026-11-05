@@ -2,7 +2,7 @@
 
 import { ArrowUp, Bike, CalendarDays, Camera, Dumbbell, Footprints, Mic, Pause, Play, RotateCcw, Square, Trash2, Waves, X, Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { useToast } from "@/components/coach/Toast";
@@ -180,6 +180,42 @@ function Voice({ m, mine }: { m: Local; mine: boolean }) {
   );
 }
 
+/** Specks that drift off a deleted bubble. Positions come from the message id, so they're stable. */
+function Dust({ mine, seed }: { mine: boolean; seed: string }) {
+  const specks = Array.from({ length: 18 }, (_, i) => {
+    const c = seed.charCodeAt(i % seed.length) + i * 37;
+    return {
+      left: `${(c * 13) % 100}%`,
+      top: `${(c * 29) % 100}%`,
+      dx: `${((c * 7) % 60) - 30 + (mine ? 18 : -18)}px`,
+      dy: `${-20 - ((c * 11) % 50)}px`,
+      size: 2 + (c % 4),
+      delay: (i % 6) * 35,
+    };
+  });
+  return (
+    <span className="pointer-events-none absolute inset-0 z-10" aria-hidden>
+      {specks.map((p, i) => (
+        <span
+          key={i}
+          className={`msg-dust absolute rounded-full ${mine ? "bg-emerald-200" : "bg-white/80"}`}
+          style={
+            {
+              left: p.left,
+              top: p.top,
+              width: p.size,
+              height: p.size,
+              animationDelay: `${120 + p.delay}ms`,
+              "--dx": p.dx,
+              "--dy": p.dy,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
 function dayLabel(iso: string) {
   const d = new Date(iso);
   const key = (x: Date) => x.toDateString();
@@ -289,6 +325,7 @@ export default function Thread({
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` }, (p) => {
         const m = p.new as Message;
+        if (m.deleted_at) startVanish(m.id); // no-op for my own deletes, already animating
         setMsgs((list) => list.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "conversation_reads", filter: `conversation_id=eq.${conv.id}` }, (p) => {
@@ -544,7 +581,24 @@ export default function Thread({
     [],
   );
 
-  // ---- deleting
+  // ---- deleting: the bubble disintegrates, then its row closes up and it's gone for good
+  const VANISH_MS = 760;
+  const [vanish, setVanish] = useState<Set<string>>(new Set());
+  const vanished = useRef(new Set<string>());
+  const startVanish = useCallback((id: string) => {
+    if (vanished.current.has(id)) return;
+    vanished.current.add(id);
+    setVanish((v) => new Set(v).add(id));
+    setTimeout(
+      () =>
+        setVanish((v) => {
+          const n = new Set(v);
+          n.delete(id);
+          return n;
+        }),
+      VANISH_MS,
+    );
+  }, []);
   const [menu, setMenu] = useState<string | null>(null);
   useEffect(() => {
     if (!menu) return;
@@ -557,9 +611,12 @@ export default function Thread({
   }, [menu]);
   async function remove(m: Local) {
     setMenu(null);
+    navigator.vibrate?.([6, 30, 12]);
+    startVanish(m.id);
     patch(m.id, { deleted_at: new Date().toISOString() });
     const { data, error } = await supabase.rpc("delete_message", { p_id: m.id });
     if (error) {
+      vanished.current.delete(m.id);
       patch(m.id, { deleted_at: null });
       return show("Couldn't delete that. Try again.", { ok: false });
     }
@@ -576,6 +633,8 @@ export default function Thread({
   const rows: ReactNode[] = [];
   let prev: Local | null = null;
   for (const m of msgs) {
+    const going = vanish.has(m.id);
+    if (m.deleted_at && !going) continue; // deleted messages leave no trace
     const day = dayLabel(m.created_at);
     if (!prev || dayLabel(prev.created_at) !== day) {
       rows.push(
@@ -589,12 +648,11 @@ export default function Thread({
     const ref = m.activity_id ? refs[m.activity_id] : m.planned_workout_id ? refs[m.planned_workout_id] : null;
     const who = people[m.sender_id];
     rows.push(
-      <li key={m.id} className={`row-in flex flex-col ${mine ? "items-end" : "items-start"} ${first ? "mt-3" : "mt-1"}`}>
+      <li key={m.id} className={`flex flex-col ${going ? "msg-collapse" : "row-in"} ${mine ? "items-end" : "items-start"} ${first ? "mt-3" : "mt-1"}`}>
         {first && group && !mine && <span className="mb-1 ml-3 text-xs text-white/50">{who?.name.split(" ")[0] ?? "Someone"}{who?.role === "coach" ? " · coach" : ""}</span>}
-        {m.deleted_at ? (
-          <span className="rounded-3xl border border-dashed border-white/15 px-4 py-2 text-sm italic text-white/40">Message deleted</span>
-        ) : (
-          <div className="relative flex max-w-[85%] flex-col gap-1.5 sm:max-w-[70%]">
+        <div className="relative flex max-w-[85%] flex-col gap-1.5 sm:max-w-[70%]">
+            {going && <Dust mine={mine} seed={m.id} />}
+            <div className={`flex flex-col gap-1.5 ${mine ? "items-end" : "items-start"} ${going ? "msg-vanish" : ""}`}>
             {ref && <WorkoutChip w={ref} mine={mine} />}
             <div
               role={mine ? "button" : undefined}
@@ -627,6 +685,7 @@ export default function Thread({
               {m.media_kind === "voice" && <Voice m={m} mine={mine} />}
               {m.body && <p className={`whitespace-pre-wrap text-[15px] leading-snug ${m.media_kind ? "px-3 pb-1.5 pt-2" : ""}`}>{m.body}</p>}
             </div>
+            </div>
             {menu === m.id && (
               <div className="toast-in absolute -top-12 right-0 z-20 rounded-2xl border border-white/10 bg-panel/95 p-1 shadow-2xl backdrop-blur-xl" onPointerDown={(e) => e.stopPropagation()}>
                 <button type="button" onClick={() => void remove(m)} className="flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm text-red-200 hover:bg-white/[0.06]">
@@ -635,8 +694,7 @@ export default function Thread({
               </div>
             )}
           </div>
-        )}
-        {m.status === "failed" ? (
+        {going ? null : m.status === "failed" ? (
           <span className="mt-1 flex items-center gap-1 text-xs text-red-200">
             <RotateCcw size={12} /> Not sent · tap to retry
           </span>

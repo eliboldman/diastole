@@ -639,3 +639,28 @@ body {
   .prop-burst, .prop-wiggle { animation: none; opacity: 0; }
   .prop-wiggle { opacity: 1; }
 }
+
+/* ---- Messages: a deleted message wobbles, blurs into dust, and its row closes up */
+@keyframes msgVanish {
+  0% { transform: scale(1) rotate(0); filter: blur(0); opacity: 1; }
+  12% { transform: scale(1.04) rotate(-1.5deg); }
+  24% { transform: scale(1.03) rotate(1.2deg); filter: blur(0); opacity: 1; }
+  100% { transform: scale(0.72) translateY(-6px); filter: blur(7px); opacity: 0; }
+}
+.msg-vanish { animation: msgVanish 560ms cubic-bezier(0.4, 0, 0.2, 1) forwards; pointer-events: none; }
+@keyframes msgDust {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { opacity: 0.95; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+.msg-dust { animation: msgDust 700ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes msgCollapse {
+  to { max-height: 0; margin-top: 0; margin-bottom: 0; }
+}
+.msg-collapse { max-height: 32rem; animation: msgCollapse 260ms 480ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .msg-vanish { animation: msgVanishCalm 200ms ease-out forwards; }
+  .msg-dust { display: none; }
+  .msg-collapse { animation-delay: 200ms; animation-duration: 1ms; }
+}
+@keyframes msgVanishCalm { to { opacity: 0; } }
