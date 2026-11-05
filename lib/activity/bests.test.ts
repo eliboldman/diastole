@@ -1,7 +1,7 @@
 // Run: npm run test:bests
 import assert from "node:assert/strict";
 
-import { bestAverage, bestsOf, fastestOver } from "./bests.ts";
+import { bestAverage, bestsOf, cleanDistance, fastestOver } from "./bests.ts";
 
 // 5 s samples at 4 m/s for 30 min, with a faster stretch (5 m/s) in the middle.
 const t: number[] = [];
@@ -29,5 +29,22 @@ assert.equal(b.run_10k, undefined);
 assert.deepEqual(bestsOf({ interval_s: 5, t, dist }, "cycling"), {}, "no run bests on a ride");
 const ride = bestsOf({ interval_s: 5, t, power: t.map((s) => (s < 1300 ? 250 : 150)) }, "cycling");
 assert.equal(ride.power_20m, 250);
+
+// GPS catch-up: a 30 s gap then the distance jumps 600 m in one step. No fake fast mile.
+{
+  const t2: number[] = [];
+  const d2: number[] = [];
+  let dd = 0;
+  for (let x = 0; x <= 2400; x += 5) {
+    t2.push(x);
+    if (x === 1200) dd += 600; // the glitch
+    dd += 3 * 5; // 3 m/s steady
+    d2.push(dd);
+  }
+  const g = bestsOf({ interval_s: 5, t: t2, dist: d2, speed: t2.map(() => 3) }, "running");
+  assert.ok(!g.run_1mi || g.run_1mi >= 520, `mile ${g.run_1mi} should be ~536 s (3 m/s), not glitch-fast`);
+  assert.equal(cleanDistance([0, 5, 10], [0, 1000, 1015], [3, 3, 3])[1], 15, "a 1 km jump in 5 s becomes 5 s at 3 m/s");
+  assert.deepEqual(cleanDistance([0, 5, 10], [100, 20, 35]), [0, 0, 15], "a reset counts as no distance");
+}
 
 console.log("bests: all passed");

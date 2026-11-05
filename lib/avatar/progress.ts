@@ -115,10 +115,13 @@ export async function refreshProgress(admin: SupabaseClient, athleteId: string, 
   }
 
   out.sort((a, b) => a.achieved_at.localeCompare(b.achieved_at));
-  if (out.length) {
-    await admin
-      .from("achievements")
-      .upsert(out.map((a) => ({ ...a, athlete_id: athleteId })), { onConflict: "athlete_id,key,achieved_at", ignoreDuplicates: true });
+  // Replace the stored history with this run's: everything here is derived from current data, so a
+  // corrected workout (or a fixed bug) never leaves stale "PRs" behind.
+  const stored = new Set(((await admin.from("achievements").select("key, achieved_at").eq("athlete_id", athleteId)).data ?? []).map((r) => `${r.key}|${Date.parse(r.achieved_at)}`));
+  const fresh = new Set(out.map((a) => `${a.key}|${Date.parse(a.achieved_at)}`));
+  if (stored.size !== fresh.size || [...fresh].some((k) => !stored.has(k))) {
+    await admin.from("achievements").delete().eq("athlete_id", athleteId);
+    if (out.length) await admin.from("achievements").insert(out.map((a) => ({ ...a, athlete_id: athleteId })));
   }
 
   const s = summarize(out, { current, best: bestRun }, Boolean(goal?.race_name));
