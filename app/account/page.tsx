@@ -7,7 +7,8 @@ import AiSettingsForm from "@/app/(coach)/settings/AiSettingsForm";
 import SettingsForm from "@/app/(coach)/settings/SettingsForm";
 import Avatar from "@/components/avatar/Avatar";
 import DashboardShell from "@/components/layout/DashboardShell";
-import ShareDetailsToggle from "@/components/ShareDetailsToggle";
+import NotifySettings from "@/components/NotifySettings";
+import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -36,7 +37,11 @@ export default async function AccountPage() {
   const supabase = await createClient();
 
   const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }] = await Promise.all([
-    supabase.from("profiles").select("full_name, timezone, units, share_workout_details").eq("id", me.id).single(),
+    supabase
+      .from("profiles")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs")
+      .eq("id", me.id)
+      .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -113,7 +118,15 @@ export default async function AccountPage() {
             )}
             {pods.some((p) => p.status === "active") && (
               <div className="mt-5 border-t border-white/10 pt-5">
-                <ShareDetailsToggle initial={Boolean(profile?.share_workout_details)} />
+                <PodSharing
+                  initial={{
+                    level: (profile?.pod_share_level ?? 0) as 0 | 1 | 2,
+                    details: Boolean(profile?.share_workout_details),
+                    hrv: Boolean(profile?.pod_share_hrv),
+                    sleep: Boolean(profile?.pod_share_sleep),
+                    stress: Boolean(profile?.pod_share_stress),
+                  }}
+                />
               </div>
             )}
             {isCoach && (
@@ -121,6 +134,12 @@ export default async function AccountPage() {
                 <Row href="/pods">Manage your pods</Row>
               </div>
             )}
+          </section>
+
+          <section className={card}>
+            <h2 className="mb-1 text-lg font-medium">Notifications</h2>
+            <p className="mb-3 text-sm text-white/55">Choose what reaches your bell. Clear any notification with a swipe or its ✕.</p>
+            <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} />
           </section>
         </div>
 

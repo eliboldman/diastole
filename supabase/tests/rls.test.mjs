@@ -152,7 +152,13 @@ r = await as(A2, `select public.respond_to_pod('${POD}', 'accept')`);
 r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
 feed = r.rows?.[0]?.f;
 const a2 = feed?.members?.find((m) => m.id === A2);
-check("after both accept, A1 sees A2's wellness", a2?.wellness?.length >= 1);
+check("after both accept, A2's health data stays hidden by default", (a2?.wellness?.length ?? 0) === 0 && a2?.readiness == null && (a2?.activities?.length ?? 0) === 0);
+// A2 shares readiness, training and HRV only.
+await as(A2, `select public.set_pod_sharing(2, true, false, false, false)`);
+r = await as(A1, `select public.get_pod_feed('${POD}') as f`);
+const a2b = r.rows?.[0]?.f?.members?.find((m) => m.id === A2);
+check("after opting in, A1 sees A2's HRV but not sleep or stress", a2b?.wellness?.length >= 1 && a2b.wellness.every((w) => w.sleep_seconds === null && w.stress_avg === null) && a2b.wellness.some((w) => w.hrv_ms !== null));
+await as(A1, `select public.set_pod_sharing(2, false, false, false, false)`);
 r = await as(A1, `select * from public.daily_wellness where athlete_id = '${A2}'`);
 check("pod membership does not open the base tables", r.rows?.length === 0);
 r = await as(STRANGER, `select public.get_pod_feed('${POD}') as f`);
@@ -482,6 +488,51 @@ await as(A1, `insert into public.messages (conversation_id, sender_id, body) val
 check("a new message resurfaces a cleared notification", (await db.query(`select dismissed_at from public.notifications where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`)).rows[0]?.dismissed_at === null);
 await as(COACH, `select public.mark_conversation_read('${DM1}')`);
 check("reading the chat clears it", (await db.query(`select dismissed_at from public.notifications where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`)).rows[0]?.dismissed_at !== null);
+
+// ---------------------------------------------------------------- pod profiles: sharing levels
+await db.exec(`update public.pod_members set status = 'active' where pod_id = '${POD}' and athlete_id in ('${A1}', '${A2}')`);
+await as(A2, `select public.set_pod_sharing(0, false, false, false, false)`);
+r = await as(A1, `select public.get_pod_profile('${A2}') as p`);
+let pp = r.rows?.[0]?.p;
+check("level 0: a pod mate gets name and avatar only", pp?.name && pp.readiness == null && pp.activities == null && pp.achievements == null && pp.wellness == null && pp.strain == null);
+r = await as(A1, `select public.get_pod_activity_feed('${POD}') as f`);
+check("level 0: their workouts stay out of the feed", !r.rows?.[0]?.f?.some((x) => x.athlete_id === A2));
+r = await as(A1, `select * from public.achievements where athlete_id = '${A2}'`);
+check("level 0: no PRs through the table either", r.rows?.length === 0);
+await db.exec(`insert into public.readiness_scores values ('${A2}', current_date, 'yellow','yellow','green','green','yellow','Take it easy') on conflict do nothing`);
+r = await as(A1, `select * from public.readiness_scores where athlete_id = '${A2}'`);
+check("level 0: readiness hidden", r.rows?.length === 0);
+
+await as(A2, `select public.set_pod_sharing(1, false, false, false, false)`);
+r = await as(A1, `select public.get_pod_profile('${A2}') as p`);
+pp = r.rows?.[0]?.p;
+check("level 1: readiness shows, training doesn't", pp?.readiness?.note === "Take it easy" && pp.activities == null);
+r = await as(A1, `select * from public.readiness_scores where athlete_id = '${A2}'`);
+check("level 1: readiness readable through the table too", r.rows?.length >= 1);
+
+await as(A2, `select public.set_pod_sharing(2, false, true, false, false)`);
+r = await as(A1, `select public.get_pod_profile('${A2}') as p`);
+pp = r.rows?.[0]?.p;
+check("level 2: workouts and PRs show; sleep only because it's opted in", Array.isArray(pp?.activities) && Array.isArray(pp?.achievements) && pp.wellness?.every((w) => w.hrv_ms === null));
+r = await as(A1, `select public.get_pod_activity_feed('${POD}') as f`);
+check("level 2: workouts appear in the feed", r.rows?.[0]?.f?.some((x) => x.athlete_id === A2));
+r = await as(STRANGER, `select public.get_pod_profile('${A2}') as p`);
+check("people outside the pod get nothing", r.rows?.[0]?.p === null);
+await as(A2, `select public.set_pod_sharing(0, false, false, false, false)`);
+r = await as(COACH, `select public.pod_can_see('${A2}', 'hrv') as h, public.pod_can_see('${A2}', 'training') as t`);
+check("their coach always sees everything", r.rows?.[0]?.h === true && r.rows?.[0]?.t === true);
+r = await as(A2, `select public.set_pod_sharing(0, false, false, false, true)`);
+check("sharing workout details lifts you to the training level", (await db.query(`select pod_share_level, share_workout_details from public.profiles where id = '${A2}'`)).rows[0].pod_share_level === 2);
+
+// Notification preferences
+await as(A1, `select public.set_notify_prefs('{"props": false, "bogus": false, "messages": "no"}')`);
+const prefs = (await db.query(`select notify_prefs from public.profiles where id = '${A1}'`)).rows[0].notify_prefs;
+check("prefs keep known groups with true/false only", prefs?.props === false && Object.keys(prefs).length === 1);
+const before = (await db.query(`select count(*)::int c from public.notifications where user_id = '${A1}' and kind = 'pod_props'`)).rows[0].c;
+await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'fire', 2)`);
+check("props notifications are skipped when turned off", (await db.query(`select count(*)::int c from public.notifications where user_id = '${A1}' and kind = 'pod_props'`)).rows[0].c === before);
+await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'comment', 1, 'still notified', '${ACT1}')`);
+check("comments still come through", (await db.query(`select count(*)::int c from public.notifications where user_id = '${A1}' and meta ->> 'comment' = 'true'`)).rows[0].c >= 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

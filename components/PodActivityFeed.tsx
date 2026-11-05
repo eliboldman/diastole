@@ -13,6 +13,8 @@ import { swimDist, swimPace, swimPool } from "@/lib/activity/swim";
 import { FEED_PAGE, type FeedComment, type FeedItem } from "@/lib/pod-feed-types";
 import { deleteComment, hideOneProp, loadPodActivities, sendComment } from "@/lib/pod-props-actions";
 import { ALL_STICKERS, NOTE_MAX, sportGroup, type SportGroup } from "@/lib/pod-stickers";
+import { PR_LABEL } from "@/lib/avatar/pr-labels";
+import Link from "next/link";
 
 const ICONS = { swim: Waves, run: Footprints, bike: Bike, strength: Dumbbell, other: Activity } as const;
 // One accent per sport: icon tint and the soft glow along the card's top edge.
@@ -230,7 +232,19 @@ function Comments({
   );
 }
 
-function FeedCard({ a, podId, timeZone, units, look }: { a: FeedItem; podId: string; timeZone: string; units: Units; look?: unknown }) {
+/** Pod mates who did the same kind of workout starting within 20 minutes: they trained together. */
+function together(a: FeedItem, all: FeedItem[]) {
+  const g = sportGroup(a.sport);
+  const t = Date.parse(a.start_time);
+  const names = all
+    .filter((b) => b.athlete_id !== a.athlete_id && sportGroup(b.sport) === g && Math.abs(Date.parse(b.start_time) - t) <= 20 * 60_000)
+    .map((b) => (b.is_me ? "you" : b.athlete_name.split(" ")[0]));
+  return [...new Set(names)];
+}
+
+const prValue = (key: string, v: number | null) => (v === null ? "" : key === "pr_power_20m" ? `${Math.round(v)} W` : clock(v));
+
+function FeedCard({ a, podId, timeZone, units, look, with: mates }: { a: FeedItem; podId: string; timeZone: string; units: Units; look?: unknown; with: string[] }) {
   const g = sportGroup(a.sport);
   const Icon = ICONS[g];
   const accent = ACCENT[g];
@@ -286,14 +300,16 @@ function FeedCard({ a, podId, timeZone, units, look }: { a: FeedItem; podId: str
     <article className="relative rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl transition hover:border-white/15 sm:p-6">
       <span className={`pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r ${accent.glow}`} aria-hidden />
       <header className="flex items-center gap-3">
-        <AvatarCircle look={look} name={first} size={40} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">
-            {a.athlete_name}
-            {a.is_me && <span className="font-normal text-white/50"> (you)</span>}
+        <Link href={`/profile/${a.athlete_id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl transition active:scale-[0.98]">
+          <AvatarCircle look={look} name={first} size={40} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium hover:text-emerald-100">
+              {a.athlete_name}
+              {a.is_me && <span className="font-normal text-white/50"> (you)</span>}
+            </span>
+            <span className="block truncate text-xs text-white/50">{`${time} · ${label}`}</span>
           </span>
-          <span className="block truncate text-xs text-white/50">{`${time} · ${label}`}</span>
-        </span>
+        </Link>
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${accent.icon}`} title={label}>
           <Icon size={17} aria-label={label} />
         </span>
@@ -311,6 +327,18 @@ function FeedCard({ a, podId, timeZone, units, look }: { a: FeedItem; podId: str
 
       {/* The double-tap area: numbers and route */}
       <div onPointerUp={onTap} className="relative select-none touch-manipulation">
+        {(a.prs.length > 0 || mates.length > 0) && (
+          <p className="mt-2 flex flex-wrap gap-1.5">
+            {a.prs.map((p) => (
+              <span key={p.key} className="success-pop rounded-full border border-amber-200/30 bg-amber-200/[0.08] px-3 py-1 text-xs text-amber-50">
+                {`🏆 New ${(PR_LABEL[p.key] ?? "PR").replace(/^Fastest |^Best /, "")} PR · ${prValue(p.key, p.value)}`}
+              </span>
+            ))}
+            {mates.length > 0 && (
+              <span className="rounded-full border border-sky-200/25 bg-sky-200/[0.06] px-3 py-1 text-xs text-sky-50">{`🤝 Trained together with ${mates.join(" and ")}`}</span>
+            )}
+          </p>
+        )}
         {nums.length > 0 && (
           <dl className="mt-3 grid grid-cols-3 gap-3">
             {nums.map(([k, v]) => (
@@ -426,7 +454,7 @@ export default function PodActivityFeed({
           <h2 className="mb-3 px-1 text-[11px] uppercase tracking-[0.2em] text-white/45">{grp.label}</h2>
           <div className="stagger grid gap-4">
             {grp.items.map((a) => (
-              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} />
+              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} with={together(a, items)} />
             ))}
           </div>
         </section>

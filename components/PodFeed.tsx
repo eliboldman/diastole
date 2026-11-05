@@ -37,6 +37,8 @@ export type PodFeedData = {
       stress_avg: number | null;
     }[];
     details?: boolean;
+    // What this member shares with the viewer (the database decides; the coach sees everything).
+    shares?: { readiness: boolean; training: boolean; hrv: boolean; sleep: boolean; stress: boolean };
     activities: {
       id?: string;
       sport: string | null;
@@ -159,23 +161,26 @@ export default function PodFeed({
               className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
-                <h2 className="flex min-w-0 items-center gap-3 text-xl font-semibold tracking-tight">
-                  <AvatarCircle look={avatars[m.id]} name={m.name} size={44} />
-                  <span className="min-w-0 truncate">{m.name}</span>{" "}
-                  {m.is_me && (
-                    <span className="text-sm font-normal text-white/50">
-                      (you)
-                    </span>
-                  )}
+                <h2 className="min-w-0 text-xl font-semibold tracking-tight">
+                  <Link href={`/profile/${m.id}`} className="flex min-w-0 items-center gap-3 rounded-2xl transition hover:text-emerald-100 active:scale-[0.98]">
+                    <AvatarCircle look={avatars[m.id]} name={m.name} size={44} />
+                    <span className="min-w-0 truncate">{m.name}</span>
+                    {m.is_me && <span className="text-sm font-normal text-white/50">(you)</span>}
+                  </Link>
                 </h2>
                 <span
                   className={`mt-1 h-4 w-4 shrink-0 rounded-full ${FLAG_STYLE[flag].dot} ${FLAG_STYLE[flag].glow}`}
                   aria-hidden
                 />
               </div>
-              <div className="mt-2">
-                <FlagBadge flag={flag} />
-              </div>
+              {m.shares && !m.shares.readiness && !m.shares.training && !m.shares.hrv && !m.shares.sleep && !m.shares.stress && (
+                <p className="mt-3 text-sm text-white/50">{`${m.is_me ? "You're" : `${m.name.split(" ")[0]} is`} sharing their avatar and name.`}</p>
+              )}
+              {(!m.shares || m.shares.readiness) && (
+                <div className="mt-2">
+                  <FlagBadge flag={flag} />
+                </div>
+              )}
               {m.readiness && (
                 <>
                   <p className="mt-2 text-sm text-white/60">
@@ -187,29 +192,17 @@ export default function PodFeed({
                 </>
               )}
 
-              <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.09] pt-4">
-                <Sparkline
-                  label="HRV"
-                  points={lastNDays(m.wellness, "hrv_ms")}
-                  format={fmt.hrv}
-                />
-                <Sparkline
-                  label="Resting HR"
-                  points={lastNDays(m.wellness, "resting_hr")}
-                  format={fmt.rhr}
-                />
-                <Sparkline
-                  label="Sleep"
-                  points={lastNDays(m.wellness, "sleep_seconds")}
-                  format={fmt.sleep}
-                />
-                <Sparkline
-                  label="Stress"
-                  points={lastNDays(m.wellness, "stress_avg")}
-                  format={fmt.stress}
-                />
-              </div>
+              {/* Health trends only for the items this member shares */}
+              {(!m.shares || m.shares.hrv || m.shares.sleep || m.shares.stress) && (
+                <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.09] pt-4">
+                  {(!m.shares || m.shares.hrv) && <Sparkline label="HRV" points={lastNDays(m.wellness, "hrv_ms")} format={fmt.hrv} />}
+                  {(!m.shares || m.shares.hrv) && <Sparkline label="Resting HR" points={lastNDays(m.wellness, "resting_hr")} format={fmt.rhr} />}
+                  {(!m.shares || m.shares.sleep) && <Sparkline label="Sleep" points={lastNDays(m.wellness, "sleep_seconds")} format={fmt.sleep} />}
+                  {(!m.shares || m.shares.stress) && <Sparkline label="Stress" points={lastNDays(m.wellness, "stress_avg")} format={fmt.stress} />}
+                </div>
+              )}
 
+              {(!m.shares || m.shares.training) && (
               <div className="mt-5 border-t border-white/[0.09] pt-4">
                 <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">
                   Recent training
@@ -259,6 +252,7 @@ export default function PodFeed({
                   </ul>
                 )}
               </div>
+              )}
               {props && (
                 <PodProps
                   podId={feed.pod.id}

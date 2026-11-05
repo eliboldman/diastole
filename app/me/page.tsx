@@ -14,9 +14,8 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "My Diastole" };
 
 const SHARED_WITH_POD = [
-  "Your daily readiness flag and note",
-  "HRV, resting heart rate, sleep and stress (last 14 days)",
-  "Your recent activities (sport, date, duration, distance, heart rate)",
+  "Your name and avatar",
+  "Nothing else unless you choose it in My pods: readiness, your workouts and PRs, and (each separately) HRV, sleep or stress",
 ];
 
 export default async function MePage() {
@@ -46,13 +45,13 @@ export default async function MePage() {
       {invites.map((inv) => (
         <section key={inv.pod_id} className="mt-6 rounded-[28px] border border-amber-200/20 bg-amber-200/[0.04] p-6">
           <h2 className="text-lg font-medium">Your coach invited you to the &ldquo;{podName(inv)}&rdquo; pod</h2>
-          <p className="mt-2 text-sm text-white/60">If you accept, the other members who have also accepted will see:</p>
+          <p className="mt-2 text-sm text-white/60">If you accept, the other members will see:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
             {SHARED_WITH_POD.map((s) => (
               <li key={s}>{s}</li>
             ))}
           </ul>
-          <p className="mt-2 text-sm text-white/60">You&apos;ll see theirs too. Your email isn&apos;t shared. You can leave anytime.</p>
+          <p className="mt-2 text-sm text-white/60">You see what they choose to share. Your email isn&apos;t shared. You can change sharing or leave anytime.</p>
           <div className="mt-4">
             <RespondToInvite podId={inv.pod_id} />
           </div>

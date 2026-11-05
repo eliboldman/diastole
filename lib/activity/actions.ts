@@ -45,11 +45,30 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   return { ok: true };
 }
 
-/** The signed-in athlete's pod sharing switch for workout details. */
-export async function setShareWorkoutDetails(share: boolean) {
+
+export type PodSharing = { level: 0 | 1 | 2; details: boolean; hrv: boolean; sleep: boolean; stress: boolean };
+
+/** What my pod mates may see. Enforced by the database (pod_can_see); this only saves the choice. */
+export async function setPodSharing(s: PodSharing) {
   await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("set_share_workout_details", { p_share: share });
+  const { error } = await supabase.rpc("set_pod_sharing", {
+    p_level: s.level,
+    p_hrv: s.hrv,
+    p_sleep: s.sleep,
+    p_stress: s.stress,
+    p_details: s.details,
+  });
   if (error) throw new Error("Couldn't update sharing.");
   revalidatePath("/me/pods");
+  revalidatePath("/account");
+}
+
+export type NotifyPrefs = Partial<Record<"props" | "comments" | "messages" | "pods" | "workouts" | "coaching", boolean>>;
+
+export async function setNotifyPrefs(prefs: NotifyPrefs) {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_notify_prefs", { p_prefs: prefs });
+  if (error) throw new Error("Couldn't save notification settings.");
 }

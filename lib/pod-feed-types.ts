@@ -26,6 +26,7 @@ export type FeedItem = {
   details: boolean;
   route: [number, number][] | null;
   pool_unit: PoolUnit | null;
+  prs: { key: string; value: number | null }[]; // personal records set in this workout
   props: FeedProp[];
   comment_count: number;
   comments: FeedComment[]; // sticker notes + comments, oldest first (latest 30)

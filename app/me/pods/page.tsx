@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import { RespondToInvite } from "@/components/PodButtons";
-import ShareDetailsToggle from "@/components/ShareDetailsToggle";
+import PodSharing from "@/components/PodSharing";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "My pods · Diastole" };
@@ -11,7 +11,11 @@ export const metadata: Metadata = { title: "My pods · Diastole" };
 export default async function MyPodsPage() {
   const me = await requireUser();
   const supabase = await createClient();
-  const { data: mine } = await supabase.from("profiles").select("share_workout_details").eq("id", me.id).maybeSingle();
+  const { data: mine } = await supabase
+    .from("profiles")
+    .select("share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress")
+    .eq("id", me.id)
+    .maybeSingle();
   const { data } = await supabase
     .from("pod_members")
     .select("pod_id, status, pods(name)")
@@ -29,7 +33,9 @@ export default async function MyPodsPage() {
       {invites.map((inv) => (
         <section key={inv.pod_id} className="row-in mt-6 rounded-[28px] border border-amber-200/20 bg-amber-200/[0.04] p-6">
           <h2 className="text-lg font-medium">Invited to &ldquo;{inv.name}&rdquo;</h2>
-          <p className="mt-1 text-sm text-white/60">Accepting shares your readiness, health trends and recent training with the other members.</p>
+          <p className="mt-1 text-sm text-white/60">
+            Members see your name and avatar. You choose what else they see below (readiness, training, health data), and you can change it any time.
+          </p>
           <div className="mt-4">
             <RespondToInvite podId={inv.pod_id} />
           </div>
@@ -53,9 +59,17 @@ export default async function MyPodsPage() {
         </ul>
       )}
 
-      {active.length > 0 && (
+      {(active.length > 0 || invites.length > 0) && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6">
-          <ShareDetailsToggle initial={Boolean(mine?.share_workout_details)} />
+          <PodSharing
+            initial={{
+              level: (mine?.pod_share_level ?? 0) as 0 | 1 | 2,
+              details: Boolean(mine?.share_workout_details),
+              hrv: Boolean(mine?.pod_share_hrv),
+              sleep: Boolean(mine?.pod_share_sleep),
+              stress: Boolean(mine?.pod_share_stress),
+            }}
+          />
         </section>
       )}
     </AthleteShell>

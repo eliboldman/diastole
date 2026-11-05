@@ -10,20 +10,7 @@ import { sportGroup } from "@/lib/pod-stickers";
 
 export type Achievement = { key: string; value: number | null; activity_id: string | null; achieved_at: string };
 
-export const PR_LABEL: Record<string, string> = {
-  pr_1mi: "Fastest mile",
-  pr_5k: "Fastest 5K",
-  pr_10k: "Fastest 10K",
-  pr_half: "Fastest half marathon",
-  pr_power_20m: "Best 20-min power",
-  longest_run: "Longest run",
-  longest_ride: "Longest ride",
-  consistency_4w: "4 consistent weeks",
-  consistency_8w: "8 consistent weeks",
-  consistency_12w: "12 consistent weeks",
-  ftp_up: "FTP up",
-  threshold_up: "Threshold pace up",
-};
+export { PR_LABEL } from "./pr-labels";
 
 const BEST_KEY: Record<keyof Bests, string> = { run_1mi: "pr_1mi", run_5k: "pr_5k", run_10k: "pr_10k", run_half: "pr_half", power_20m: "pr_power_20m" };
 const LOWER_IS_BETTER = new Set(["pr_1mi", "pr_5k", "pr_10k", "pr_half"]);
@@ -134,26 +121,32 @@ export async function refreshProgress(admin: SupabaseClient, athleteId: string, 
       .upsert(out.map((a) => ({ ...a, athlete_id: athleteId })), { onConflict: "athlete_id,key,achieved_at", ignoreDuplicates: true });
   }
 
-  // Unlocks: real milestones only.
+  const s = summarize(out, { current, best: bestRun }, Boolean(goal?.race_name));
+  return { achievements: out, ...s, streak: { current, best: bestRun } };
+}
+
+/** Unlocks, aura (0-4) and pins from achievements alone (also used for pod mates' pages). */
+export function summarize(out: Achievement[], streak: { current: number; best: number }, goalRace = false) {
   const count = (k: string) => out.filter((a) => a.key === k).length;
   const prImproved = Object.values(BEST_KEY).some((k) => count(k) > 1);
+  const longestRun = Math.max(0, ...out.filter((a) => a.key === "longest_run").map((a) => a.value ?? 0));
   const unlocked = new Set<string>();
   if (prImproved) unlocked.add("pr_any");
-  if (count("pr_half") > 0 || (best.get("longest_run") ?? 0) >= 21097.5) unlocked.add("pr_half");
+  if (count("pr_half") > 0 || longestRun >= 21097.5) unlocked.add("pr_half");
   for (const n of [4, 8, 12]) if (count(`consistency_${n}w`) > 0) unlocked.add(`consistency_${n}w`);
   if (count("ftp_up") > 0) unlocked.add("ftp_up");
   if (count("threshold_up") > 0) unlocked.add("threshold_up");
-  if (goal?.race_name) unlocked.add("goal_race");
+  if (goalRace) unlocked.add("goal_race");
 
   const recent = (k: string, days: number) => out.some((a) => a.key.startsWith(k) && Date.now() - Date.parse(a.achieved_at) < days * 86_400_000);
   const recentPr = Object.values(BEST_KEY).some((k) => count(k) > 1 && recent(k, 30));
+  const bestStreak = Math.max(streak.best, count("consistency_8w") ? 8 : 0);
   const aura = Math.min(
     4,
-    (prImproved ? 1 : 0) + (current >= 4 ? 1 : 0) + (bestRun >= 8 ? 1 : 0) + (count("ftp_up") + count("threshold_up") > 0 ? 1 : 0) + (unlocked.has("pr_half") ? 1 : 0),
+    (prImproved ? 1 : 0) + (streak.current >= 4 ? 1 : 0) + (bestStreak >= 8 ? 1 : 0) + (count("ftp_up") + count("threshold_up") > 0 ? 1 : 0) + (unlocked.has("pr_half") ? 1 : 0),
   );
-  const badges = [recentPr && "⭐", current >= 4 && "🔥", (recent("ftp_up", 90) || recent("threshold_up", 90)) && "⚡", unlocked.has("pr_half") && "🏅"].filter(Boolean) as string[];
-
-  return { achievements: out, unlocked, aura, badges, streak: { current, best: bestRun } };
+  const badges = [recentPr && "⭐", streak.current >= 4 && "🔥", (recent("ftp_up", 90) || recent("threshold_up", 90)) && "⚡", unlocked.has("pr_half") && "🏅"].filter(Boolean) as string[];
+  return { unlocked, aura, badges };
 }
 
 /** Today's look: mood from the latest readiness, and the muscles still recovering (last 72 h, fading). */
