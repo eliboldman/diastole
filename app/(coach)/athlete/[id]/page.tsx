@@ -59,7 +59,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const me = await requireCoach();
   const supabase = await createClient();
   const [{ data: zones }, { data: recentMax }, { data: insightRows }] = await Promise.all([
-    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w").eq("athlete_id", id).maybeSingle(),
+    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", id).maybeSingle(),
     supabase
       .from("activities")
       .select("max_hr")
@@ -102,9 +102,14 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device connected"}
             {profile.email ? ` · ${profile.email}` : ""}
           </p>
-          <Link href={`/athlete/${profile.id}/import`} className="mt-1 inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
-            Import Garmin history →
-          </Link>
+          <span className="mt-1 flex flex-wrap gap-x-4">
+            <Link href={`/profile/${profile.id}`} className="inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
+              Avatar and metrics →
+            </Link>
+            <Link href={`/athlete/${profile.id}/import`} className="inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
+              Import Garmin history →
+            </Link>
+          </span>
         </div>
         <FlagBadge flag={overall} large />
       </div>
@@ -207,6 +212,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             thresholdPace={zones?.threshold_speed_mps ? paceOf(Number(zones.threshold_speed_mps), me.units) : null}
             units={me.units}
             ftp={zones?.ftp_w ?? null}
+            thresholdHr={zones?.threshold_hr ?? null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
         </section>

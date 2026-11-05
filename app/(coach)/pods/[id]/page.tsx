@@ -26,6 +26,8 @@ export default async function CoachPodFeedPage({
   ]);
   if (!data) notFound();
   const feed = data as PodFeedData;
+  // Avatars the viewer may see (row-level security leaves out anyone else).
+  const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) });
 
   return (
     <DashboardShell>
@@ -37,9 +39,9 @@ export default async function CoachPodFeedPage({
       </div>
       <div className="mt-6">
         {view === "feed" ? (
-          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} />
+          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
         ) : (
-          <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} />
+          <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} />
         )}
       </div>
     </DashboardShell>

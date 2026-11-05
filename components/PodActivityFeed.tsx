@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type PointerEvent, type RefObject } from "react";
 
 import ActivityTitle from "@/components/activity/ActivityTitle";
+import AvatarCircle from "@/components/avatar/AvatarCircle";
 import { useToast } from "@/components/coach/Toast";
 import PodProps from "@/components/PodProps";
 import { clock, distance, speedText, sportLabel, whole, type Units } from "@/lib/activity/format";
@@ -229,7 +230,7 @@ function Comments({
   );
 }
 
-function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; timeZone: string; units: Units }) {
+function FeedCard({ a, podId, timeZone, units, look }: { a: FeedItem; podId: string; timeZone: string; units: Units; look?: unknown }) {
   const g = sportGroup(a.sport);
   const Icon = ICONS[g];
   const accent = ACCENT[g];
@@ -285,9 +286,7 @@ function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; t
     <article className="relative rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl transition hover:border-white/15 sm:p-6">
       <span className={`pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r ${accent.glow}`} aria-hidden />
       <header className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300/30 to-sky-300/20 text-sm font-semibold text-emerald-50 ring-1 ring-white/10">
-          {first.charAt(0).toUpperCase()}
-        </span>
+        <AvatarCircle look={look} name={first} size={40} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">
             {a.athlete_name}
@@ -357,7 +356,19 @@ function FeedCard({ a, podId, timeZone, units }: { a: FeedItem; podId: string; t
   );
 }
 
-export default function PodActivityFeed({ podId, initial, timeZone, units = "mi" }: { podId: string; initial: FeedItem[]; timeZone: string; units?: Units }) {
+export default function PodActivityFeed({
+  podId,
+  initial,
+  timeZone,
+  units = "mi",
+  avatars = {},
+}: {
+  podId: string;
+  initial: FeedItem[];
+  timeZone: string;
+  units?: Units;
+  avatars?: Record<string, unknown>;
+}) {
   // Pages loaded while scrolling; the first page comes from the server so a refresh (after props) updates it.
   const [more, setMore] = useState<FeedItem[]>([]);
   const [done, setDone] = useState(initial.length < FEED_PAGE);
@@ -415,7 +426,7 @@ export default function PodActivityFeed({ podId, initial, timeZone, units = "mi"
           <h2 className="mb-3 px-1 text-[11px] uppercase tracking-[0.2em] text-white/45">{grp.label}</h2>
           <div className="stagger grid gap-4">
             {grp.items.map((a) => (
-              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} />
+              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} />
             ))}
           </div>
         </section>

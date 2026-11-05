@@ -1,7 +1,7 @@
-import { Users } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import AvatarCircle from "@/components/avatar/AvatarCircle";
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import Thread from "@/components/messages/Thread";
@@ -43,6 +43,8 @@ export default async function ConversationPage({
     me.timezone,
   );
   const attach = (attachAct && refs[attachAct]) || (attachPlan && refs[attachPlan]) || null;
+  const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: conv.people.map((p) => p.id) });
+  const looks = (avatars ?? {}) as Record<string, unknown>;
 
   const other = conv.people.find((p) => !p.is_me && conv.kind === "direct");
   const subtitle =
@@ -53,16 +55,14 @@ export default async function ConversationPage({
       <div className="mx-auto max-w-3xl">
         <BackLink href="/messages" label="Messages" />
         <header className="mt-3 flex items-center gap-3 border-b border-white/[0.08] pb-4">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300/30 to-sky-300/20 font-semibold text-emerald-50 ring-1 ring-white/10">
-            {conv.kind === "pod" ? <Users size={18} aria-hidden /> : conv.title.charAt(0).toUpperCase()}
-          </span>
+          <AvatarCircle look={conv.other_id ? looks[conv.other_id] : undefined} name={conv.title} size={44} group={conv.kind === "pod"} />
           <span className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight">{conv.title}</h1>
             <span className="block truncate text-xs text-white/50">{subtitle}</span>
           </span>
         </header>
         <div className="mt-2">
-          <Thread conv={conv} me={me.id} initial={messages} initialRefs={refs} attach={attach} hasMore={(latest ?? []).length === PAGE} />
+          <Thread conv={conv} me={me.id} initial={messages} initialRefs={refs} attach={attach} avatars={looks} hasMore={(latest ?? []).length === PAGE} />
         </div>
       </div>
     </DashboardShell>

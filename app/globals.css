@@ -664,3 +664,14 @@ body {
   .msg-collapse { animation-delay: 200ms; animation-duration: 1ms; }
 }
 @keyframes msgVanishCalm { to { opacity: 0; } }
+
+/* ---- Avatars: readiness glow breathes, fresh sparkles twinkle, the aura's specks orbit slowly */
+@keyframes avatarGlow { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+.avatar-glow { animation: avatarGlow 2.8s ease-in-out infinite; }
+@keyframes avatarSparkle { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.avatar-sparkle { animation: avatarSparkle 3.2s ease-in-out infinite; }
+@keyframes avatarOrbit { to { transform: rotate(360deg); } }
+.avatar-orbit { animation: avatarOrbit 40s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .avatar-glow, .avatar-sparkle, .avatar-orbit { animation: none; }
+}

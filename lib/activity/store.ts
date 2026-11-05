@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { bestsOf } from "@/lib/activity/bests";
 import { parseFit, type FitActivity } from "@/lib/activity/fit";
 import { formToStore } from "@/lib/activity/form-store";
 
@@ -116,6 +117,7 @@ export async function saveFitDetail(
       route: fit.route,
       record_fields: fit.record_fields,
       form: formToStore(fit.streams, (activity.sport as string | null) ?? sportName(fit)),
+      bests: bestsOf(fit.streams, (activity.sport as string | null) ?? sportName(fit)),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "activity_id" },

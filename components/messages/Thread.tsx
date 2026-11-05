@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import AvatarCircle from "@/components/avatar/AvatarCircle";
 import { useToast } from "@/components/coach/Toast";
 import { sportLabel } from "@/lib/activity/format";
 import { baseMime, extFor, recorderMime, shrinkPhoto } from "@/lib/messages/media";
@@ -271,6 +272,7 @@ export default function Thread({
   initialRefs,
   attach: attachInitial,
   hasMore: hasMoreInitial,
+  avatars = {},
 }: {
   conv: ConversationInfo;
   me: string;
@@ -278,6 +280,7 @@ export default function Thread({
   initialRefs: Record<string, WorkoutRef>;
   attach: WorkoutRef | null;
   hasMore: boolean;
+  avatars?: Record<string, unknown>;
 }) {
   const supabase = browserClient();
   const { show, element: toast } = useToast(5000);
@@ -693,7 +696,12 @@ export default function Thread({
     const who = people[m.sender_id];
     rows.push(
       <li key={m.id} className={`flex flex-col ${going ? "msg-collapse" : "row-in"} ${mine ? "items-end" : "items-start"} ${first ? "mt-3" : "mt-1"}`}>
-        {first && group && !mine && <span className="mb-1 ml-3 text-xs text-white/50">{who?.name.split(" ")[0] ?? "Someone"}{who?.role === "coach" ? " · coach" : ""}</span>}
+        {first && group && !mine && (
+          <span className="mb-1 ml-1 flex items-center gap-1.5 text-xs text-white/50">
+            <AvatarCircle look={avatars[m.sender_id]} name={who?.name ?? "?"} size={22} />
+            {`${who?.name.split(" ")[0] ?? "Someone"}${who?.role === "coach" ? " · coach" : ""}`}
+          </span>
+        )}
         <div className="relative flex max-w-[85%] flex-col gap-1.5 sm:max-w-[70%]">
             {going && <Dust mine={mine} seed={m.id} />}
             <div className={`flex flex-col gap-1.5 ${mine ? "items-end" : "items-start"} ${going ? "msg-vanish" : ""}`}>

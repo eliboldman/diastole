@@ -400,5 +400,49 @@ r = await as(A1, `select * from public.messages where conversation_id = '${DM1}'
 check("a removed athlete loses the thread", r.rows?.length === 0);
 await db.exec(`update public.profiles set coach_id = '${COACH}' where id = '${A1}'`);
 
+// ---------------------------------------------------------------- avatars, goals, achievements (Phase 8)
+// State: A1 active in POD (COACH coaches it), A2 coached by COACH but left the pod, STRANGER unrelated.
+r = await as(A1, `insert into public.avatars (athlete_id, look) values ('${A1}', '{"body":"b","skin":"s3"}') returning athlete_id`);
+check("athlete saves their avatar", !r.error);
+r = await as(A1, `insert into public.avatars (athlete_id, look) values ('${A2}', '{}')`);
+check("can't save someone else's avatar", !!r.error);
+r = await as(A1, `update public.avatars set look = '{"body":"a"}' where athlete_id = '${A1}' returning athlete_id`);
+check("athlete edits their avatar", r.rows?.length === 1);
+r = await as(COACH, `select public.get_avatars(array['${A1}']::uuid[]) as a`);
+check("coach sees their athlete's avatar", r.rows?.[0]?.a?.[A1]?.body === "a");
+r = await as(STRANGER, `select public.get_avatars(array['${A1}']::uuid[]) as a`);
+check("strangers don't", JSON.stringify(r.rows?.[0]?.a) === "{}");
+await db.exec(`insert into public.avatars (athlete_id, look) values ('${A2}', '{"body":"b"}'), ('${COACH}', '{"body":"a"}')`);
+r = await as(A1, `select public.get_avatars(array['${A2}', '${COACH}']::uuid[]) as a`);
+check("a former pod mate's avatar is hidden; the coach's shows", !r.rows?.[0]?.a?.[A2] && Boolean(r.rows?.[0]?.a?.[COACH]));
+await as(A2, `select public.respond_to_pod('${POD}', 'accept')`);
+const a2status = (await db.query(`select status from public.pod_members where athlete_id = '${A2}' and pod_id = '${POD}'`)).rows[0]?.status;
+if (a2status === "active") {
+  r = await as(A1, `select public.get_avatars(array['${A2}']::uuid[]) as a`);
+  check("active pod mates see each other's avatars", Boolean(r.rows?.[0]?.a?.[A2]));
+}
+r = await as(A1, `insert into public.avatars (athlete_id, look) values ('${A1}', '${JSON.stringify({ junk: "x".repeat(9000) })}') on conflict (athlete_id) do update set look = excluded.look`);
+check("oversized looks are refused", !!r.error);
+
+r = await as(COACH, `insert into public.athlete_goals (athlete_id, race_name, race_date) values ('${A1}', 'City Half', '2027-03-01')`);
+check("coach sets a goal race", !r.error);
+r = await as(A1, `select race_name from public.athlete_goals where athlete_id = '${A1}'`);
+check("athlete reads it", r.rows?.[0]?.race_name === "City Half");
+r = await as(A1, `update public.athlete_goals set race_name = 'Mine' where athlete_id = '${A1}' returning athlete_id`);
+check("athlete can't change it", !!r.error || r.rows?.length === 0);
+r = await as(STRANGER, `select * from public.athlete_goals`);
+check("strangers can't read goals", r.rows?.length === 0);
+
+await as(COACH, `update public.athlete_zones set ftp_w = 260, threshold_hr = 172 where athlete_id = '${A1}'`);
+r = await as(A1, `select field, value from public.zone_history where athlete_id = '${A1}' order by changed_at`);
+check("zone changes are kept as history", r.rows?.some((x) => x.field === "ftp_w" && Number(x.value) === 260) && r.rows?.some((x) => x.field === "threshold_hr"));
+r = await as(A1, `insert into public.achievements (athlete_id, key, value, achieved_at) values ('${A1}', 'pr_5k', 1200, now())`);
+check("athletes can't write achievements", !!r.error);
+await db.exec(`insert into public.achievements (athlete_id, key, value, achieved_at) values ('${A1}', 'pr_5k', 1200, now())`);
+r = await as(COACH, `select key from public.achievements where athlete_id = '${A1}'`);
+check("coach reads achievements", r.rows?.length === 1);
+r = await as(A2, `select key from public.achievements where athlete_id = '${A1}'`);
+check("other athletes don't", r.rows?.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

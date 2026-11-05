@@ -3,6 +3,7 @@ import Link from "next/link";
 import { shortDistance, type Units } from "@/lib/activity/format";
 import { FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
+import AvatarCircle from "@/components/avatar/AvatarCircle";
 import PodProps, { type PropSend, type PropTotal } from "@/components/PodProps";
 import { ALL_STICKERS, podAwards } from "@/lib/pod-stickers";
 import type { Flag } from "@/lib/readiness/engine";
@@ -65,11 +66,13 @@ export default function PodFeed({
   timeZone,
   props,
   units = "mi",
+  avatars = {},
 }: {
   feed: PodFeedData;
   timeZone: string;
   units?: Units;
   props: PodPropsData | null;
+  avatars?: Record<string, unknown>;
 }) {
   if (!feed.members.length) {
     return <p className="text-white/50">Nobody has joined this pod yet.</p>;
@@ -156,8 +159,9 @@ export default function PodFeed({
               className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  {m.name}{" "}
+                <h2 className="flex min-w-0 items-center gap-3 text-xl font-semibold tracking-tight">
+                  <AvatarCircle look={avatars[m.id]} name={m.name} size={44} />
+                  <span className="min-w-0 truncate">{m.name}</span>{" "}
                   {m.is_me && (
                     <span className="text-sm font-normal text-white/50">
                       (you)

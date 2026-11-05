@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import AiSettingsForm from "@/app/(coach)/settings/AiSettingsForm";
 import SettingsForm from "@/app/(coach)/settings/SettingsForm";
+import Avatar from "@/components/avatar/Avatar";
 import DashboardShell from "@/components/layout/DashboardShell";
 import ShareDetailsToggle from "@/components/ShareDetailsToggle";
 import SyncedAgo from "@/components/SyncedAgo";
@@ -34,12 +35,13 @@ export default async function AccountPage() {
   const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent] = await Promise.all([
+  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }] = await Promise.all([
     supabase.from("profiles").select("full_name, timezone, units, share_workout_details").eq("id", me.id).single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
+    supabase.from("avatars").select("look").eq("athlete_id", me.id).maybeSingle(),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(aiRow ?? {}) };
   const pods = (memberships ?? []).map((m) => ({ id: m.pod_id, status: m.status, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
@@ -49,6 +51,21 @@ export default async function AccountPage() {
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">Account</p>
       <h1 className="mt-3 break-words text-4xl font-bold tracking-tight">{profile?.full_name || "Me"}</h1>
       <p className="mt-1 truncate text-sm text-white/50">{me.email}</p>
+
+      {/* The avatar and metrics page: the one obvious thing to open here */}
+      <Link
+        href={`/profile/${me.id}`}
+        className="lift mt-6 flex items-center gap-4 rounded-[28px] border border-emerald-300/20 bg-emerald-300/[0.05] p-3 pr-5 backdrop-blur-xl"
+      >
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10">
+          <Avatar look={avatar?.look ?? null} variant="bust" className="h-16 w-16" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">{avatar ? "Your avatar and metrics" : "Create your avatar"}</span>
+          <span className="block truncate text-sm text-white/55">FTP, threshold pace, PRs, streaks and today&apos;s readiness</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-emerald-200" aria-hidden />
+      </Link>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className={card}>

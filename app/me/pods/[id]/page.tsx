@@ -28,6 +28,8 @@ export default async function AthletePodPage({
   ]);
   if (!data) notFound();
   const feed = data as PodFeedData;
+  // Avatars the viewer may see (row-level security leaves out anyone else).
+  const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) });
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
@@ -41,9 +43,9 @@ export default async function AthletePodPage({
       </div>
       <div className="mt-6">
         {view === "feed" ? (
-          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={me.timezone} units={me.units} />
+          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={me.timezone} units={me.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
         ) : (
-          <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} />
+          <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} />
         )}
       </div>
     </AthleteShell>

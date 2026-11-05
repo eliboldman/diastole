@@ -1,4 +1,6 @@
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+
+import AvatarCircle from "@/components/avatar/AvatarCircle";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -45,6 +47,9 @@ export default async function MessagesPage() {
       : supabase.from("pod_members").select("pods(id, name)").eq("athlete_id", me.id).eq("status", "active"),
   ]);
   const rows = (inbox ?? []) as InboxRow[];
+  const ids = [...new Set([...rows.flatMap((r) => (r.other_id ? [r.other_id] : [])), ...(people.data ?? []).map((p) => p.id)])];
+  const { data: avatarRows } = ids.length ? await supabase.rpc("get_avatars", { p_ids: ids }) : { data: {} };
+  const looks = (avatarRows ?? {}) as Record<string, unknown>;
   const active = rows.filter((r) => r.last);
 
   // Everyone you can message who doesn't have a thread with messages yet.
@@ -82,9 +87,7 @@ export default async function MessagesPage() {
                     r.unread ? "border-emerald-300/25 bg-emerald-300/[0.06]" : "border-white/10 bg-white/[0.04]"
                   }`}
                 >
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300/30 to-sky-300/20 font-semibold text-emerald-50 ring-1 ring-white/10">
-                    {r.kind === "pod" ? <Users size={19} aria-hidden /> : r.title.charAt(0).toUpperCase()}
-                  </span>
+                  <AvatarCircle look={r.other_id ? looks[r.other_id] : undefined} name={r.title} size={48} group={r.kind === "pod"} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className={`truncate ${r.unread ? "font-semibold" : "font-medium"}`}>{r.title}</span>
@@ -116,9 +119,7 @@ export default async function MessagesPage() {
               {contacts.map((c) => (
                 <li key={c.key}>
                   <Link href={c.href} className="flex min-h-14 items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.03] px-3 transition hover:bg-white/[0.07]">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-sm text-white/80">
-                      {c.pod ? <Users size={16} aria-hidden /> : c.title.charAt(0).toUpperCase()}
-                    </span>
+                    <AvatarCircle look={c.pod ? undefined : looks[c.key]} name={c.title} size={36} group={c.pod} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{c.title}</span>
                       <span className="block truncate text-xs text-white/45">{c.subtitle}</span>
