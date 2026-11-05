@@ -83,6 +83,7 @@ export default async function WorkoutPage({
         steps: w.steps,
         status: w.status,
         pool,
+        why: w.why,
       }
     : undefined;
 
@@ -103,7 +104,8 @@ export default async function WorkoutPage({
           <MessageAbout to={id} name={firstName} workoutId={w.id} />
         </div>
       )}
-      {w && !w.deleted_at && (
+      {/* Drafts edit the why inside the builder; once sent (builder locked), it's edited here. */}
+      {w && !w.deleted_at && w.status !== "draft" && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl sm:p-6">
           <h2 className="text-lg font-medium">Why this workout</h2>
           <p className="mb-3 mt-1 text-sm text-white/55">{`A sentence or two on what it's for. ${firstName} sees it with the workout once you save it.`}</p>

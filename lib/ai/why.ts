@@ -27,14 +27,22 @@ export type WhyResult = { ok: true; draft: string; costUsd: number } | { ok: fal
 
 const money = (n: number) => `${"$"}${n.toFixed(2)}`;
 
-/** Draft a "why" for one of my athletes' planned workouts. Stored as a coach-only draft; nothing reaches the athlete. */
+type WorkoutForWhy = {
+  athlete_id: string;
+  title: string;
+  sport: string;
+  scheduled_date: string;
+  description: string | null;
+  steps: unknown;
+  pool_length: number | null;
+  pool_unit: string | null;
+};
+
+/** Draft a "why" for one of my athletes' saved workouts. Kept as a coach-only draft; nothing reaches the athlete. */
 export async function draftWhy(workoutId: string): Promise<WhyResult> {
   const me = await requireCoach();
   if (!UUID.test(workoutId)) return { ok: false, error: "Unknown workout." };
-  if (!process.env.ANTHROPIC_API_KEY) return { ok: false, error: "No Anthropic API key is configured." };
   const supabase = await createClient();
-  const admin = createAdminClient();
-
   // Row-level security: only the coach of this athlete gets the row.
   const { data: w } = await supabase
     .from("planned_workouts")
@@ -42,6 +50,49 @@ export async function draftWhy(workoutId: string): Promise<WhyResult> {
     .eq("id", workoutId)
     .maybeSingle();
   if (!w || w.coach_id !== me.id) return { ok: false, error: "That workout isn't one of yours." };
+  const r = await generateWhy(me.id, w);
+  if (r.ok)
+    await createAdminClient()
+      .from("workout_why_drafts")
+      .upsert({ workout_id: w.id, coach_id: me.id, draft: r.draft.slice(0, 600), model: WHY_MODEL, created_at: new Date().toISOString() });
+  return r;
+}
+
+/**
+ * Draft a "why" from what's in the builder right now (the workout may not be saved yet). The text
+ * only fills the builder's field; it reaches the athlete when the coach saves the workout.
+ */
+export async function draftWhyForBuilder(input: {
+  athleteId: string;
+  title: string;
+  sport: string;
+  scheduledDate: string;
+  description: string;
+  steps: Step[];
+  pool: Pool;
+}): Promise<WhyResult> {
+  const me = await requireCoach();
+  if (!UUID.test(input.athleteId)) return { ok: false, error: "Unknown athlete." };
+  const supabase = await createClient();
+  const { data: athlete } = await supabase.from("profiles").select("id, coach_id").eq("id", input.athleteId).maybeSingle();
+  if (!athlete || (athlete.id !== me.id && athlete.coach_id !== me.id)) return { ok: false, error: "That athlete isn't yours." };
+  if (!input.steps.length) return { ok: false, error: "Add some steps first." };
+  return generateWhy(me.id, {
+    athlete_id: input.athleteId,
+    title: input.title.trim() || "Workout",
+    sport: input.sport,
+    scheduled_date: input.scheduledDate,
+    description: input.description.trim() || null,
+    steps: input.steps,
+    pool_length: input.pool?.length ?? null,
+    pool_unit: input.pool?.unit ?? null,
+  });
+}
+
+async function generateWhy(coachId: string, w: WorkoutForWhy): Promise<WhyResult> {
+  const me = { id: coachId };
+  if (!process.env.ANTHROPIC_API_KEY) return { ok: false, error: "No Anthropic API key is configured." };
+  const admin = createAdminClient();
 
   const { data: s } = await admin.from("coach_settings").select("ai_enabled, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle();
   const settings = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
@@ -108,10 +159,6 @@ export async function draftWhy(workoutId: string): Promise<WhyResult> {
   if (response.stop_reason === "refusal") return { ok: false, error: "Claude declined to draft this one. Write it yourself." };
   const draft = response.parsed_output?.why?.replace(/\s+/g, " ").trim();
   if (!draft) return { ok: false, error: "The draft came back empty. Try again." };
-
-  await admin
-    .from("workout_why_drafts")
-    .upsert({ workout_id: w.id, coach_id: me.id, draft: draft.slice(0, 600), model: WHY_MODEL, created_at: new Date().toISOString() });
   return { ok: true, draft, costUsd };
 }
 

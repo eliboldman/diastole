@@ -16,6 +16,7 @@ export type WorkoutInput = {
   description: string;
   steps: Step[];
   pool?: Pool; // swims only; null = any pool
+  why?: string; // what the athlete sees about the session's purpose (the coach wrote or approved it)
 };
 
 export type ActionResult = { ok: true; id: string; message?: string } | { ok: false; error: string };
@@ -47,6 +48,9 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     steps: input.steps,
     pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
     pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,
+    ...(input.why !== undefined
+      ? { why: input.why.replace(/\s+/g, " ").trim().slice(0, 400) || null, why_updated_at: input.why.trim() ? new Date().toISOString() : null }
+      : {}),
   };
 
   if (input.id) {

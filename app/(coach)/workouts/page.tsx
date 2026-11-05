@@ -1,4 +1,6 @@
+import { Plus } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import BulkWorkouts from "@/components/coach/BulkWorkouts";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -37,8 +39,18 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
 
   return (
     <DashboardShell>
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workouts</h1>
-      <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, and clean up in bulk.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workouts</h1>
+          <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, and clean up in bulk.</p>
+        </div>
+        <Link
+          href="/endurance-lab"
+          className="flex min-h-12 shrink-0 items-center gap-2 rounded-full bg-emerald-300 px-6 text-sm font-medium text-black transition hover:bg-emerald-200"
+        >
+          <Plus size={16} aria-hidden /> Build a workout
+        </Link>
+      </div>
 
       <form className="mt-6 grid gap-2 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr_auto]">
         <select name="athlete" defaultValue={sp.athlete ?? ""} className="min-h-12 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:text-sm">

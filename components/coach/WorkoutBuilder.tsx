@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
+import { draftWhyForBuilder } from "@/lib/ai/why";
 import { describe } from "@/lib/workouts/describe";
 import {
   DRILLS,
@@ -514,7 +515,7 @@ export default function WorkoutBuilder({
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
-  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool };
+  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null };
 }) {
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
@@ -523,6 +524,9 @@ export default function WorkoutBuilder({
   // Tomorrow in the coach's local time (en-CA formats as YYYY-MM-DD).
   const [date, setDate] = useState(() => initial?.scheduledDate ?? new Date(Date.now() + 86400_000).toLocaleDateString("en-CA"));
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [why, setWhy] = useState(initial?.why ?? "");
+  const [drafting, startDraft] = useTransition();
+  const [whyNote, setWhyNote] = useState<string | null>(null);
   const [steps, setSteps] = useState<UiStep[]>(() =>
     withIds(initial?.steps ?? (startSport === "swim" ? swimDefault({ length: 25, unit: "YARD" }) : DEFAULT_STEPS)),
   );
@@ -552,7 +556,15 @@ export default function WorkoutBuilder({
       if (r.description) setDescription(r.description);
       navigator.vibrate?.([8, 30, 8]);
     });
-  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null });
+  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why });
+  const draftTheWhy = () =>
+    startDraft(async () => {
+      setWhyNote(null);
+      const r = await draftWhyForBuilder({ athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null });
+      if (!r.ok) return setWhyNote(r.error);
+      setWhy(r.draft);
+      setWhyNote(`AI draft (${r.costUsd < 0.01 ? "under 1¢" : `${(r.costUsd * 100).toFixed(1)}¢`}). Edit it as you like; ${athleteName} sees it once you send the workout.`);
+    });
 
   // Switching sport on an untouched starter workout swaps in that sport's starter.
   const changeSport = (next: Sport) => {
@@ -660,6 +672,34 @@ export default function WorkoutBuilder({
         disabled={!editable}
         maxLength={1024}
       />
+      {editable && (
+        <div>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium">Why this workout</span>
+            <button
+              type="button"
+              onClick={draftTheWhy}
+              disabled={drafting}
+              className="flex min-h-10 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 text-sm text-white/80 transition hover:bg-white/[0.09] disabled:opacity-60"
+            >
+              <Sparkles size={14} className={drafting ? "animate-pulse text-amber-200" : "text-amber-200"} />
+              {drafting ? "Drafting…" : why.trim() ? "Redraft with AI" : "Draft with AI"}
+            </button>
+          </div>
+          <textarea
+            className={`${field} min-h-16 w-full`}
+            value={why}
+            onChange={(e) => {
+              setWhy(e.target.value);
+              setWhyNote(null);
+            }}
+            maxLength={400}
+            placeholder={`What this session is for, in a sentence or two. ${athleteName} sees it with the workout.`}
+            aria-label="Why this workout"
+          />
+          {whyNote && <p className="mt-1 text-xs text-white/55">{whyNote}</p>}
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Steps</h2>
