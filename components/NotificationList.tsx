@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { NoticeRow, syncNotifications } from "@/components/layout/Notifications";
-import { listNotifications, markAllRead, type Notice } from "@/lib/notifications";
+import { dismissAll, listNotifications, type Notice } from "@/lib/notifications";
 
 const PAGE = 50;
 
@@ -25,44 +25,45 @@ export default function NotificationList({ initial, initialUnread }: { initial: 
     }
   };
 
+  const remove = (n: Notice) => {
+    setItems((cur) => cur.filter((i) => i.id !== n.id));
+    if (!n.read_at) setUnread((u) => Math.max(0, u - 1));
+    setTimeout(syncNotifications, 500);
+  };
+
   if (!items.length)
     return (
-      <p className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5 text-sm text-white/55">
-        Nothing yet. Workouts, pod news and updates about your athletes show up here.
-      </p>
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-8 text-center">
+        <p className="text-3xl" aria-hidden>
+          ✨
+        </p>
+        <p className="mt-2 font-medium">All caught up</p>
+        <p className="mt-1 text-sm text-white/55">Workouts, messages, pod news and updates about your athletes show up here.</p>
+      </div>
     );
 
   return (
     <div className="grid gap-3">
       <div className="flex min-h-11 items-center justify-between gap-3">
-        <p className="text-sm text-white/55">{unread ? `${unread} unread` : "All caught up"}</p>
-        {unread > 0 && (
-          <button
-            onClick={async () => {
-              setUnread(0);
-              setItems((cur) => cur.map((i) => ({ ...i, read_at: i.read_at ?? new Date().toISOString() })));
-              await markAllRead();
-              syncNotifications();
-            }}
-            className="min-h-11 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]"
-          >
-            Mark all read
-          </button>
-        )}
+        <p className="text-sm text-white/55">{unread ? `${unread} unread · swipe or ✕ to clear` : "Swipe or ✕ to clear"}</p>
+        <button
+          onClick={async () => {
+            navigator.vibrate?.(8);
+            setUnread(0);
+            setItems([]);
+            setMore(false);
+            await dismissAll();
+            syncNotifications();
+          }}
+          className="min-h-11 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1]"
+        >
+          Clear all
+        </button>
       </div>
       <ul className="grid gap-1 rounded-[24px] border border-white/10 bg-white/[0.03] p-2">
         {items.map((n) => (
           <li key={n.id}>
-            <NoticeRow
-              n={n}
-              onOpen={() => {
-                if (!n.read_at) {
-                  setUnread((u) => Math.max(0, u - 1));
-                  setItems((cur) => cur.map((i) => (i.id === n.id ? { ...i, read_at: new Date().toISOString() } : i)));
-                  setTimeout(syncNotifications, 500);
-                }
-              }}
-            />
+            <NoticeRow n={n} onOpen={() => remove(n)} onDismiss={() => remove(n)} />
           </li>
         ))}
       </ul>

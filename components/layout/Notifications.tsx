@@ -13,14 +13,15 @@ import {
   Unplug,
   UserPlus,
   Watch,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { listNotifications, markAllRead, markRead, type Notice } from "@/lib/notifications";
+import { dismiss, dismissAll, listNotifications, openNotice, type Notice } from "@/lib/notifications";
 import { ALL_STICKERS } from "@/lib/pod-stickers";
 import { browserClient } from "@/lib/supabase/browser";
 
@@ -83,24 +84,89 @@ function stickerLine(meta: Record<string, unknown>) {
     .join("  ");
 }
 
-/** One notification. Opening it marks it read. */
-export function NoticeRow({ n, onOpen }: { n: Notice; onOpen?: () => void }) {
+/** Drop a notification from the shared bell state (it was opened or dismissed). */
+function drop(n: Notice) {
+  set({ items: state.items.filter((i) => i.id !== n.id), unread: n.read_at ? state.unread : Math.max(0, state.unread - 1) });
+}
+
+/**
+ * One notification. Opening it (acting on it) marks it read and clears it; the ✕ or a sideways
+ * swipe clears it without opening.
+ */
+export function NoticeRow({ n, onOpen, onDismiss }: { n: Notice; onOpen?: () => void; onDismiss?: () => void }) {
   const router = useRouter();
   const Icon = ICON[n.kind] ?? Watch;
   const unread = !n.read_at;
   const stickers = n.kind === "pod_props" ? stickerLine(n.meta) : null;
+  const [dx, setDx] = useState(0);
+  const [gone, setGone] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const swipe = useRef<{ x: number; y: number; on: boolean } | null>(null);
+  const moved = useRef(false);
 
   const open = () => {
-    if (unread) {
-      set({ items: state.items.map((i) => (i.id === n.id ? { ...i, read_at: new Date().toISOString() } : i)), unread: Math.max(0, state.unread - 1) });
-      void markRead(n.id);
-    }
+    if (moved.current) return; // that was a swipe, not a tap
+    drop(n);
+    void openNotice(n.id);
     onOpen?.();
     if (n.href) router.push(n.href);
   };
+  const clear = (dir = 1) => {
+    navigator.vibrate?.(6);
+    setDx(dir * 420);
+    setGone(true);
+    setTimeout(() => {
+      drop(n);
+      onDismiss?.();
+    }, 180);
+    void dismiss(n.id);
+  };
+
+  const down = (e: RPointerEvent) => {
+    swipe.current = { x: e.clientX, y: e.clientY, on: false };
+    moved.current = false;
+  };
+  const move = (e: RPointerEvent) => {
+    const s = swipe.current;
+    if (!s) return;
+    const ddx = e.clientX - s.x;
+    if (!s.on && Math.abs(ddx) > 12 && Math.abs(ddx) > Math.abs(e.clientY - s.y)) {
+      s.on = true;
+      setDragging(true);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+    if (s.on) {
+      moved.current = true;
+      setDx(ddx);
+    }
+  };
+  const up = () => {
+    const s = swipe.current;
+    swipe.current = null;
+    setDragging(false);
+    if (!s?.on) return;
+    if (Math.abs(dx) > 90) clear(dx > 0 ? 1 : -1);
+    else setDx(0);
+    setTimeout(() => (moved.current = false), 0);
+  };
 
   return (
-    <button onClick={open} className={`flex min-h-14 w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-white/[0.06] ${unread ? "bg-white/[0.04]" : ""}`}>
+    <div
+      className="group relative touch-pan-y overflow-hidden rounded-2xl"
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+    >
+      {/* What's under the row while it slides */}
+      <span className={`absolute inset-0 flex items-center rounded-2xl bg-white/[0.05] px-5 text-xs text-white/50 ${dx > 0 ? "justify-start" : "justify-end"}`} aria-hidden>
+        Clear
+      </span>
+      <div
+        className={`relative flex items-start rounded-2xl bg-panel/95 ${dragging ? "" : "transition-[transform,opacity] duration-200"}`}
+        style={{ transform: `translateX(${dx}px)`, opacity: gone ? 0 : 1 - Math.min(0.6, Math.abs(dx) / 300) }}
+      >
+    <button onClick={open} className={`flex min-h-14 w-full min-w-0 flex-1 items-start gap-3 rounded-2xl px-3 py-2.5 pr-11 text-left transition hover:bg-white/[0.06] ${unread ? "bg-white/[0.04]" : ""}`}>
       <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${unread ? "bg-emerald-300/15 text-emerald-200" : "bg-white/[0.05] text-white/45"}`}>
         <Icon size={16} aria-hidden />
       </span>
@@ -116,6 +182,16 @@ export function NoticeRow({ n, onOpen }: { n: Notice; onOpen?: () => void }) {
         {unread && <span className="h-2 w-2 rounded-full bg-emerald-300" aria-label="Unread" />}
       </span>
     </button>
+        <button
+          type="button"
+          onClick={() => clear()}
+          aria-label={`Clear: ${n.title}`}
+          className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-white/40 transition hover:bg-white/[0.08] hover:text-white md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+        >
+          <X size={15} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -151,7 +227,7 @@ export function NotificationButton({ className = "" }: { className?: string }) {
  * tab comes back into view) and renders the panel into <body> so blurred bars can't trap it.
  */
 export default function NotificationHost() {
-  const { items, unread, loaded, open } = useStore();
+  const { items, loaded, open } = useStore();
   const pathname = usePathname();
   const panel = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -208,15 +284,16 @@ export default function NotificationHost() {
     >
       <div className="flex items-center justify-between gap-2 border-b border-white/10 py-2 pl-4 pr-2">
         <h2 className="text-sm font-medium">Notifications</h2>
-        {unread > 0 && (
+        {items.length > 0 && (
           <button
             onClick={() => {
-              set({ unread: 0, items: state.items.map((i) => ({ ...i, read_at: i.read_at ?? new Date().toISOString() })) });
-              void markAllRead();
+              navigator.vibrate?.(8);
+              set({ unread: 0, items: [] });
+              void dismissAll();
             }}
             className="min-h-11 rounded-xl px-3 text-xs text-emerald-200/90 hover:bg-white/[0.06]"
           >
-            Mark all read
+            Clear all
           </button>
         )}
       </div>
@@ -224,7 +301,12 @@ export default function NotificationHost() {
         {!loaded ? (
           <p className="px-3 py-6 text-sm text-white/45">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="px-3 py-6 text-sm text-white/45">Nothing yet. Workouts, pod news and updates about your athletes show up here.</p>
+          <p className="px-3 py-8 text-center text-sm text-white/45">
+            <span className="mb-1 block text-2xl" aria-hidden>
+              ✨
+            </span>
+            All caught up.
+          </p>
         ) : (
           <ul className="grid gap-1">
             {items.map((n) => (

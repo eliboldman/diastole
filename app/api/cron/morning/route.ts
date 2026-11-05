@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   }
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;
+  // Read notifications clear themselves after a week; cleared ones are deleted after 30 days.
+  await admin.from("notifications").update({ dismissed_at: new Date().toISOString() }).is("dismissed_at", null).lt("read_at", new Date(Date.now() - 7 * day).toISOString());
+  await admin.from("notifications").delete().lt("dismissed_at", new Date(Date.now() - 30 * day).toISOString());
   await admin.from("notifications").delete().not("read_at", "is", null).lt("created_at", new Date(Date.now() - 90 * day).toISOString());
   await admin.from("notifications").delete().lt("created_at", new Date(Date.now() - 365 * day).toISOString());
   console.info("Morning coach assistant", results);

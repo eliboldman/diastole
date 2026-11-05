@@ -648,13 +648,24 @@ export default function Thread({
     );
   }, []);
   const [menu, setMenu] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Close on a tap anywhere else. React's handlers live on the document in this app, so stopping
+  // propagation inside the menu can't shield it: check where the tap landed instead.
   useEffect(() => {
     if (!menu) return;
-    const close = () => setMenu(null);
-    const t = setTimeout(() => document.addEventListener("pointerdown", close, { once: true }), 0);
+    const close = (e: PointerEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setMenu(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    const t = setTimeout(() => {
+      document.addEventListener("pointerdown", close);
+      document.addEventListener("keydown", esc);
+    }, 0);
     return () => {
       clearTimeout(t);
       document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
     };
   }, [menu]);
   async function remove(m: Local) {
@@ -738,7 +749,7 @@ export default function Thread({
             </div>
             </div>
             {menu === m.id && (
-              <div className="toast-in absolute -top-12 right-0 z-20 rounded-2xl border border-white/10 bg-panel/95 p-1 shadow-2xl backdrop-blur-xl" onPointerDown={(e) => e.stopPropagation()}>
+              <div ref={menuRef} className="toast-in absolute -top-12 right-0 z-20 rounded-2xl border border-white/10 bg-panel/95 p-1 shadow-2xl backdrop-blur-xl">
                 <button type="button" onClick={() => void remove(m)} className="flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm text-red-200 hover:bg-white/[0.06]">
                   <Trash2 size={15} /> Delete for everyone
                 </button>

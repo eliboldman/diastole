@@ -465,5 +465,23 @@ check("coach reads it", r.rows?.length === 1);
 r = await as(STRANGER, `select * from public.activity_strain`);
 check("strangers can't read it", r.rows?.length === 0);
 
+// ---------------------------------------------------------------- dismissing notifications
+// The harness grants every table broadly at setup; restore the migrations' column grants here.
+await db.exec(`revoke update on public.notifications from authenticated; grant update (read_at, dismissed_at) on public.notifications to authenticated;`);
+const nid = (await db.query(`select id from public.notifications where user_id = '${A1}' limit 1`)).rows[0]?.id;
+r = await as(A1, `update public.notifications set dismissed_at = now() where id = '${nid}' returning id`);
+check("you can clear your own notification", r.rows?.length === 1);
+const other = (await db.query(`select id from public.notifications where user_id <> '${A1}' limit 1`)).rows[0]?.id;
+r = await as(A1, `update public.notifications set dismissed_at = now() where id = '${other}' returning id`);
+check("but not someone else's", !!r.error || r.rows?.length === 0);
+r = await as(A1, `update public.notifications set title = 'x' where id = '${nid}' returning id`);
+check("and nothing but read/dismissed", !!r.error);
+// New activity on a cleared row brings it back.
+await db.exec(`update public.notifications set dismissed_at = now() where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`);
+await as(A1, `insert into public.messages (conversation_id, sender_id, body) values ('${DM1}', '${A1}', 'one more thing')`);
+check("a new message resurfaces a cleared notification", (await db.query(`select dismissed_at from public.notifications where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`)).rows[0]?.dismissed_at === null);
+await as(COACH, `select public.mark_conversation_read('${DM1}')`);
+check("reading the chat clears it", (await db.query(`select dismissed_at from public.notifications where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`)).rows[0]?.dismissed_at !== null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
