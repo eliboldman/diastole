@@ -12,6 +12,7 @@ import { clock, distance, shortDistance, sportLabel, whole } from "@/lib/activit
 import { buildMetricCards } from "@/lib/avatar/metrics";
 import type { Mood } from "@/components/avatar/Avatar";
 import { PR_LABEL, refreshProgress, summarize, todayState, type Achievement } from "@/lib/avatar/progress";
+import { PAIN_LABEL, SPOTS, spotLabel, type Pain, type PainLevel } from "@/lib/avatar/pain";
 import { normalizeStrain, recentStrain, type Strain } from "@/lib/avatar/strain";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 
@@ -47,6 +48,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   let mood: Mood = null;
   let strain: Strain = {};
   let note: string | null = null;
+  let sore: Pain = {}; // self and coach only
   let achievements: Achievement[] = [];
   let aura = 0;
   let badges: string[] = [];
@@ -70,7 +72,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
       supabase.from("athlete_goals").select("race_name, race_date, block_name, block_ends").eq("athlete_id", id).maybeSingle(),
     ]);
     look = avatar?.look ?? null;
-    ({ mood, strain, note } = today);
+    ({ mood, strain, note, sore } = today);
     ({ achievements, aura, badges, streak } = progress);
     zones = z.data ?? [];
     days = d.data ?? [];
@@ -138,6 +140,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
           </div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">{person.full_name || "Athlete"}</h1>
           <p className="mt-2 max-w-md text-[15px] text-white/70">{sentence}</p>
+          {Object.keys(sore).length > 0 && (
+            <p className="mt-2 max-w-md text-sm text-rose-100/80">
+              {`Sore: ${SPOTS.filter((s) => sore[s])
+                .map((s) => `${spotLabel(s).toLowerCase()} (${PAIN_LABEL[sore[s] as PainLevel].toLowerCase()})`)
+                .join(", ")}`}
+            </p>
+          )}
           {(streak.current >= 2 || aura > 0) && (
             <p className="mt-3 flex flex-wrap justify-center gap-2 text-xs">
               {streak.current >= 2 && (

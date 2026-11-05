@@ -5,6 +5,7 @@ import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import WorkoutList from "@/components/coach/WorkoutList";
 import FormInsights, { type InsightView } from "@/components/coach/FormInsights";
+import RecentCheckins from "@/components/coach/RecentCheckins";
 import ZonesForm from "@/components/coach/ZonesForm";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { paceOf, shortDistance } from "@/lib/activity/format";
@@ -201,6 +202,12 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           <h2 className="text-lg font-medium">Form insights</h2>
           <p className="mb-4 mt-1 text-sm text-white/55">Only you see these. Suggested workouts are added as drafts for you to approve and send.</p>
           <FormInsights athleteId={profile.id} insights={insights} tomorrow={daysBackIso(-1).slice(0, 10)} />
+        </section>
+
+        <section id="checkins" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Recent check-ins</h2>
+          <p className="mb-2 mt-1 text-sm text-white/55">How workouts felt, how hard, and anything that hurt. You get a notification when pain is moderate or severe.</p>
+          <RecentCheckins athleteId={profile.id} timeZone={me.timezone} />
         </section>
 
         <section id="zones" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">

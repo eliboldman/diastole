@@ -6,6 +6,7 @@
 import * as THREE from "three";
 
 import type { Look } from "./look";
+import { PAIN_COLOR, type Pain, type PainLevel, type Spot } from "./pain";
 import { REGIONS, type Level, type Region, type Strain } from "./strain";
 
 export type Mood = "fresh" | "ok" | "tired" | null;
@@ -13,6 +14,8 @@ export type SceneOpts = {
   look: Look;
   mood?: Mood;
   strain?: Strain; // muscles worked (a workout) or still recovering (the avatar)
+  pain?: Pain; // sore spots (the check-in)
+  mode?: "strain" | "pain"; // what the colors show (and what a tap picks)
   aura?: number;
   variant?: "full" | "bust";
   view?: "front" | "back"; // still images
@@ -36,6 +39,8 @@ const REGION_SHADE: Record<Region, THREE.Color> = Object.fromEntries(
 export const STRAIN_COLOR: Record<Level, string> = { 1: "#fcd34d", 2: "#fb923c", 3: "#f87171" };
 const STRAIN = { 1: new THREE.Color(STRAIN_COLOR[1]), 2: new THREE.Color(STRAIN_COLOR[2]), 3: new THREE.Color(STRAIN_COLOR[3]) } as const;
 const UNSEG = BASE.clone().offsetHSL(0, -0.04, 0.02); // head, hands, feet
+const PAIN = { 1: new THREE.Color(PAIN_COLOR[1]), 2: new THREE.Color(PAIN_COLOR[2]), 3: new THREE.Color(PAIN_COLOR[3]) } as const;
+const MUTED = BASE.clone().offsetHSL(0, -0.12, -0.04); // pain mode: everything not marked recedes
 
 // ---------------------------------------------------------------- geometry
 
@@ -88,6 +93,24 @@ function box(w: number, h: number, d: number, hang = true) {
 // ---------------------------------------------------------------- regions
 
 type Classify = (p: THREE.Vector3) => Region | null;
+type ClassifySpot = (p: THREE.Vector3) => Spot | null;
+
+// Sides: the figure faces the camera, so its left is at +x.
+const sideOf = (side: number) => (side > 0 ? "l" : "r");
+const torsoSpot: ClassifySpot = ({ x, y, z }) => {
+  const front = z > 0.01;
+  if (y > 1.46) return "neck";
+  if (y > 1.21) return front ? "chest" : "upper_back";
+  if (y > 1.0) return front ? "abs" : "lower_back";
+  return `hip_${x > 0 ? "l" : "r"}`;
+};
+const upperArmSpot = (side: number): ClassifySpot => ({ y }) => (y > -0.15 ? `shoulder_${sideOf(side)}` : `elbow_${sideOf(side)}`);
+const forearmSpot = (side: number): ClassifySpot => ({ y }) => (y > -0.12 ? `elbow_${sideOf(side)}` : `wrist_${sideOf(side)}`);
+const thighSpot = (side: number): ClassifySpot => ({ x, y, z }) =>
+  y > -0.05 ? `hip_${sideOf(side)}` : x * -side > 0.034 ? `groin_${sideOf(side)}` : z >= 0 ? `quad_${sideOf(side)}` : `hamstring_${sideOf(side)}`;
+const shinSpot = (side: number): ClassifySpot => ({ y, z }) =>
+  y > -0.06 ? `knee_${sideOf(side)}` : y < -0.34 ? `ankle_${sideOf(side)}` : z > 0.004 ? `shin_${sideOf(side)}` : `calf_${sideOf(side)}`;
+const fixedSpot = (s: Spot | null): ClassifySpot => () => s;
 
 const torsoRegion: Classify = ({ x, y, z }) => {
   const ax = Math.abs(x);
@@ -116,8 +139,8 @@ const always =
   () =>
     r;
 
-/** Make faces paintable: one region per triangle (by its center), colors per vertex. */
-function segment(mesh: THREE.Mesh, classify: Classify) {
+/** Make faces paintable: one region (and one pain spot) per triangle, by its center; colors per vertex. */
+function segment(mesh: THREE.Mesh, classify: Classify, spotOf?: ClassifySpot) {
   const g = (mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry) as THREE.BufferGeometry;
   g.computeVertexNormals();
   mesh.geometry = g;
@@ -125,6 +148,7 @@ function segment(mesh: THREE.Mesh, classify: Classify) {
   const pos = g.attributes.position;
   const faces = pos.count / 3;
   const regions: (Region | null)[] = new Array(faces);
+  const spots: (Spot | null)[] = new Array(faces);
   const c = new THREE.Vector3();
   const v = new THREE.Vector3();
   for (let f = 0; f < faces; f++) {
@@ -132,19 +156,31 @@ function segment(mesh: THREE.Mesh, classify: Classify) {
     for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, f * 3 + k));
     c.multiplyScalar(1 / 3).applyMatrix4(mesh.matrix); // into the parent's space (blocks boxes are offset)
     regions[f] = classify(c);
+    spots[f] = spotOf ? spotOf(c) : null;
   }
   g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
   mesh.userData.faceRegions = regions;
+  mesh.userData.faceSpots = spots;
 }
 
-function paint(meshes: THREE.Mesh[], strain: Strain) {
+type Paint = { mode: "strain" | "pain"; strain: Strain; pain: Pain };
+
+function paint(meshes: THREE.Mesh[], p: Paint) {
   for (const m of meshes) {
     const regions = m.userData.faceRegions as (Region | null)[];
+    const spots = m.userData.faceSpots as (Spot | null)[];
     const col = (m.geometry as THREE.BufferGeometry).attributes.color as THREE.BufferAttribute;
     for (let f = 0; f < regions.length; f++) {
       const r = regions[f];
-      const lvl = r ? strain[r] : undefined;
-      const color = lvl ? STRAIN[lvl] : r ? REGION_SHADE[r] : UNSEG;
+      let color: THREE.Color;
+      if (p.mode === "pain") {
+        const s = spots[f];
+        const lvl = s ? (p.pain[s] as PainLevel | undefined) : undefined;
+        color = lvl ? PAIN[lvl] : MUTED;
+      } else {
+        const lvl = r ? p.strain[r] : undefined;
+        color = lvl ? STRAIN[lvl] : r ? REGION_SHADE[r] : UNSEG;
+      }
       for (let k = 0; k < 3; k++) col.setXYZ(f * 3 + k, color.r, color.g, color.b);
     }
     col.needsUpdate = true;
@@ -161,15 +197,16 @@ function buildFigure(o: SceneOpts): Built {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: blocks ? 0.7 : 0.42, metalness: 0.06, flatShading: blocks });
   const meshes: THREE.Mesh[] = [];
   // Position first (some regions depend on where the part sits), then segment.
-  const part = (g: THREE.BufferGeometry, classify: Classify, at?: (m: THREE.Mesh) => void) => {
+  const part = (g: THREE.BufferGeometry, classify: Classify, at?: (m: THREE.Mesh) => void, spotOf?: ClassifySpot) => {
     const m = new THREE.Mesh(g, mat);
     at?.(m);
-    segment(m, classify);
+    segment(m, classify, spotOf);
     meshes.push(m);
     return m;
   };
-  const limb = (r0: number, r1: number, len: number, classify: Classify) => part(blocks ? box(r0 * 2, len + r1, r0 * 1.7) : taper(r0, r1, len), classify);
-  const joint = (r: number, classify: Classify) => part(blocks ? box(r * 2, r * 2, r * 2, false) : new THREE.SphereGeometry(r, 24, 16), classify);
+  const limb = (r0: number, r1: number, len: number, classify: Classify, spotOf?: ClassifySpot) =>
+    part(blocks ? box(r0 * 2, len + r1, r0 * 1.7) : taper(r0, r1, len), classify, undefined, spotOf);
+  const joint = (r: number, classify: Classify, spotOf?: ClassifySpot) => part(blocks ? box(r * 2, r * 2, r * 2, false) : new THREE.SphereGeometry(r, 24, 16), classify, undefined, spotOf);
 
   const root = new THREE.Group();
   const body = new THREE.Group(); // everything below the neck takes the sliders; the head keeps its size
@@ -182,31 +219,31 @@ function buildFigure(o: SceneOpts): Built {
       [0.27, 0.18, 0.17, 1.1],
       [0.3, 0.16, 0.18, 0.94],
     ]) {
-      body.add(part(box(w, h, d, false), torsoRegion, (m) => (m.position.y = y)));
+      body.add(part(box(w, h, d, false), torsoRegion, (m) => (m.position.y = y), torsoSpot));
     }
-  } else body.add(part(torsoGeometry(), torsoRegion));
+  } else body.add(part(torsoGeometry(), torsoRegion, undefined, torsoSpot));
 
   body.add(
-    part(blocks ? box(0.08, 0.1, 0.08, false) : new THREE.CylinderGeometry(0.043, 0.05, 0.12, 24, 2), neckRegion, (m) => (m.position.y = 1.53)),
+    part(blocks ? box(0.08, 0.1, 0.08, false) : new THREE.CylinderGeometry(0.043, 0.05, 0.12, 24, 2), neckRegion, (m) => (m.position.y = 1.53), fixedSpot("neck")),
   );
 
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group();
     shoulder.position.set(side * 0.2, 1.4, 0);
     shoulder.rotation.z = side * (o.mood === "tired" ? 0.24 : 0.32);
-    shoulder.add(joint(0.058, always("shoulders")));
-    shoulder.add(limb(0.05, 0.039, 0.29, armUpper));
+    shoulder.add(joint(0.058, always("shoulders"), fixedSpot(`shoulder_${sideOf(side)}`)));
+    shoulder.add(limb(0.05, 0.039, 0.29, armUpper, upperArmSpot(side)));
     const elbow = new THREE.Group();
     elbow.position.y = -0.3;
     elbow.rotation.z = side * -0.1;
     elbow.rotation.x = -0.12;
-    elbow.add(joint(0.04, always("forearms")));
-    elbow.add(limb(0.039, 0.029, 0.26, always("forearms")));
+    elbow.add(joint(0.04, always("forearms"), fixedSpot(`elbow_${sideOf(side)}`)));
+    elbow.add(limb(0.039, 0.029, 0.26, always("forearms"), forearmSpot(side)));
     elbow.add(
       part(blocks ? box(0.05, 0.1, 0.03) : taper(0.03, 0.022, 0.08, 16, 2), always(null), (m) => {
         m.scale.z = blocks ? 1 : 0.55;
         m.position.y = -0.27;
-      }),
+      }, fixedSpot(`wrist_${sideOf(side)}`)),
     );
     shoulder.add(elbow);
     body.add(shoulder);
@@ -216,11 +253,11 @@ function buildFigure(o: SceneOpts): Built {
     const hip = new THREE.Group();
     hip.position.set(side * 0.088, 0.92, 0);
     hip.rotation.z = side * 0.03;
-    hip.add(limb(0.083, 0.056, 0.42, thigh(side)));
+    hip.add(limb(0.083, 0.056, 0.42, thigh(side), thighSpot(side)));
     const knee = new THREE.Group();
     knee.position.y = -0.43;
-    knee.add(joint(0.056, kneeRegion));
-    knee.add(limb(0.055, 0.036, 0.41, shin));
+    knee.add(joint(0.056, kneeRegion, fixedSpot(`knee_${sideOf(side)}`)));
+    knee.add(limb(0.055, 0.036, 0.41, shin, shinSpot(side)));
     knee.add(
       part(blocks ? box(0.08, 0.06, 0.2, false) : taper(0.036, 0.03, 0.17, 16, 2), always(null), (m) => {
         if (!blocks) {
@@ -228,7 +265,7 @@ function buildFigure(o: SceneOpts): Built {
           m.scale.set(1.15, 1, 0.75);
         }
         m.position.set(0, -0.44, 0.03);
-      }),
+      }, fixedSpot(`foot_${sideOf(side)}`)),
     );
     hip.add(knee);
     body.add(hip);
@@ -261,7 +298,7 @@ function buildFigure(o: SceneOpts): Built {
   if (o.mood === "tired") head.rotation.x = 0.16;
   root.add(head);
 
-  paint(meshes, o.strain ?? {});
+  paint(meshes, { mode: o.mode ?? "strain", strain: o.strain ?? {}, pain: o.pain ?? {} });
 
   let sparkles: THREE.Group | null = null;
   if (o.mood === "fresh") {
@@ -374,8 +411,8 @@ function free(root: THREE.Object3D) {
 export type Stage = {
   render: (t: number, spin: number) => void;
   update: (o: SceneOpts) => void; // rebuild in place (slider changes)
-  setStrain: (s: Strain) => void; // repaint only (taps)
-  pick: (x: number, y: number) => Region | null; // canvas pixel -> region under it
+  setPaint: (p: { mode?: "strain" | "pain"; strain?: Strain; pain?: Pain }) => void; // repaint only (taps)
+  pick: (x: number, y: number) => { region: Region | null; spot: Spot | null } | null; // canvas pixel -> what's under it
   resize: (w: number, h: number) => void;
   dispose: () => void;
   animated: boolean;
@@ -403,8 +440,8 @@ export function createStage(canvas: HTMLCanvasElement, o: SceneOpts): Stage {
       stage.animated = Boolean(fig.sparkles) || Boolean(fig.orbit);
       cam = camera(next.variant ?? "full", cam.aspect, next.look.height);
     },
-    setStrain(s) {
-      paint(fig.meshes, s);
+    setPaint(p) {
+      paint(fig.meshes, { mode: p.mode ?? "strain", strain: p.strain ?? {}, pain: p.pain ?? {} });
     },
     pick(x, y) {
       const r = canvas.getBoundingClientRect();
@@ -412,7 +449,10 @@ export function createStage(canvas: HTMLCanvasElement, o: SceneOpts): Stage {
       fig.root.updateMatrixWorld(true);
       const hit = ray.intersectObjects(fig.meshes, false)[0];
       if (!hit || hit.faceIndex == null) return null;
-      return (hit.object.userData.faceRegions as (Region | null)[])[hit.faceIndex] ?? null;
+      return {
+        region: (hit.object.userData.faceRegions as (Region | null)[])[hit.faceIndex] ?? null,
+        spot: (hit.object.userData.faceSpots as (Spot | null)[])[hit.faceIndex] ?? null,
+      };
     },
     render(t, spin) {
       fig.root.rotation.y = spin;
@@ -441,7 +481,7 @@ let shared: { renderer: THREE.WebGLRenderer; canvas: HTMLCanvasElement } | null 
 const snaps = new Map<string, Promise<string>>();
 
 export function snapshot(o: SceneOpts, px = 192): Promise<string> {
-  const key = JSON.stringify([o.look, o.mood ?? null, o.strain ?? null, o.aura ?? 0, o.variant ?? "full", o.view ?? null, Boolean(o.blocks), px]);
+  const key = JSON.stringify([o.look, o.mood ?? null, o.strain ?? null, o.pain ?? null, o.mode ?? "strain", o.aura ?? 0, o.variant ?? "full", o.view ?? null, Boolean(o.blocks), px]);
   const hit = snaps.get(key);
   if (hit) return hit;
   const p = new Promise<string>((resolve) => {

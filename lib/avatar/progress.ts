@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { bestsOf, RUN_DISTANCES, type Bests } from "@/lib/activity/bests";
 import type { Streams } from "@/lib/activity/fit";
 import type { AvatarState, Mood } from "@/components/avatar/Avatar";
+import { normalizePain, type Pain, type PainLevel, type Spot } from "@/lib/avatar/pain";
 import { normalizeStrain, recentStrain, type Strain } from "@/lib/avatar/strain";
 import { sportGroup } from "@/lib/pod-stickers";
 
@@ -153,12 +154,16 @@ export function summarize(out: Achievement[], streak: { current: number; best: n
 }
 
 /** Today's look: mood from the latest readiness, and the muscles still recovering (last 72 h, fading). */
-export async function todayState(db: SupabaseClient, athleteId: string): Promise<{ mood: Mood; strain: Strain; note: string | null; date: string | null }> {
+export async function todayState(db: SupabaseClient, athleteId: string): Promise<{ mood: Mood; strain: Strain; sore: Pain; note: string | null; date: string | null }> {
   const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
-  const [{ data: r }, { data: worked }] = await Promise.all([
+  const [{ data: r }, { data: worked }, { data: checks }] = await Promise.all([
     db.from("readiness_scores").select("date, overall, note").eq("athlete_id", athleteId).order("date", { ascending: false }).limit(1).maybeSingle(),
     db.from("activity_strain").select("auto, custom, activities!inner(start_time)").eq("athlete_id", athleteId).gte("activities.start_time", since),
+    // Sore spots from the last 3 days of check-ins (worst level wins). Self and coach only (RLS).
+    db.from("workout_checkins").select("pain").eq("athlete_id", athleteId).gte("created_at", since),
   ]);
+  const sore: Pain = {};
+  for (const c of checks ?? []) for (const [k, v] of Object.entries(normalizePain(c.pain))) sore[k as Spot] = Math.max(sore[k as Spot] ?? 0, v) as PainLevel;
   // Only today's or yesterday's readiness counts as "today".
   const fresh = r && Date.now() - Date.parse(`${r.date}T12:00:00Z`) < 2.5 * 86_400_000;
   const mood: Mood = !fresh ? null : r.overall === "green" ? "fresh" : r.overall === "yellow" ? "ok" : r.overall === "red" ? "tired" : null;
@@ -168,7 +173,7 @@ export async function todayState(db: SupabaseClient, athleteId: string): Promise
       at: (w.activities as unknown as { start_time: string }).start_time,
     })),
   );
-  return { mood, strain, note: fresh ? r.note : null, date: fresh ? r.date : null };
+  return { mood, strain, sore, note: fresh ? r.note : null, date: fresh ? r.date : null };
 }
 
 export const RUN_PR_KEYS = RUN_DISTANCES.map((d) => BEST_KEY[d.key]);

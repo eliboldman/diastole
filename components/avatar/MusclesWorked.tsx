@@ -68,7 +68,7 @@ export default function MusclesWorked({
   return (
     <div className="grid gap-5 md:grid-cols-[minmax(0,15rem)_1fr] md:items-start">
       <div className="flex flex-col items-center">
-        <Avatar look={look} strain={strain} view={view} onPick={editable ? tap : undefined} className="h-80 w-52" title={`Muscles worked by ${firstName}`} />
+        <Avatar look={look} strain={strain} view={view} onPick={editable ? (h) => h.region && tap(h.region) : undefined} className="h-80 w-52" title={`Muscles worked by ${firstName}`} />
         <div className="mt-1 inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1" role="tablist" aria-label="Side">
           {(["front", "back"] as const).map((v) => (
             <button

@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { normalizeLook } from "@/lib/avatar/look";
 import type { Mood, SceneOpts, Stage } from "@/lib/avatar/mannequin";
+import type { Pain, Spot } from "@/lib/avatar/pain";
 import type { Region, Strain } from "@/lib/avatar/strain";
+
+export type Hit = { region: Region | null; spot: Spot | null };
 
 export type { Mood };
 
@@ -20,7 +23,9 @@ type Props = AvatarState & {
   variant?: "full" | "bust"; // full = live 3D you can spin; bust = still image for small spots
   blocks?: boolean; // the Blocks theme's boxy version
   view?: "front" | "back"; // still images; and which way a live one faces
-  onPick?: (r: Region) => void; // live only: tap a muscle
+  pain?: Pain; // sore spots (check-in)
+  mode?: "strain" | "pain"; // which layer shows and gets tapped
+  onPick?: (hit: Hit) => void; // live only: tap the body
   still?: boolean; // a picture instead of a live figure (lists of workouts)
   className?: string;
   title?: string;
@@ -29,13 +34,13 @@ type Props = AvatarState & {
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The live, drag-to-spin 3D mannequin. three.js loads only when one of these is on screen. */
-function Live({ opts, className, title, onPick }: { opts: SceneOpts; className: string; title?: string; onPick?: (r: Region) => void }) {
+function Live({ opts, className, title, onPick }: { opts: SceneOpts; className: string; title?: string; onPick?: (hit: Hit) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<Stage | null>(null);
   // Rebuilds on body/mood/aura changes; muscle taps only repaint (below).
-  const { strain, view, ...shape } = opts;
+  const { strain, pain, mode, view, ...shape } = opts;
   const key = JSON.stringify(shape);
-  const strainKey = JSON.stringify(strain ?? {});
+  const paintKey = JSON.stringify({ strain: strain ?? {}, pain: pain ?? {}, mode: mode ?? "strain" });
   const optsRef = useRef(opts);
   const pickRef = useRef(onPick);
   // Keep the latest props for the event handlers (runs before the mount effect below).
@@ -130,10 +135,10 @@ function Live({ opts, className, title, onPick }: { opts: SceneOpts; className: 
       // A tap (not a drag) on the figure picks the muscle under it.
       if (pickRef.current && e.type === "pointerup" && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 8 && performance.now() - downAt.t < 450) {
         const r = el.getBoundingClientRect();
-        const region = stage.current?.pick(e.clientX - r.left, e.clientY - r.top);
-        if (region) {
+        const hit = stage.current?.pick(e.clientX - r.left, e.clientY - r.top);
+        if (hit) {
           vel = 0;
-          pickRef.current(region);
+          pickRef.current(hit);
         }
       }
       kick();
@@ -164,12 +169,12 @@ function Live({ opts, className, title, onPick }: { opts: SceneOpts; className: 
     stage.current.update(optsRef.current);
     stage.current.render(performance.now(), 0.35);
   }, [key]);
-  // Muscle edits just repaint.
+  // Muscle and pain edits just repaint.
   useEffect(() => {
     if (!stage.current) return;
-    stage.current.setStrain(JSON.parse(strainKey) as Strain);
+    stage.current.setPaint(JSON.parse(paintKey) as { strain: Strain; pain: Pain; mode: "strain" | "pain" });
     stage.current.render(performance.now(), 0.35);
-  }, [strainKey]);
+  }, [paintKey]);
   // Face front or back when asked.
   useEffect(() => {
     if (!view) return;
@@ -206,8 +211,8 @@ function Still({ opts, className, title }: { opts: SceneOpts; className: string;
   );
 }
 
-export default function Avatar({ look, mood = null, strain, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, className = "", title }: Props) {
-  const opts: SceneOpts = { look: normalizeLook(look), mood, strain, aura, variant, blocks, view };
+export default function Avatar({ look, mood = null, strain, pain, mode, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, className = "", title }: Props) {
+  const opts: SceneOpts = { look: normalizeLook(look), mood, strain, pain, mode, aura, variant, blocks, view };
   if (variant === "bust" || still) return <Still opts={opts} className={className} title={title} />;
   return (
     <span className="relative inline-flex flex-col items-center">

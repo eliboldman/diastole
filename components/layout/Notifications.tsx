@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   CalendarClock,
   CalendarX,
+  HeartPulse,
   Lightbulb,
   MessageCircle,
   Orbit,
@@ -37,6 +38,7 @@ const ICON: Record<string, LucideIcon> = {
   pod_answer: Orbit,
   garmin_disconnected: Unplug,
   message: MessageCircle,
+  checkin_pain: HeartPulse,
 };
 
 // ---------------------------------------------------------------- one shared store per tab

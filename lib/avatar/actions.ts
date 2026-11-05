@@ -50,3 +50,20 @@ export async function saveStrain(activityId: string, strain: Record<string, numb
   revalidatePath(`/activity/${activityId}`);
   return { ok: true as const };
 }
+
+/** The athlete's post-workout check-in (only they can write it; their coach can read it). */
+export async function saveCheckin(activityId: string, c: { feel: number | null; rpe: number | null; pain: Record<string, number>; note: string }) {
+  const me = await requireUser();
+  if (!UUID.test(activityId)) return { ok: false as const, error: "Unknown workout." };
+  const feel = c.feel && c.feel >= 1 && c.feel <= 5 ? Math.round(c.feel) : null;
+  const rpe = c.rpe && c.rpe >= 1 && c.rpe <= 10 ? Math.round(c.rpe) : null;
+  const note = c.note.replace(/\s+$/g, "").slice(0, 500) || null;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("workout_checkins")
+    .upsert({ activity_id: activityId, athlete_id: me.id, feel, rpe, pain: c.pain, note, updated_at: new Date().toISOString() }, { onConflict: "activity_id" });
+  if (error) return { ok: false as const, error: "Couldn't save your check-in." };
+  revalidatePath(`/activity/${activityId}`);
+  revalidatePath("/me");
+  return { ok: true as const };
+}

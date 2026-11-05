@@ -22,7 +22,9 @@ import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
+import CheckIn from "@/components/avatar/CheckIn";
 import MusclesWorked from "@/components/avatar/MusclesWorked";
+import { normalizePain } from "@/lib/avatar/pain";
 import { normalizeStrain } from "@/lib/avatar/strain";
 import { writeAutoStrain } from "@/lib/avatar/strain-store";
 
@@ -126,8 +128,9 @@ function actualText(c: ComparedStep, sport: string | null, swimUnit: PoolUnit | 
   return [clock(a.duration_s), dist, measured].filter(Boolean).join(" · ") || "–";
 }
 
-export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ActivityPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ feel?: string }> }) {
   const { id } = await params;
+  const presetFeel = Number((await searchParams).feel) || null;
   const me = await requireUser();
   const supabase = await createClient();
 
@@ -156,7 +159,11 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     await writeAutoStrain(createAdminClient(), id, { laps: detail?.laps });
     ({ data: strainRow } = await supabase.from("activity_strain").select("auto, custom, reviewed_at").eq("activity_id", id).maybeSingle());
   }
-  const { data: ownerAvatar } = await supabase.from("avatars").select("look").eq("athlete_id", act.athlete_id).maybeSingle();
+  const [{ data: ownerAvatar }, { data: checkin }] = await Promise.all([
+    supabase.from("avatars").select("look").eq("athlete_id", act.athlete_id).maybeSingle(),
+    // Only the athlete and their coach can read check-ins (row-level security).
+    supabase.from("workout_checkins").select("feel, rpe, pain, note, updated_at").eq("activity_id", id).maybeSingle(),
+  ]);
 
   const streams = (detail?.streams ?? null) as Streams | null;
   const laps = ((detail?.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0);
@@ -291,6 +298,22 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
               <p className="mt-1 truncate text-xl font-semibold tabular-nums">{value}</p>
             </div>
           ))}
+        </section>
+      )}
+
+      {(isOwn || checkin) && (
+        <section id="checkin" className="scroll-mt-6">
+          <Card title={isOwn ? "How did it go?" : "Check-in"}>
+            <CheckIn
+              activityId={act.id}
+              look={ownerAvatar?.look ?? null}
+              initial={checkin ? { feel: checkin.feel, rpe: checkin.rpe, pain: normalizePain(checkin.pain), note: checkin.note, updated_at: checkin.updated_at } : null}
+              editable={isOwn}
+              durationS={act.duration_s}
+              firstName={owner?.full_name?.split(" ")[0] ?? "The athlete"}
+              presetFeel={presetFeel}
+            />
+          </Card>
         </section>
       )}
 

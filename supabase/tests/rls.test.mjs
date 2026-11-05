@@ -534,5 +534,30 @@ check("props notifications are skipped when turned off", (await db.query(`select
 await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'comment', 1, 'still notified', '${ACT1}')`);
 check("comments still come through", (await db.query(`select count(*)::int c from public.notifications where user_id = '${A1}' and meta ->> 'comment' = 'true'`)).rows[0].c >= 1);
 
+// ---------------------------------------------------------------- post-workout check-ins
+r = await as(A1, `insert into public.workout_checkins (activity_id, athlete_id, feel, rpe, pain, note) values ('${ACT1}', '${A1}', 4, 7, '{"knee_l": 1}', 'Legs heavy')`);
+check("athlete checks in on their own workout", !r.error);
+r = await as(A1, `insert into public.workout_checkins (activity_id, athlete_id, feel) values ('${ACT2}', '${A1}', 3)`);
+check("not on someone else's workout", !!r.error);
+r = await as(A1, `update public.workout_checkins set pain = '{"elbow": 2}' where activity_id = '${ACT1}' returning activity_id`);
+check("pain spots must be known and sided", !!r.error);
+r = await as(A1, `update public.workout_checkins set rpe = 11 where activity_id = '${ACT1}' returning activity_id`);
+check("RPE stays 1-10", !!r.error);
+const painNotes = async () => (await db.query(`select count(*)::int c from public.notifications where user_id = '${COACH}' and kind = 'checkin_pain'`)).rows[0].c;
+check("mild pain doesn't ping the coach", (await painNotes()) === 0);
+await db.exec(`update public.profiles set notify_prefs = '{}' where id = '${COACH}'`);
+r = await as(A1, `update public.workout_checkins set pain = '{"knee_l": 2, "calf_r": 3}' where activity_id = '${ACT1}' returning activity_id`);
+check("moderate/severe pain saves", r.rows?.length === 1);
+const pn = (await db.query(`select title, body, href from public.notifications where user_id = '${COACH}' and kind = 'checkin_pain'`)).rows;
+check("and notifies the coach once, naming the spots", pn.length === 1 && /knee \(left\), moderate/.test(pn[0].body) && /calf \(right\), severe/.test(pn[0].body) && pn[0].href === `/activity/${ACT1}#checkin`);
+await as(A1, `update public.workout_checkins set pain = '{"knee_l": 3}' where activity_id = '${ACT1}'`);
+check("updates refresh the same notification", (await painNotes()) === 1);
+r = await as(COACH, `select feel, rpe, note from public.workout_checkins where activity_id = '${ACT1}'`);
+check("coach reads the check-in", r.rows?.[0]?.rpe === 7);
+r = await as(A2, `select * from public.workout_checkins`);
+check("pod mates never see check-ins", r.rows?.length === 0);
+r = await as(COACH, `update public.workout_checkins set note = 'coach edit' where activity_id = '${ACT1}' returning activity_id`);
+check("coach can't edit it", !!r.error || r.rows?.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
