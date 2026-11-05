@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import NotificationHost, { NotificationButton } from "@/components/layout/Notifications";
 import SearchHost, { SearchButton } from "@/components/layout/SearchDialog";
 
 export type NavRole = "coach" | "athlete";
@@ -91,11 +92,13 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
         </div>
       </aside>
 
-      {/* Desktop: search (and, from Phase 3, notifications) top right */}
+      {/* Desktop: search and notifications top right */}
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
         <SearchButton />
+        <NotificationButton />
       </div>
       <SearchHost />
+      <NotificationHost />
 
       {/* Mobile: slim top bar + bottom tab bar in thumb reach */}
       <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-canvas/80 pt-[env(safe-area-inset-top)] backdrop-blur-2xl md:hidden">
@@ -104,7 +107,10 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
             <Image src="/logo.png" alt="" width={26} height={26} className="rounded-md" />
             <span className="text-sm font-semibold">Diastole</span>
           </Link>
-          <SearchButton />
+          <div className="flex items-center">
+            <SearchButton />
+            <NotificationButton />
+          </div>
         </div>
       </header>
 

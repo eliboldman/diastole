@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     // Form insights only call Claude when a new pattern shows up across several runs.
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   }
+  // Notifications: read ones go after 90 days, everything after a year.
+  const day = 86_400_000;
+  await admin.from("notifications").delete().not("read_at", "is", null).lt("created_at", new Date(Date.now() - 90 * day).toISOString());
+  await admin.from("notifications").delete().lt("created_at", new Date(Date.now() - 365 * day).toISOString());
   console.info("Morning coach assistant", results);
   return NextResponse.json({ ok: true, results });
 }

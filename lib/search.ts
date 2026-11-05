@@ -20,6 +20,7 @@ const PAGES: { title: string; href: string; roles: ("coach" | "athlete")[]; word
   { title: "Me", href: "/account", roles: ["coach", "athlete"], words: "account settings profile units timezone name device sign out" },
   { title: "Watch connection", href: "/connect", roles: ["coach", "athlete"], words: "garmin apple device watch connect" },
   { title: "Import Garmin history", href: "/me/import", roles: ["coach", "athlete"], words: "export zip history backfill" },
+  { title: "Notifications", href: "/notifications", roles: ["coach", "athlete"], words: "bell alerts inbox updates" },
   { title: "Upload a workout file", href: "/me/upload", roles: ["coach", "athlete"], words: "fit file rouvy zwift trainerroad upload ride" },
   { title: "Garmin deliveries", href: "/garmin-log", roles: ["coach"], words: "webhook log sync" },
   { title: "AI test mode", href: "/lab", roles: ["coach"], words: "test lab fake athletes" },
