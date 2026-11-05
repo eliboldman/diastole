@@ -1,7 +1,7 @@
 // Run with: node lib/pod-stickers.test.ts
 import assert from "node:assert/strict";
 
-import { ALL_STICKERS, isSticker, milestone, podAwards, rampStep, unlockedFor } from "./pod-stickers.ts";
+import { ALL_STICKERS, isSticker, milestone, podAwards, rampStep, sportGroup, sportStickers, unlockedFor, unlockedForActivity } from "./pod-stickers.ts";
 
 const now = new Date("2026-11-03T18:00:00Z");
 const day = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -50,4 +50,19 @@ assert.deepEqual(
   ["Sleep Royalty:Maya", "Vampire Award:Sam", "Most Zen:Maya", "Grindset:Sam"],
 );
 assert.deepEqual(podAwards([member("Solo", 8, 20, 60)], now), []);
+// Activity stickers
+for (const k of Object.keys(ALL_STICKERS)) assert.match(k, /^[a-z0-9_]{1,40}$/, `sticker key ${k} must fit the database check`);
+assert.equal(new Set(Object.values(ALL_STICKERS).map((s) => s.emoji)).size >= 50, true, "catalog grew");
+assert.equal(sportGroup("lap_swimming"), "swim");
+assert.equal(sportGroup("indoor_cycling"), "bike");
+assert.equal(sportGroup("trail_running"), "run");
+assert.equal(sportGroup("yoga"), "other");
+assert.ok(sportStickers("open_water_swimming").every((s) => isSticker(s.key)));
+assert.deepEqual(sportStickers("yoga"), []);
+const actKeys = (a: Parameters<typeof unlockedForActivity>[0]) => unlockedForActivity(a).map((s) => s.key).sort();
+assert.deepEqual(actKeys({ sport: "running", local_hour: 5, duration_s: 9000, elevation_gain_m: 600, avg_hr: 170 }), ["dawn", "epic", "goat_climb", "redline"]);
+assert.deepEqual(actKeys({ sport: "running", local_hour: 22, duration_s: 600, elevation_gain_m: null, avg_hr: null }), ["owl", "quickie"]);
+assert.deepEqual(actKeys({ sport: "strength_training", local_hour: 12, duration_s: 600, elevation_gain_m: null, avg_hr: null }), []);
+assert.match(unlockedForActivity({ sport: "run", local_hour: 21, duration_s: null, elevation_gain_m: null, avg_hr: null })[0].line!, /9 PM/);
+
 console.log("pod-stickers: all tests passed");

@@ -3,10 +3,24 @@
 import { Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 import { useToast } from "@/components/coach/Toast";
 import { hideOneProp, hideProps, sendProps } from "@/lib/pod-props-actions";
-import { ALL_STICKERS, ALWAYS_STICKERS, MAX_SEND, NOTE_MAX, milestone, rampStep, unlockedFor, type MemberData, type Sticker } from "@/lib/pod-stickers";
+import {
+  ALL_STICKERS,
+  ALWAYS_STICKERS,
+  MAX_SEND,
+  NOTE_MAX,
+  milestone,
+  rampStep,
+  sportStickers,
+  unlockedFor,
+  unlockedForActivity,
+  type ActivityFacts,
+  type MemberData,
+  type Sticker,
+} from "@/lib/pod-stickers";
 
 export type PropSend = {
   id: string;
@@ -19,8 +33,13 @@ export type PropSend = {
   to_me: boolean;
   from_me: boolean;
   from_name: string;
+  activity_id?: string | null;
+  activity_sport?: string | null;
 };
-export type PropTotal = { to_id: string; sticker: string; total: number; senders: number; from_me: boolean; hidden: boolean };
+export type PropTotal = { to_id: string; sticker: string; total: number; all_time?: number; senders: number; from_me: boolean; hidden: boolean };
+export type PropNote = Pick<PropSend, "id" | "sticker" | "note" | "hidden" | "from_me" | "to_me" | "from_name">;
+/** Props for one activity instead of the person: the sheet adds that sport's stickers and the activity's unlocks. */
+export type PropActivity = ActivityFacts & { id: string; label: string };
 
 const fmt = (n: number) => (n >= 10_000 ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n) : n.toLocaleString());
 const buzz = (p: number | number[]) => navigator.vibrate?.(p);
@@ -34,16 +53,22 @@ export default function PodProps({
   member,
   totals,
   notes,
+  activity,
 }: {
   podId: string;
-  member: MemberData & { id: string; name: string; is_me: boolean };
+  member: Partial<MemberData> & { id: string; name: string; is_me: boolean };
   totals: PropTotal[];
-  notes: PropSend[];
+  notes: PropNote[];
+  activity?: PropActivity;
 }) {
   const router = useRouter();
   const { show, element: toast } = useToast(4500);
   const first = member.name.split(" ")[0];
-  const secrets = useMemo(() => unlockedFor(member), [member]);
+  const secrets = useMemo(
+    () => (activity ? unlockedForActivity(activity) : member.wellness && member.activities ? unlockedFor(member as MemberData) : []),
+    [member, activity],
+  );
+  const sportSet = useMemo(() => (activity ? sportStickers(activity.sport) : []), [activity]);
 
   // Local totals so sends land instantly; the server copy replaces them on refresh.
   // Keyed to the server totals they were added on top of, so a refresh drops them automatically.
@@ -97,7 +122,7 @@ export default function PodProps({
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 1400);
     bump(c.sticker.key, c.n);
     const sentNote = noteRef.current.trim();
-    const r = await sendProps(podId, member.id, c.sticker.key, c.n, sentNote);
+    const r = await sendProps(podId, member.id, c.sticker.key, c.n, sentNote, activity?.id);
     if (!r.ok) {
       bump(c.sticker.key, -c.n);
       show(r.error, { ok: false });
@@ -108,7 +133,7 @@ export default function PodProps({
       setNote("");
     }
     const m = milestone(c.n);
-    show(`${c.n.toLocaleString()} × ${c.sticker.emoji} sent to ${first}${m && c.n >= 100 ? `. ${m.charAt(0).toUpperCase()}${m.slice(1)}.` : ""}`);
+    show(`${c.n.toLocaleString()} × ${c.sticker.emoji} sent to ${first}${activity ? ` for their ${activity.label.toLowerCase()}` : ""}${m && c.n >= 100 ? `. ${m.charAt(0).toUpperCase()}${m.slice(1)}.` : ""}`);
     router.refresh();
   }
 
@@ -183,7 +208,7 @@ export default function PodProps({
     if (member.is_me) {
       setWiggle((w) => w + 1);
       buzz([8, 40, 8]);
-      show("You can't heckle yourself. We checked.", { ok: false });
+      show(activity ? "No props for your own workout. Humble, we know." : "You can't heckle yourself. We checked.", { ok: false });
       return;
     }
     setOpen(true);
@@ -198,7 +223,7 @@ export default function PodProps({
 
   async function hide(key: string) {
     setPeek(null);
-    const r = await hideProps(podId, key);
+    const r = await hideProps(podId, key, activity?.id);
     if (!r.ok) return show(r.error, { ok: false });
     show(`${ALL_STICKERS[key].emoji} hidden. Nobody saw anything.`);
     router.refresh();
@@ -229,8 +254,9 @@ export default function PodProps({
   );
 
   return (
-    <div className="relative mt-5 border-t border-white/[0.09] pt-4">
+    <div className={`relative ${activity ? "mt-4" : "mt-5 border-t border-white/[0.09] pt-4"}`}>
       {/* Received */}
+      {!activity && shown.length > 0 && <p className="mb-2 text-[11px] uppercase tracking-[0.15em] text-white/45">Today&apos;s props</p>}
       {shown.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
           {shown.map((t) => {
@@ -252,7 +278,8 @@ export default function PodProps({
                     <span className="block text-sm font-medium text-white">
                       {s.emoji} {s.label}
                     </span>
-                    {t.total.toLocaleString()} from {t.senders} {t.senders === 1 ? (t.from_me ? "person (you)" : "person") : "people"}
+                    {`${t.total.toLocaleString()} ${activity ? "" : "today "}from ${t.senders} ${t.senders === 1 ? (t.from_me ? "person (you)" : "person") : "people"}`}
+                    {t.all_time && t.all_time > t.total ? <span className="block text-white/50">{t.all_time.toLocaleString()} all-time</span> : null}
                     {t.hidden && <span className="block text-white/50">Hidden by {first}. Only you can see it.</span>}
                     {member.is_me && !t.hidden && (
                       <button onClick={() => hide(t.sticker)} className="mt-2 block min-h-9 text-red-200 hover:underline">
@@ -291,7 +318,7 @@ export default function PodProps({
         onClick={openSheet}
         className={`flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.09] ${wiggle ? "prop-wiggle" : ""}`}
       >
-        <span aria-hidden>🐐</span> Send props
+        <span aria-hidden>{activity ? "👏" : "🐐"}</span> {activity ? "Give props" : "Send props"}
         {!member.is_me && secrets.length > 0 && <Sparkles size={14} className="text-amber-200/80" aria-label="Something's unlocked" />}
       </button>
 
@@ -317,8 +344,10 @@ export default function PodProps({
         </span>
       ))}
 
-      {open && (
-        <>
+      {/* Portaled: cards use backdrop-filter, which would trap a fixed sheet inside the card. */}
+      {open &&
+        createPortal(
+          <>
           <div className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-[2px]" onClick={close} aria-hidden />
           <div
             role="dialog"
@@ -326,7 +355,10 @@ export default function PodProps({
             className="toast-in fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] overflow-y-auto rounded-t-[32px] border border-white/10 bg-panel/95 p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] shadow-2xl backdrop-blur-2xl sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[30rem] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[32px]"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">To {first}</h3>
+              <h3 className="min-w-0 truncate text-lg font-medium">
+                To {first}
+                {activity && <span className="text-white/50"> · {activity.label}</span>}
+              </h3>
               <button onClick={close} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06]">
                 <X size={18} />
               </button>
@@ -364,9 +396,15 @@ export default function PodProps({
             {secrets.length > 0 && (
               <section className="mb-4">
                 <p className="mb-2 flex items-center gap-1.5 text-xs uppercase tracking-[0.15em] text-amber-200/80">
-                  <Sparkles size={13} /> Unlocked by {first}&apos;s numbers
+                  <Sparkles size={13} /> Unlocked by {activity ? "this workout" : `${first}'s numbers`}
                 </p>
                 <div className="grid grid-cols-2 gap-2">{secrets.map((s) => stickerButton(s, true))}</div>
+              </section>
+            )}
+            {sportSet.length > 0 && (
+              <section className="mb-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-sky-200/75">{activity!.label}</p>
+                <div className="grid grid-cols-2 gap-2">{sportSet.map((s) => stickerButton(s))}</div>
               </section>
             )}
             <section className="mb-4">
@@ -378,9 +416,11 @@ export default function PodProps({
               <div className="grid grid-cols-2 gap-2">{ALWAYS_STICKERS.filter((s) => s.tone === "heckle").map((s) => stickerButton(s))}</div>
             </section>
           </div>
-        </>
-      )}
-      {toast}
+          </>,
+          document.body,
+        )}
+      {/* Only set after a click, so this never runs during server rendering. */}
+      {toast && createPortal(toast, document.body)}
     </div>
   );
 }

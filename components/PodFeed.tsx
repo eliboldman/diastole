@@ -8,6 +8,7 @@ import { ALL_STICKERS, podAwards } from "@/lib/pod-stickers";
 import type { Flag } from "@/lib/readiness/engine";
 
 export type PodPropsData = {
+  day_start?: string; // member-card props start over at this time (midnight, coach's timezone)
   totals: PropTotal[];
   recent: PropSend[];
 };
@@ -129,6 +130,7 @@ export default function PodFeed({
                       {ALL_STICKERS[r.sticker].emoji}
                       <span className="text-white/50"> to </span>
                       {firstName(r.to_id)}
+                      {r.activity_id && <span className="text-white/50">{` for their ${(r.activity_sport ?? "workout").replaceAll("_", " ")}`}</span>}
                       {r.note && (
                         <span className="block break-words text-white/65">
                           &ldquo;{r.note}&rdquo;
@@ -259,7 +261,11 @@ export default function PodFeed({
                   member={m}
                   totals={props.totals.filter((t) => t.to_id === m.id)}
                   notes={props.recent.filter(
-                    (r) => r.to_id === m.id && r.note,
+                    (r) =>
+                      r.to_id === m.id &&
+                      r.note &&
+                      !r.activity_id &&
+                      (!props.day_start || Date.parse(r.created_at) >= Date.parse(props.day_start)),
                   )}
                 />
               )}

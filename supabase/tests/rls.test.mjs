@@ -13,6 +13,7 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema public, auth to anon, authenticated;
+  create publication supabase_realtime;
   grant execute on function auth.uid() to authenticated;
 `);
 await db.exec(migration);
@@ -223,6 +224,41 @@ r = await as(COACH, `insert into public.form_insights (coach_id, athlete_id, iss
 check("only the server writes form insights", !!r.error);
 await db.exec(`insert into public.ai_usage (coach_id, model, athletes, input_tokens, output_tokens, cost_usd, trigger) values ('${COACH}', 'm', 1, 1, 1, 0, 'form')`);
 check("ai_usage accepts form runs", true);
+
+// ---------------------------------------------------------------- activity props + daily reset
+// State here: A1 active in POD, A2 left, COACH is the pod's coach.
+r = await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'goat', 5, 'nice run', '${ACT1}') as e`);
+check("coach gives props on A1's activity", !r.error && r.rows?.[0]?.e === null);
+r = await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'goat', 1, null, '${ACT2}') as e`);
+check("props can't be pinned to someone else's activity", r.rows?.[0]?.e === "That workout isn't theirs.");
+r = await as(A1, `select public.send_pod_props('${POD}', '${A1}', 'goat', 1, null, '${ACT1}') as e`);
+check("no props on your own activity", r.rows?.[0]?.e === "self");
+r = await as(COACH, `select public.send_pod_props('${POD}', '${A1}', 'clap', 3) as e`);
+check("member-card props still work", r.rows?.[0]?.e === null);
+await db.exec(`insert into public.pod_props (pod_id, from_id, to_id, sticker, count, created_at) values ('${POD}', '${COACH}', '${A1}', 'clap', 7, now() - interval '2 days')`);
+r = await as(A1, `select public.get_pod_props('${POD}') as p`);
+const props = r.rows?.[0]?.p;
+const clap = props?.totals?.find((t) => t.sticker === "clap");
+check("member totals count today only, with all-time alongside", clap?.total === 3 && clap?.all_time === 10);
+check("activity props stay off the member card", !props?.totals?.some((t) => t.sticker === "goat"));
+check("recent sends say which activity", props?.recent?.some((x) => x.activity_id === ACT1 && x.activity_sport === "running"));
+r = await as(A1, `select public.get_pod_activity_feed('${POD}') as f`);
+const item = r.rows?.[0]?.f?.find((x) => x.id === ACT1);
+check("activity feed shows the activity with its props and note", item?.props?.[0]?.sticker === "goat" && item?.props?.[0]?.total === 5 && item?.notes?.[0]?.note === "nice run");
+check("feed leaves out members who left", !r.rows?.[0]?.f?.some((x) => x.id === ACT2));
+r = await as(STRANGER, `select public.get_pod_activity_feed('${POD}') as f`);
+check("strangers get no activity feed", r.rows?.[0]?.f === null);
+r = await as(A2, `select public.get_pod_activity_feed('${POD}') as f`);
+check("former members get no activity feed", r.rows?.[0]?.f === null);
+r = await as(A1, `select public.get_pod_activity_feed('${POD}', now() - interval '1 day') as f`);
+check("feed pages by start time", Array.isArray(r.rows?.[0]?.f) && r.rows[0].f.length === 0);
+const note = (await db.query(`select title, href from public.notifications where user_id = '${A1}' and kind = 'pod_props' and href like '/activity/%'`)).rows[0];
+check("activity props notify with a link to the activity", note?.href === `/activity/${ACT1}` && /on your running/.test(note?.title ?? ""));
+await as(A1, `select public.hide_pod_props('${POD}', 'goat', '${ACT1}')`);
+r = await as(A1, `select public.get_pod_activity_feed('${POD}') as f`);
+check("recipient can hide a sticker on their activity", !r.rows?.[0]?.f?.find((x) => x.id === ACT1)?.props?.length);
+r = await as(COACH, `select public.get_pod_activity_feed('${POD}') as f`);
+check("coach still sees hidden activity props", r.rows?.[0]?.f?.find((x) => x.id === ACT1)?.props?.[0]?.hidden === true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

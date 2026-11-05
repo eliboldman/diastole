@@ -17,13 +17,68 @@ const ALWAYS: Sticker[] = [
   { key: "rocket", emoji: "🚀", label: "Built different", tone: "props" },
   { key: "clap", emoji: "👏", label: "Standing ovation", tone: "props" },
   { key: "heart", emoji: "🫀", label: "Big heart (literally)", tone: "props" },
+  { key: "muscle", emoji: "💪", label: "Strong work", tone: "props" },
+  { key: "bolt", emoji: "⚡", label: "Lightning", tone: "props" },
+  { key: "trophy", emoji: "🏆", label: "Champion stuff", tone: "props" },
+  { key: "diamond", emoji: "💎", label: "Diamond legs", tone: "props" },
+  { key: "brain", emoji: "🧠", label: "Big brain pacing", tone: "props" },
+  { key: "horse", emoji: "🐎", label: "Workhorse", tone: "props" },
+  { key: "hundred", emoji: "💯", label: "No notes", tone: "props" },
+  { key: "eyes", emoji: "👀", label: "Who IS this", tone: "props" },
   { key: "salt", emoji: "🧂", label: "Salty", tone: "heckle" },
   { key: "snail", emoji: "🐌", label: "Snail mode", tone: "heckle" },
   { key: "rip", emoji: "🪦", label: "RIP legs", tone: "heckle" },
   { key: "clown", emoji: "🤡", label: "Clown behavior", tone: "heckle" },
   { key: "sloth", emoji: "🦥", label: "Sloth mode", tone: "heckle" },
   { key: "potato", emoji: "🥔", label: "Couch potato", tone: "heckle" },
+  { key: "melt", emoji: "🫠", label: "Melting", tone: "heckle" },
+  { key: "yawn", emoji: "🥱", label: "Was that a warmup?", tone: "heckle" },
+  { key: "ice", emoji: "🧊", label: "Ice bath. Now.", tone: "heckle" },
+  { key: "skull", emoji: "💀", label: "Absolutely cooked", tone: "heckle" },
+  { key: "pizza", emoji: "🍕", label: "Pizza powered", tone: "heckle" },
+  { key: "duck", emoji: "🦆", label: "Quack (no reason)", tone: "heckle" },
 ];
+
+export type SportGroup = "run" | "swim" | "bike" | "strength" | "other";
+export function sportGroup(sport: string | null | undefined): SportGroup {
+  const s = sport ?? "";
+  if (/swim/i.test(s)) return "swim";
+  if (/run|walk|hik|trail|treadmill|track/i.test(s)) return "run";
+  if (/cycl|bik|ride|spin/i.test(s)) return "bike";
+  if (/strength|weight|gym|lift|hiit|crossfit/i.test(s)) return "strength";
+  return "other";
+}
+
+// Shown in the sheet when the props are for one activity of that sport.
+const SPORT: Record<Exclude<SportGroup, "other">, Sticker[]> = {
+  run: [
+    { key: "run_demon", emoji: "👟", label: "Speed demon", tone: "props" },
+    { key: "run_legs", emoji: "🦵", label: "Legs for days", tone: "props" },
+    { key: "run_cheetah", emoji: "🐆", label: "Cheetah mode", tone: "props" },
+    { key: "run_shuffle", emoji: "🐧", label: "Penguin shuffle", tone: "heckle" },
+  ],
+  swim: [
+    { key: "swim_fish", emoji: "🐟", label: "Fish mode", tone: "props" },
+    { key: "swim_shark", emoji: "🦈", label: "Shark in the lane", tone: "props" },
+    { key: "swim_dolphin", emoji: "🐬", label: "Dolphin kick", tone: "props" },
+    { key: "swim_seal", emoji: "🦭", label: "Wall hugger", tone: "heckle" },
+  ],
+  bike: [
+    { key: "bike_watts", emoji: "🔋", label: "Watt bomb", tone: "props" },
+    { key: "bike_quads", emoji: "🍗", label: "Quads of thunder", tone: "props" },
+    { key: "bike_tornado", emoji: "🌪️", label: "Draft this", tone: "props" },
+    { key: "bike_coffee", emoji: "☕", label: "Café ride", tone: "heckle" },
+  ],
+  strength: [
+    { key: "lift_swole", emoji: "🏋️", label: "Swole", tone: "props" },
+    { key: "lift_gorilla", emoji: "🦍", label: "Gorilla strength", tone: "props" },
+    { key: "lift_noodle", emoji: "🍜", label: "Noodle arms", tone: "heckle" },
+  ],
+};
+export const sportStickers = (sport: string | null | undefined): Sticker[] => {
+  const g = sportGroup(sport);
+  return g === "other" ? [] : SPORT[g];
+};
 
 // Every secret sticker, so labels resolve even after the numbers that unlocked it change.
 const SECRETS: Record<string, Sticker> = Object.fromEntries(
@@ -39,11 +94,20 @@ const SECRETS: Record<string, Sticker> = Object.fromEntries(
       ["unhinged", "🥵", "Unhinged volume", "props"],
       ["sendhelp", "🚑", "Send help", "heckle"],
       ["greenlight", "🟢", "Green light gang", "props"],
+      ["dawn", "🌅", "Dawn patrol", "props"],
+      ["owl", "🦉", "Night owl", "props"],
+      ["epic", "🗻", "Certified epic", "props"],
+      ["goat_climb", "⛰️", "Mountain goat", "props"],
+      ["redline", "🚨", "Redline enjoyer", "heckle"],
+      ["quickie", "⏱️", "Speedrun any%", "heckle"],
     ] as const
   ).map(([key, emoji, label, tone]) => [key, { key, emoji, label, tone, secret: true }]),
 );
 
-export const ALL_STICKERS: Record<string, Sticker> = { ...Object.fromEntries(ALWAYS.map((s) => [s.key, s])), ...SECRETS };
+export const ALL_STICKERS: Record<string, Sticker> = {
+  ...Object.fromEntries([...ALWAYS, ...Object.values(SPORT).flat()].map((s) => [s.key, s])),
+  ...SECRETS,
+};
 export const isSticker = (key: string) => key in ALL_STICKERS;
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -83,6 +147,28 @@ export function unlockedFor(m: MemberData, now = new Date()): Sticker[] {
 }
 
 export const ALWAYS_STICKERS = ALWAYS;
+
+export type ActivityFacts = {
+  sport: string | null;
+  local_hour: number | null; // start hour in the athlete's own timezone
+  duration_s: number | null;
+  elevation_gain_m: number | null;
+  avg_hr: number | null;
+};
+
+/** Secret stickers one activity's own numbers unlock. */
+export function unlockedForActivity(a: ActivityFacts): Sticker[] {
+  const out: Sticker[] = [];
+  const add = (key: string, line: string) => out.push({ ...SECRETS[key], line });
+  const min = a.duration_s ? a.duration_s / 60 : null;
+  if (a.local_hour !== null && a.local_hour < 6) add("dawn", `Started before 6 AM. The sun wasn't even up.`);
+  if (a.local_hour !== null && a.local_hour >= 21) add("owl", `A ${a.local_hour - 12} PM workout. Who does that?`);
+  if (min !== null && min >= 120) add("epic", `${Math.floor(min / 60)}h${String(Math.round(min % 60)).padStart(2, "0")} of moving. Legendary.`);
+  if (a.elevation_gain_m && a.elevation_gain_m >= 500) add("goat_climb", `${Math.round(a.elevation_gain_m)} m of climbing. Hooves recommended.`);
+  if (a.avg_hr && a.avg_hr >= 165) add("redline", `Averaged ${Math.round(a.avg_hr)} bpm. Heart said "please."`);
+  if (min !== null && min > 0 && min < 15 && sportGroup(a.sport) !== "strength") add("quickie", `${Math.round(min)} minutes. Blink and you missed it.`);
+  return out;
+}
 
 /** The caption that pops up as a held sticker's count climbs. */
 export function milestone(n: number): string | null {
