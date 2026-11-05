@@ -19,7 +19,7 @@ export type AiModel = keyof typeof AI_MODELS;
 
 export const DEFAULT_SETTINGS = { ai_enabled: true, ai_model: "claude-opus-5-5" as AiModel, ai_monthly_cap_usd: 5 };
 
-function costOf(model: AiModel, u: Anthropic.Beta.BetaUsage) {
+export function costOf(model: AiModel, u: Anthropic.Beta.BetaUsage) {
   const p = AI_MODELS[model];
   const input = u.input_tokens ?? 0;
   const output = u.output_tokens ?? 0;

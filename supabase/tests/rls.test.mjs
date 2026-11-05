@@ -559,5 +559,28 @@ check("pod mates never see check-ins", r.rows?.length === 0);
 r = await as(COACH, `update public.workout_checkins set note = 'coach edit' where activity_id = '${ACT1}' returning activity_id`);
 check("coach can't edit it", !!r.error || r.rows?.length === 0);
 
+// ---------------------------------------------------------------- the "why" (Phase 6)
+const WK = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, why)
+  values ('${A1}', '${COACH}', current_date + 1, 'run', 'Tempo', 'approved', 'Builds your threshold for the half.') returning id`)).rows[0].id;
+const WKD = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, why)
+  values ('${A1}', '${COACH}', current_date + 2, 'run', 'Secret draft', 'draft', 'Not yet') returning id`)).rows[0].id;
+await db.exec(`insert into public.workout_why_drafts (workout_id, coach_id, draft, model) values ('${WK}', '${COACH}', 'AI draft text', 'claude-haiku-5-5')`);
+r = await as(A1, `select why from public.planned_workouts where id = '${WK}'`);
+check("athlete sees the saved why on a sent workout", r.rows?.[0]?.why === "Builds your threshold for the half.");
+r = await as(A1, `select why from public.planned_workouts where id = '${WKD}'`);
+check("but not on a draft workout", r.rows?.length === 0);
+r = await as(A1, `select * from public.workout_why_drafts`);
+check("athletes never see AI drafts", r.rows?.length === 0);
+r = await as(COACH, `select draft from public.workout_why_drafts where workout_id = '${WK}'`);
+check("the coach sees their draft", r.rows?.[0]?.draft === "AI draft text");
+r = await as(A1, `update public.planned_workouts set why = 'mine' where id = '${WK}' returning id`);
+check("athletes can't change the why", !!r.error || r.rows?.length === 0);
+r = await as(COACH, `delete from public.workout_why_drafts where workout_id = '${WK}' returning workout_id`);
+check("coach clears the draft", r.rows?.length === 1);
+r = await as(COACH, `update public.planned_workouts set why = '${"x".repeat(401)}' where id = '${WK}' returning id`);
+check("why stays under 400 characters", !!r.error);
+await db.exec(`insert into public.ai_usage (coach_id, model, athletes, input_tokens, output_tokens, cost_usd, trigger) values ('${COACH}', 'claude-haiku-5-5', 1, 1, 1, 0, 'why')`);
+check("ai_usage accepts why drafts", true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

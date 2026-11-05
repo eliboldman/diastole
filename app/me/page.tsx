@@ -26,7 +26,7 @@ export default async function MePage() {
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
+    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
@@ -92,7 +92,7 @@ export default async function MePage() {
           <p className="mt-2 text-sm text-white/55">No workouts scheduled.</p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
-            {workouts.map((w) => (
+            {workouts.map((w, i) => (
               <li key={w.id} className="border-t border-white/[0.09]">
                 <Link href={`/training/workouts/${w.id}`} className="flex min-h-11 items-center justify-between gap-3 rounded-lg py-1 hover:bg-white/[0.04]">
                   <span className="min-w-0 truncate">
@@ -103,6 +103,7 @@ export default async function MePage() {
                   </span>
                   <span className="shrink-0 text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
                 </Link>
+                {i === 0 && w.why && <p className="pb-2 text-sm leading-relaxed text-emerald-50/80">{w.why}</p>}
               </li>
             ))}
           </ul>

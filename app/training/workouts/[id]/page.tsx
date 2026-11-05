@@ -22,7 +22,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const [{ data: w }, { data: done }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit")
+      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -42,6 +42,14 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
+
+      {w.why && (
+        <section className="row-in mt-6 rounded-[28px] border border-emerald-300/20 bg-emerald-300/[0.05] p-5">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-emerald-100/70">Why this workout</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-white/90">{w.why}</p>
+          <p className="mt-2 text-xs text-white/45">From your coach</p>
+        </section>
+      )}
 
       {me.coach_id && me.coach_id !== me.id && (
         <div className="mt-4">

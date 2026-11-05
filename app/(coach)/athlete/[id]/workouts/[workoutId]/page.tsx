@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import VersionHistory, { type Version } from "@/components/coach/VersionHistory";
 import WorkoutBuilder from "@/components/coach/WorkoutBuilder";
+import WhyEditor from "@/components/coach/WhyEditor";
 import WorkoutTools from "@/components/coach/WorkoutTools";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
@@ -14,6 +15,7 @@ export const metadata: Metadata = { title: "Workout · Diastole" };
 
 type Row = {
   id: string;
+  why: string | null;
   title: string;
   sport: string;
   scheduled_date: string;
@@ -49,11 +51,12 @@ export default async function WorkoutPage({
 
   let w: Row | null = null;
   let versions: Version[] = [];
+  let whyDraft: { draft: string } | null = null;
   if (workoutId !== "new") {
     const [{ data }, { data: v }] = await Promise.all([
       supabase
         .from("planned_workouts")
-        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit")
+        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why")
         .eq("id", workoutId)
         .eq("athlete_id", id)
         .maybeSingle(),
@@ -65,6 +68,7 @@ export default async function WorkoutPage({
     ]);
     if (!data) notFound();
     w = data as Row;
+    ({ data: whyDraft } = await supabase.from("workout_why_drafts").select("draft").eq("workout_id", workoutId).maybeSingle());
     versions = (v ?? []) as Version[];
   }
 
@@ -98,6 +102,13 @@ export default async function WorkoutPage({
         <div className="mt-4">
           <MessageAbout to={id} name={firstName} workoutId={w.id} />
         </div>
+      )}
+      {w && !w.deleted_at && (
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl sm:p-6">
+          <h2 className="text-lg font-medium">Why this workout</h2>
+          <p className="mb-3 mt-1 text-sm text-white/55">{`A sentence or two on what it's for. ${firstName} sees it with the workout once you save it.`}</p>
+          <WhyEditor workoutId={w.id} athleteFirstName={firstName} saved={w.why ?? null} draft={whyDraft?.draft ?? null} />
+        </section>
       )}
       {w && w.status !== "draft" && <WorkoutMessages workoutId={w.id} me={me.id} names={{ [id]: firstName }} />}
 
