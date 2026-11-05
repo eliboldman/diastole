@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { normalizeLook } from "@/lib/avatar/look";
-import type { LoadAreas, Mood, SceneOpts, Stage } from "@/lib/avatar/mannequin";
+import type { Mood, SceneOpts, Stage } from "@/lib/avatar/mannequin";
+import type { Region, Strain } from "@/lib/avatar/strain";
 
-export type { LoadAreas, Mood };
+export type { Mood };
 
 export type AvatarState = {
   mood?: Mood; // today's readiness: fresh (green), ok (yellow), tired (red)
-  load?: LoadAreas; // where the last few days' training landed, 0..1
+  strain?: Strain; // muscles worked (a workout) or still recovering (the last 72 h)
   aura?: number; // fitness progression 0..4, from real milestones
   badges?: string[]; // milestone pins (shown under the full avatar)
 };
@@ -18,6 +19,9 @@ type Props = AvatarState & {
   look: unknown;
   variant?: "full" | "bust"; // full = live 3D you can spin; bust = still image for small spots
   blocks?: boolean; // the Blocks theme's boxy version
+  view?: "front" | "back"; // still images; and which way a live one faces
+  onPick?: (r: Region) => void; // live only: tap a muscle
+  still?: boolean; // a picture instead of a live figure (lists of workouts)
   className?: string;
   title?: string;
 };
@@ -25,11 +29,21 @@ type Props = AvatarState & {
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The live, drag-to-spin 3D mannequin. three.js loads only when one of these is on screen. */
-function Live({ opts, className, title }: { opts: SceneOpts; className: string; title?: string }) {
+function Live({ opts, className, title, onPick }: { opts: SceneOpts; className: string; title?: string; onPick?: (r: Region) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<Stage | null>(null);
-  const key = JSON.stringify(opts);
-  const optsRef = useRef(key);
+  // Rebuilds on body/mood/aura changes; muscle taps only repaint (below).
+  const { strain, view, ...shape } = opts;
+  const key = JSON.stringify(shape);
+  const strainKey = JSON.stringify(strain ?? {});
+  const optsRef = useRef(opts);
+  const pickRef = useRef(onPick);
+  // Keep the latest props for the event handlers (runs before the mount effect below).
+  useEffect(() => {
+    optsRef.current = opts;
+    pickRef.current = onPick;
+  });
+  const facing = useRef<{ target: number | null }>({ target: null });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -43,12 +57,20 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
     let dragging = false;
     let lastX = 0;
     let idleFrom = 0;
-    const still = reduced();
+    let downAt = { x: 0, y: 0, t: 0 };
+    const still = reduced() || Boolean(pickRef.current); // no sway while editing: taps need a steady target
 
     const draw = (t: number) => stage.current?.render(t, spin);
     const loop = (t: number) => {
       if (!alive) return;
       if (!dragging) {
+        // Turning to face front/back (the editor's buttons).
+        if (facing.current.target !== null) {
+          const d = facing.current.target - base;
+          base += d * 0.18;
+          if (Math.abs(d) < 0.002) facing.current.target = null;
+          idleFrom = t;
+        }
         if (Math.abs(vel) > 0.0004) {
           base += vel;
           vel *= 0.94;
@@ -58,7 +80,7 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
         spin = base + (still ? 0 : Math.sin((t - idleFrom) / 2600) * 0.22);
       }
       draw(t);
-      if (visible && (!still || dragging || Math.abs(vel) > 0.0004)) raf = requestAnimationFrame(loop);
+      if (visible && (!still || dragging || Math.abs(vel) > 0.0004 || facing.current.target !== null)) raf = requestAnimationFrame(loop);
     };
     const kick = () => {
       cancelAnimationFrame(raf);
@@ -78,7 +100,7 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
 
     void import("@/lib/avatar/mannequin").then((m) => {
       if (!alive) return;
-      stage.current = m.createStage(el, JSON.parse(optsRef.current) as SceneOpts);
+      stage.current = m.createStage(el, optsRef.current);
       setReady(true);
       ro.observe(el);
       io.observe(el);
@@ -89,6 +111,7 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
     const down = (e: PointerEvent) => {
       dragging = true;
       lastX = e.clientX;
+      downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
       vel = 0;
       el.setPointerCapture(e.pointerId);
       kick();
@@ -101,9 +124,18 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
       spin = base;
       vel = dx * 0.6;
     };
-    const up = () => {
+    const up = (e: PointerEvent) => {
       dragging = false;
       idleFrom = performance.now();
+      // A tap (not a drag) on the figure picks the muscle under it.
+      if (pickRef.current && e.type === "pointerup" && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 8 && performance.now() - downAt.t < 450) {
+        const r = el.getBoundingClientRect();
+        const region = stage.current?.pick(e.clientX - r.left, e.clientY - r.top);
+        if (region) {
+          vel = 0;
+          pickRef.current(region);
+        }
+      }
       kick();
     };
     el.addEventListener("pointerdown", down);
@@ -125,13 +157,25 @@ function Live({ opts, className, title }: { opts: SceneOpts; className: string; 
   }, []);
 
   // Slider changes and readiness updates rebuild the figure in place.
+  const built = useRef(key);
   useEffect(() => {
-    optsRef.current = key;
-    if (stage.current) {
-      stage.current.update(JSON.parse(key) as SceneOpts);
-      stage.current.render(performance.now(), 0.35);
-    }
+    if (!stage.current || built.current === key) return;
+    built.current = key;
+    stage.current.update(optsRef.current);
+    stage.current.render(performance.now(), 0.35);
   }, [key]);
+  // Muscle edits just repaint.
+  useEffect(() => {
+    if (!stage.current) return;
+    stage.current.setStrain(JSON.parse(strainKey) as Strain);
+    stage.current.render(performance.now(), 0.35);
+  }, [strainKey]);
+  // Face front or back when asked.
+  useEffect(() => {
+    if (!view) return;
+    facing.current.target = view === "back" ? Math.PI : 0;
+    canvas.current?.dispatchEvent(new PointerEvent("pointercancel"));
+  }, [view]);
 
   return (
     <canvas
@@ -162,12 +206,12 @@ function Still({ opts, className, title }: { opts: SceneOpts; className: string;
   );
 }
 
-export default function Avatar({ look, mood = null, load, aura = 0, badges = [], variant = "full", blocks = false, className = "", title }: Props) {
-  const opts: SceneOpts = { look: normalizeLook(look), mood, load, aura, variant, blocks };
-  if (variant === "bust") return <Still opts={opts} className={className} title={title} />;
+export default function Avatar({ look, mood = null, strain, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, className = "", title }: Props) {
+  const opts: SceneOpts = { look: normalizeLook(look), mood, strain, aura, variant, blocks, view };
+  if (variant === "bust" || still) return <Still opts={opts} className={className} title={title} />;
   return (
     <span className="relative inline-flex flex-col items-center">
-      <Live opts={opts} className={className} title={title} />
+      <Live opts={opts} className={className} title={title} onPick={onPick} />
       {badges.length > 0 && (
         <span className="pointer-events-none -mt-2 flex gap-1" aria-label={`Milestones: ${badges.join(" ")}`}>
           {badges.slice(0, 4).map((b, i) => (

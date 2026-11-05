@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { bestsOf, RUN_DISTANCES, type Bests } from "@/lib/activity/bests";
 import type { Streams } from "@/lib/activity/fit";
-import type { AvatarState, LoadAreas, Mood } from "@/components/avatar/Avatar";
+import type { AvatarState, Mood } from "@/components/avatar/Avatar";
+import { normalizeStrain, recentStrain, type Strain } from "@/lib/avatar/strain";
 import { sportGroup } from "@/lib/pod-stickers";
 
 export type Achievement = { key: string; value: number | null; activity_id: string | null; achieved_at: string };
@@ -155,25 +156,23 @@ export async function refreshProgress(admin: SupabaseClient, athleteId: string, 
   return { achievements: out, unlocked, aura, badges, streak: { current, best: bestRun } };
 }
 
-/** Today's look: mood from the latest readiness, glow where the last 3 days' training landed. */
-export async function todayState(db: SupabaseClient, athleteId: string): Promise<{ mood: Mood; load: LoadAreas; note: string | null; date: string | null }> {
+/** Today's look: mood from the latest readiness, and the muscles still recovering (last 72 h, fading). */
+export async function todayState(db: SupabaseClient, athleteId: string): Promise<{ mood: Mood; strain: Strain; note: string | null; date: string | null }> {
   const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
-  const [{ data: r }, { data: acts }] = await Promise.all([
+  const [{ data: r }, { data: worked }] = await Promise.all([
     db.from("readiness_scores").select("date, overall, note").eq("athlete_id", athleteId).order("date", { ascending: false }).limit(1).maybeSingle(),
-    db.from("activities").select("sport, duration_s").eq("athlete_id", athleteId).gte("start_time", since),
+    db.from("activity_strain").select("auto, custom, activities!inner(start_time)").eq("athlete_id", athleteId).gte("activities.start_time", since),
   ]);
   // Only today's or yesterday's readiness counts as "today".
   const fresh = r && Date.now() - Date.parse(`${r.date}T12:00:00Z`) < 2.5 * 86_400_000;
   const mood: Mood = !fresh ? null : r.overall === "green" ? "fresh" : r.overall === "yellow" ? "ok" : r.overall === "red" ? "tired" : null;
-  const minutes: Record<string, number> = {};
-  for (const a of acts ?? []) minutes[sportGroup(a.sport)] = (minutes[sportGroup(a.sport)] ?? 0) + (a.duration_s ?? 0) / 60;
-  const load: LoadAreas = {
-    legs: Math.min(1, (minutes.run ?? 0) / 90),
-    quads: Math.min(1, (minutes.bike ?? 0) / 120),
-    shoulders: Math.min(1, (minutes.swim ?? 0) / 60),
-    core: Math.min(1, (minutes.strength ?? 0) / 60),
-  };
-  return { mood, load, note: fresh ? r.note : null, date: fresh ? r.date : null };
+  const strain = recentStrain(
+    (worked ?? []).map((w) => ({
+      strain: normalizeStrain(w.custom ?? w.auto),
+      at: (w.activities as unknown as { start_time: string }).start_time,
+    })),
+  );
+  return { mood, strain, note: fresh ? r.note : null, date: fresh ? r.date : null };
 }
 
 export const RUN_PR_KEYS = RUN_DISTANCES.map((d) => BEST_KEY[d.key]);

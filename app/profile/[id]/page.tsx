@@ -72,7 +72,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
       <div className="mx-auto max-w-3xl">
         <section className="flex flex-col items-center text-center">
           <div className="relative">
-            <Avatar look={avatar?.look ?? null} mood={today.mood} load={today.load} aura={progress.aura} badges={progress.badges} className="h-72 w-48 sm:h-80 sm:w-52" title={`${first}'s avatar`} />
+            <Avatar look={avatar?.look ?? null} mood={today.mood} strain={today.strain} aura={progress.aura} badges={progress.badges} className="h-72 w-48 sm:h-80 sm:w-52" title={`${first}'s avatar`} />
           </div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">{person.full_name || "Athlete"}</h1>
           <p className="mt-2 max-w-md text-[15px] text-white/70">{sentence}</p>

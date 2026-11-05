@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import SyncedAgo from "@/components/SyncedAgo";
 
+import StrainPrompt from "@/components/avatar/StrainPrompt";
 import AthleteShell from "@/components/AthleteShell";
 import { FlagBadge, FlagRow } from "@/components/coach/Flags";
 import { RespondToInvite } from "@/components/PodButtons";
@@ -40,6 +41,7 @@ export default async function MePage() {
     <AthleteShell isCoach={me.role === "coach"}>
       <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">{firstName ? `Hi, ${firstName}` : "Welcome"}</p>
       <h1 className="mt-3 text-3xl font-medium tracking-tight sm:text-4xl">Today</h1>
+      <StrainPrompt athleteId={me.id} />
 
       {invites.map((inv) => (
         <section key={inv.pod_id} className="mt-6 rounded-[28px] border border-amber-200/20 bg-amber-200/[0.04] p-6">

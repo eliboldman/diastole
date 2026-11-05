@@ -63,8 +63,11 @@ export type FitSummary = {
   device: string | null;
 };
 
+export type StrengthSetRow = { category: string | null; reps: number | null; weight: number | null; duration_s: number | null };
+
 export type FitActivity = {
   summary: FitSummary;
+  sets: StrengthSetRow[]; // logged strength sets (active ones only)
   streams: Streams;
   laps: Lap[];
   route: [number, number][] | null;
@@ -244,7 +247,15 @@ export function parseFit(bytes: Uint8Array): FitActivity {
   const poolLen = pos(s.poolLength);
   if (swim && poolLen) streams.pool = { unit: s.poolLengthUnit === "statute" ? "YARD" : "METER", length_m: round(poolLen, 2)! };
 
-  return { summary, streams, laps, route: trimRoute(gps), record_fields: [...fields].sort() };
+  // Strength sets: the watch lists candidate categories; the first real one wins.
+  const sets: StrengthSetRow[] = ((messages.setMesgs ?? []) as Rec[])
+    .filter((x) => x.setType !== "rest")
+    .map((x) => {
+      const cats = (Array.isArray(x.category) ? x.category : [x.category]).map((c) => snake(c)).filter((c) => c && c !== "unknown");
+      return { category: cats[0] ?? null, reps: pos(x.repetitions), weight: pos(x.weight), duration_s: round(pos(x.duration), 1) };
+    });
+
+  return { summary, streams, laps, sets, route: trimRoute(gps), record_fields: [...fields].sort() };
 }
 
 const STOP = new Error("stop");

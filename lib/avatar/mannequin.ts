@@ -1,38 +1,61 @@
-// The 3D avatar: a smooth mannequin in Diastole greens, built from code (no model files, so no art
-// licensing). Browser-only: imported dynamically by the avatar components.
+// The 3D avatar: a smooth mannequin in Diastole greens, segmented into 18 muscle regions, built
+// from code (no model files, so no art licensing). Browser-only: imported dynamically.
 //
-// Proportions come only from the athlete's own sliders (build, height). Readiness tints the areas
-// that worked recently; the fitness aura grows with real milestones.
+// Every triangle belongs to one region (or none: head, hands, feet), so worked muscles can be
+// shaded per workout and tapped to edit. Proportions come only from the athlete's sliders.
 import * as THREE from "three";
 
 import type { Look } from "./look";
+import { REGIONS, type Level, type Region, type Strain } from "./strain";
 
 export type Mood = "fresh" | "ok" | "tired" | null;
-export type LoadAreas = Partial<Record<"legs" | "quads" | "shoulders" | "core", number>>;
-export type SceneOpts = { look: Look; mood?: Mood; load?: LoadAreas; aura?: number; variant?: "full" | "bust"; blocks?: boolean };
+export type SceneOpts = {
+  look: Look;
+  mood?: Mood;
+  strain?: Strain; // muscles worked (a workout) or still recovering (the avatar)
+  aura?: number;
+  variant?: "full" | "bust";
+  view?: "front" | "back"; // still images
+  blocks?: boolean;
+};
 
-const BODY = 0x2fa47c; // emerald mannequin
-const BODY_FRESH = 0x34b386;
-const GLOW = { ok: 0xfbbf24, tired: 0xf87171 } as const;
+// ---------------------------------------------------------------- colors
 
-// ---------------------------------------------------------------- geometry helpers
+const BASE = new THREE.Color(0x2fa47c);
+// Each region a touch lighter or darker, so the segments read even when nothing is worked.
+const REGION_SHADE: Record<Region, THREE.Color> = Object.fromEntries(
+  REGIONS.map((r, i) => {
+    const c = BASE.clone();
+    const hsl = { h: 0, s: 0, l: 0 };
+    c.getHSL(hsl);
+    const offs = [0.035, -0.03, 0.015, -0.045, 0.045, -0.015, 0.025, -0.035];
+    c.setHSL(hsl.h + ((i % 3) - 1) * 0.006, hsl.s, hsl.l + offs[i % offs.length]);
+    return [r, c];
+  }),
+) as Record<Region, THREE.Color>;
+export const STRAIN_COLOR: Record<Level, string> = { 1: "#fcd34d", 2: "#fb923c", 3: "#f87171" };
+const STRAIN = { 1: new THREE.Color(STRAIN_COLOR[1]), 2: new THREE.Color(STRAIN_COLOR[2]), 3: new THREE.Color(STRAIN_COLOR[3]) } as const;
+const UNSEG = BASE.clone().offsetHSL(0, -0.04, 0.02); // head, hands, feet
+
+// ---------------------------------------------------------------- geometry
 
 /** A tapered capsule hanging down from the origin: radius r0 at the top, r1 at the bottom. */
-function taper(r0: number, r1: number, len: number, seg = 24): THREE.BufferGeometry {
+function taper(r0: number, r1: number, len: number, seg = 32, rows = 10): THREE.BufferGeometry {
   const pts: THREE.Vector2[] = [];
-  const steps = 8;
-  for (let i = 0; i <= steps; i++) {
-    const a = -Math.PI / 2 + (i / steps) * (Math.PI / 2); // bottom cap: -90..0
+  const caps = 8;
+  for (let i = 0; i <= caps; i++) {
+    const a = -Math.PI / 2 + (i / caps) * (Math.PI / 2);
     pts.push(new THREE.Vector2(Math.cos(a) * r1, -len + Math.sin(a) * r1));
   }
-  for (let i = 0; i <= steps; i++) {
-    const a = (i / steps) * (Math.PI / 2); // top cap: 0..90
+  for (let i = 1; i < rows; i++) pts.push(new THREE.Vector2(r1 + (r0 - r1) * (i / rows), -len + len * (i / rows)));
+  for (let i = 0; i <= caps; i++) {
+    const a = (i / caps) * (Math.PI / 2);
     pts.push(new THREE.Vector2(Math.cos(a) * r0, Math.sin(a) * r0));
   }
   return new THREE.LatheGeometry(pts, seg);
 }
 
-/** Torso from crotch to neck base: a smooth lathe, flattened front to back. */
+/** Torso from crotch to neck base: a smooth lathe (fine rows for clean region edges), flattened front to back. */
 function torsoGeometry(): THREE.BufferGeometry {
   const profile: [number, number][] = [
     [0.0, 0.86],
@@ -49,203 +72,197 @@ function torsoGeometry(): THREE.BufferGeometry {
     [0.055, 1.49],
     [0.0, 1.5],
   ];
-  const g = new THREE.LatheGeometry(
-    profile.map(([r, y]) => new THREE.Vector2(r, y)),
-    40,
-  );
+  const curve = new THREE.CatmullRomCurve3(profile.map(([r, y]) => new THREE.Vector3(r, y, 0)));
+  const pts = curve.getPoints(90).map((p) => new THREE.Vector2(Math.max(0, p.x), p.y));
+  const g = new THREE.LatheGeometry(pts, 72);
   g.scale(1, 1, 0.64);
   return g;
 }
 
-function box(w: number, h: number, d: number, yTop = true) {
-  const g = new THREE.BoxGeometry(w, h, d);
-  if (yTop) g.translate(0, -h / 2, 0); // hang from the origin like taper()
+function box(w: number, h: number, d: number, hang = true) {
+  const g = new THREE.BoxGeometry(w, h, d, 4, 6, 3);
+  if (hang) g.translate(0, -h / 2, 0); // hang from the origin like taper()
   return g;
+}
+
+// ---------------------------------------------------------------- regions
+
+type Classify = (p: THREE.Vector3) => Region | null;
+
+const torsoRegion: Classify = ({ x, y, z }) => {
+  const ax = Math.abs(x);
+  const front = z > 0.01;
+  if (y > 1.445) return "traps";
+  if (y > 1.21) {
+    if (front) return ax > 0.158 && y < 1.33 ? "lats" : "chest";
+    return ax < 0.085 ? "upper_back" : y < 1.37 ? "lats" : "upper_back";
+  }
+  if (y > 1.0) {
+    if (front) return ax < 0.07 ? "abs" : "obliques";
+    return ax < 0.075 ? "lower_back" : y > 1.11 ? "lats" : "obliques";
+  }
+  return front ? "hip_flexors" : "glutes";
+};
+const armUpper: Classify = ({ z }) => (z >= 0 ? "biceps" : "triceps");
+const thigh =
+  (side: number): Classify =>
+  ({ x, z }) =>
+    x * -side > 0.034 ? "adductors" : z >= 0 ? "quads" : "hamstrings";
+const kneeRegion: Classify = ({ z }) => (z >= 0 ? "quads" : "hamstrings");
+const shin: Classify = ({ z }) => (z > 0.004 ? "shins" : "calves");
+const neckRegion: Classify = ({ z }) => (z < 0 ? "traps" : null);
+const always =
+  (r: Region | null): Classify =>
+  () =>
+    r;
+
+/** Make faces paintable: one region per triangle (by its center), colors per vertex. */
+function segment(mesh: THREE.Mesh, classify: Classify) {
+  const g = (mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry) as THREE.BufferGeometry;
+  g.computeVertexNormals();
+  mesh.geometry = g;
+  mesh.updateMatrix();
+  const pos = g.attributes.position;
+  const faces = pos.count / 3;
+  const regions: (Region | null)[] = new Array(faces);
+  const c = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let f = 0; f < faces; f++) {
+    c.set(0, 0, 0);
+    for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, f * 3 + k));
+    c.multiplyScalar(1 / 3).applyMatrix4(mesh.matrix); // into the parent's space (blocks boxes are offset)
+    regions[f] = classify(c);
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
+  mesh.userData.faceRegions = regions;
+}
+
+function paint(meshes: THREE.Mesh[], strain: Strain) {
+  for (const m of meshes) {
+    const regions = m.userData.faceRegions as (Region | null)[];
+    const col = (m.geometry as THREE.BufferGeometry).attributes.color as THREE.BufferAttribute;
+    for (let f = 0; f < regions.length; f++) {
+      const r = regions[f];
+      const lvl = r ? strain[r] : undefined;
+      const color = lvl ? STRAIN[lvl] : r ? REGION_SHADE[r] : UNSEG;
+      for (let k = 0; k < 3; k++) col.setXYZ(f * 3 + k, color.r, color.g, color.b);
+    }
+    col.needsUpdate = true;
+  }
 }
 
 // ---------------------------------------------------------------- the figure
 
-type Built = {
-  root: THREE.Group;
-  materials: Record<"base" | "legs" | "quads" | "shoulders" | "core", THREE.MeshStandardMaterial>;
-  halos: THREE.Sprite[];
-  shells: THREE.MeshBasicMaterial[];
-  head: THREE.Group;
-  sparkles: THREE.Group | null;
-  orbit: THREE.Group | null;
-};
-
-function material(color: number, blocks: boolean) {
-  return new THREE.MeshStandardMaterial({ color, roughness: blocks ? 0.7 : 0.42, metalness: 0.06, flatShading: blocks });
-}
+type Built = { root: THREE.Group; meshes: THREE.Mesh[]; sparkles: THREE.Group | null; orbit: THREE.Group | null };
 
 function buildFigure(o: SceneOpts): Built {
   const blocks = Boolean(o.blocks);
   const { build, height } = o.look;
-  const base = o.mood === "fresh" ? BODY_FRESH : BODY;
-  const mats = {
-    base: material(base, blocks),
-    legs: material(base, blocks),
-    quads: material(base, blocks),
-    shoulders: material(base, blocks),
-    core: material(base, blocks),
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: blocks ? 0.7 : 0.42, metalness: 0.06, flatShading: blocks });
+  const meshes: THREE.Mesh[] = [];
+  // Position first (some regions depend on where the part sits), then segment.
+  const part = (g: THREE.BufferGeometry, classify: Classify, at?: (m: THREE.Mesh) => void) => {
+    const m = new THREE.Mesh(g, mat);
+    at?.(m);
+    segment(m, classify);
+    meshes.push(m);
+    return m;
   };
-  const glow = o.mood === "ok" || o.mood === "tired" ? GLOW[o.mood] : null;
-  if (glow && o.load) {
-    for (const k of ["legs", "quads", "shoulders", "core"] as const) {
-      const v = o.load[k] ?? 0;
-      if (v > 0.05) mats[k].userData.glow = Math.min(1, v); // the green stays green; shells below do the glowing
-    }
-  }
-
-  const mesh = (g: THREE.BufferGeometry, m: THREE.Material) => {
-    const x = new THREE.Mesh(g, m);
-    x.castShadow = false;
-    return x;
-  };
-  const limb = (r0: number, r1: number, len: number, m: THREE.Material) =>
-    blocks ? mesh(box(r0 * 2, len + r1, r0 * 1.7), m) : mesh(taper(r0, r1, len), m);
-  const joint = (r: number, m: THREE.Material) => (blocks ? mesh(box(r * 2, r * 2, r * 2, false), m) : mesh(new THREE.SphereGeometry(r, 20, 14), m));
+  const limb = (r0: number, r1: number, len: number, classify: Classify) => part(blocks ? box(r0 * 2, len + r1, r0 * 1.7) : taper(r0, r1, len), classify);
+  const joint = (r: number, classify: Classify) => part(blocks ? box(r * 2, r * 2, r * 2, false) : new THREE.SphereGeometry(r, 24, 16), classify);
 
   const root = new THREE.Group();
-  // Everything below the neck takes the athlete's sliders; the head keeps its size.
-  const body = new THREE.Group();
+  const body = new THREE.Group(); // everything below the neck takes the sliders; the head keeps its size
   body.scale.set(build, height, build);
   root.add(body);
 
-  // Torso
-  body.add(blocks ? (() => {
-    const t = new THREE.Group();
-    const chest = mesh(box(0.34, 0.3, 0.2, false), mats.core);
-    chest.position.y = 1.3;
-    const waist = mesh(box(0.27, 0.18, 0.17, false), mats.core);
-    waist.position.y = 1.1;
-    const hips = mesh(box(0.3, 0.16, 0.18, false), mats.core);
-    hips.position.y = 0.94;
-    t.add(chest, waist, hips);
-    return t;
-  })() : mesh(torsoGeometry(), mats.core));
+  if (blocks) {
+    for (const [w, h, d, y] of [
+      [0.34, 0.3, 0.2, 1.3],
+      [0.27, 0.18, 0.17, 1.1],
+      [0.3, 0.16, 0.18, 0.94],
+    ]) {
+      body.add(part(box(w, h, d, false), torsoRegion, (m) => (m.position.y = y)));
+    }
+  } else body.add(part(torsoGeometry(), torsoRegion));
 
-  // Neck
-  const neck = blocks ? mesh(box(0.08, 0.1, 0.08, false), mats.base) : mesh(new THREE.CylinderGeometry(0.043, 0.05, 0.12, 20), mats.base);
-  neck.position.y = 1.53;
-  body.add(neck);
+  body.add(
+    part(blocks ? box(0.08, 0.1, 0.08, false) : new THREE.CylinderGeometry(0.043, 0.05, 0.12, 24, 2), neckRegion, (m) => (m.position.y = 1.53)),
+  );
 
-  // Arms: A-pose like a mannequin, slight bend at the elbow.
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group();
     shoulder.position.set(side * 0.2, 1.4, 0);
-    shoulder.rotation.z = side * 0.32;
-    if (o.mood === "tired") shoulder.rotation.z = side * 0.24; // shoulders drop a little
-    shoulder.add(joint(0.058, mats.shoulders));
-    shoulder.add(limb(0.05, 0.039, 0.29, mats.shoulders));
+    shoulder.rotation.z = side * (o.mood === "tired" ? 0.24 : 0.32);
+    shoulder.add(joint(0.058, always("shoulders")));
+    shoulder.add(limb(0.05, 0.039, 0.29, armUpper));
     const elbow = new THREE.Group();
     elbow.position.y = -0.3;
     elbow.rotation.z = side * -0.1;
     elbow.rotation.x = -0.12;
-    elbow.add(joint(0.04, mats.base));
-    elbow.add(limb(0.039, 0.029, 0.26, mats.base));
-    const hand = blocks ? mesh(box(0.05, 0.1, 0.03), mats.base) : mesh(taper(0.03, 0.022, 0.08), mats.base);
-    hand.scale.z = blocks ? 1 : 0.55;
-    hand.position.y = -0.27;
-    elbow.add(hand);
+    elbow.add(joint(0.04, always("forearms")));
+    elbow.add(limb(0.039, 0.029, 0.26, always("forearms")));
+    elbow.add(
+      part(blocks ? box(0.05, 0.1, 0.03) : taper(0.03, 0.022, 0.08, 16, 2), always(null), (m) => {
+        m.scale.z = blocks ? 1 : 0.55;
+        m.position.y = -0.27;
+      }),
+    );
     shoulder.add(elbow);
     body.add(shoulder);
   }
 
-  // Legs
   for (const side of [-1, 1]) {
     const hip = new THREE.Group();
     hip.position.set(side * 0.088, 0.92, 0);
     hip.rotation.z = side * 0.03;
-    hip.add(limb(0.083, 0.056, 0.42, mats.quads));
+    hip.add(limb(0.083, 0.056, 0.42, thigh(side)));
     const knee = new THREE.Group();
     knee.position.y = -0.43;
-    knee.add(joint(0.056, mats.quads));
-    knee.add(limb(0.055, 0.036, 0.41, mats.legs));
-    const foot = blocks ? mesh(box(0.08, 0.06, 0.2, false), mats.legs) : mesh(taper(0.036, 0.03, 0.17), mats.legs);
-    if (!blocks) {
-      foot.rotation.x = -Math.PI / 2 + 0.08;
-      foot.scale.set(1.15, 1, 0.75);
-    }
-    foot.position.set(0, -0.44, 0.03);
-    knee.add(foot);
+    knee.add(joint(0.056, kneeRegion));
+    knee.add(limb(0.055, 0.036, 0.41, shin));
+    knee.add(
+      part(blocks ? box(0.08, 0.06, 0.2, false) : taper(0.036, 0.03, 0.17, 16, 2), always(null), (m) => {
+        if (!blocks) {
+          m.rotation.x = -Math.PI / 2 + 0.08;
+          m.scale.set(1.15, 1, 0.75);
+        }
+        m.position.set(0, -0.44, 0.03);
+      }),
+    );
     hip.add(knee);
     body.add(hip);
   }
 
-  // Head: an egg on the neck, a little forward, mannequin style. Sits on top of the scaled body.
+  // Head: one smooth egg, narrower at the chin, tipped slightly forward.
   const head = new THREE.Group();
   head.position.y = 1.59 * height;
-  const skull = blocks ? mesh(box(0.2, 0.24, 0.21), mats.base) : mesh(new THREE.SphereGeometry(0.1, 32, 24), mats.base);
-  if (blocks) skull.position.y = 0.2;
-  else {
-    // One smooth egg, narrower at the chin, tipped slightly forward.
-    const p = (skull.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+  const skullGeo = blocks ? box(0.2, 0.24, 0.21, false) : new THREE.SphereGeometry(0.1, 32, 24);
+  if (!blocks) {
+    const p = skullGeo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
       const y = p.getY(i);
-      const k = y < 0 ? 1 + y * 2.2 : 1; // taper the lower half toward the chin
-      p.setX(i, p.getX(i) * k);
-      p.setZ(i, p.getZ(i) * (y < 0 ? 1 + y * 1.2 : 1));
-    }
-    skull.geometry.computeVertexNormals();
-    skull.scale.set(0.95, 1.25, 1.05);
-    skull.position.set(0, 0.1, 0.012);
-    skull.rotation.x = -0.08;
-  }
-  head.add(skull);
-  if (o.mood === "tired") head.rotation.x = 0.16; // a tired head dips
-  root.add(head);
-
-  // Readiness glow, part 1: a see-through shell just outside each loaded limb (an outline of light).
-  const halos: THREE.Sprite[] = [];
-  const shells: THREE.MeshBasicMaterial[] = [];
-  if (glow) {
-    const targets: THREE.Mesh[] = [];
-    root.traverse((x) => {
-      const m = x as THREE.Mesh;
-      if (m.isMesh && (m.material as THREE.MeshStandardMaterial).userData?.glow) targets.push(m);
-    });
-    for (const m of targets) {
-      const v = (m.material as THREE.MeshStandardMaterial).userData.glow as number;
-      const mat = new THREE.MeshBasicMaterial({ color: glow, transparent: true, opacity: 0.26 + v * 0.36, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false });
-      mat.userData.base = mat.opacity;
-      shells.push(mat);
-      const shell = new THREE.Mesh(m.geometry, mat);
-      // Grow around the limb's own center, not its origin (the torso's origin is at the floor).
-      m.geometry.computeBoundingBox();
-      const c = m.geometry.boundingBox!.getCenter(new THREE.Vector3());
-      const k = 1.14;
-      shell.scale.setScalar(k);
-      shell.position.copy(c).multiplyScalar(1 - k);
-      m.add(shell);
-    }
-  }
-  // Part 2: soft light behind the body around those areas.
-  if (glow && o.load) {
-    const spots: Record<keyof LoadAreas, [number, number][]> = {
-      legs: [[-0.09, 0.28], [0.09, 0.28]],
-      quads: [[-0.09, 0.7], [0.09, 0.7]],
-      shoulders: [[-0.21, 1.36], [0.21, 1.36]],
-      core: [[0, 1.15]],
-    };
-    const tex = radialTexture(glow === GLOW.tired ? "#f87171" : "#fbbf24");
-    for (const k of Object.keys(spots) as (keyof LoadAreas)[]) {
-      const v = Math.min(1, o.load[k] ?? 0);
-      if (v <= 0.05) continue;
-      for (const [x, y] of spots[k]) {
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.3 + v * 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
-        sp.position.set(x * build, y * height, -0.14); // behind the body: glows around the edges
-        const size = k === "core" ? 0.62 : k === "shoulders" ? 0.4 : 0.46;
-        sp.scale.set(size * build, (k === "legs" || k === "quads" ? size * 1.5 : size) * height, 1);
-        sp.userData.base = sp.material.opacity;
-        halos.push(sp);
-        root.add(sp);
+      if (y < 0) {
+        p.setX(i, p.getX(i) * (1 + y * 2.2));
+        p.setZ(i, p.getZ(i) * (1 + y * 1.2));
       }
     }
   }
+  head.add(
+    part(skullGeo, always(null), (m) => {
+      if (blocks) m.position.y = 0.12;
+      else {
+        m.scale.set(0.95, 1.25, 1.05);
+        m.position.set(0, 0.1, 0.012);
+        m.rotation.x = -0.08;
+      }
+    }),
+  );
+  if (o.mood === "tired") head.rotation.x = 0.16;
+  root.add(head);
 
-  // Fresh: a few calm sparkles near the head.
+  paint(meshes, o.strain ?? {});
+
   let sparkles: THREE.Group | null = null;
   if (o.mood === "fresh") {
     sparkles = new THREE.Group();
@@ -262,7 +279,6 @@ function buildFigure(o: SceneOpts): Built {
     root.add(sparkles);
   }
 
-  // Fitness aura: halo, then a ring at the feet, then orbiting specks; gold at the top level.
   let orbit: THREE.Group | null = null;
   const level = Math.max(0, Math.min(4, Math.round(o.aura ?? 0)));
   if (level > 0) {
@@ -272,10 +288,7 @@ function buildFigure(o: SceneOpts): Built {
     halo.position.set(0, 0.95 * height, -0.4);
     root.add(halo);
     if (level >= 2) {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.42, 0.006, 8, 64),
-        new THREE.MeshBasicMaterial({ color: gold ? 0xfbbf24 : 0x6ee7b7, transparent: true, opacity: 0.55 }),
-      );
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.006, 8, 64), new THREE.MeshBasicMaterial({ color: gold ? 0xfbbf24 : 0x6ee7b7, transparent: true, opacity: 0.55 }));
       ring.rotation.x = Math.PI / 2;
       ring.position.y = 0.01;
       root.add(ring);
@@ -293,17 +306,13 @@ function buildFigure(o: SceneOpts): Built {
     }
   }
 
-  // Soft contact shadow
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.34, 40),
-    new THREE.MeshBasicMaterial({ map: radialTexture("#000000"), transparent: true, opacity: 0.45, depthWrite: false }),
-  );
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.34, 40), new THREE.MeshBasicMaterial({ map: radialTexture("#000000"), transparent: true, opacity: 0.45, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.002;
   shadow.scale.set(build, 1, 1);
   root.add(shadow);
 
-  return { root, materials: mats, halos, shells, head, sparkles, orbit };
+  return { root, meshes, sparkles, orbit };
 }
 
 const textures = new Map<string, THREE.Texture>();
@@ -332,9 +341,11 @@ function lights(scene: THREE.Scene) {
   key.position.set(2, 3.2, 3);
   const rim = new THREE.DirectionalLight(0x6ee7b7, 1.6);
   rim.position.set(-2.4, 2.2, -3);
+  const back = new THREE.DirectionalLight(0xffffff, 0.8); // so the back view isn't in shadow
+  back.position.set(1.5, 2.5, -3);
   const fill = new THREE.DirectionalLight(0x9cc7ff, 0.35);
   fill.position.set(-3, 1, 2);
-  scene.add(key, rim, fill);
+  scene.add(key, rim, back, fill);
 }
 
 function camera(variant: "full" | "bust", aspect: number, height: number) {
@@ -350,9 +361,21 @@ function camera(variant: "full" | "bust", aspect: number, height: number) {
   return c;
 }
 
+function free(root: THREE.Object3D) {
+  root.traverse((x) => {
+    const m = x as THREE.Mesh;
+    m.geometry?.dispose();
+    const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(mat)) mat.forEach((y) => y.dispose());
+    else mat?.dispose();
+  });
+}
+
 export type Stage = {
   render: (t: number, spin: number) => void;
-  update: (o: SceneOpts) => void; // rebuild the figure in place (slider changes)
+  update: (o: SceneOpts) => void; // rebuild in place (slider changes)
+  setStrain: (s: Strain) => void; // repaint only (taps)
+  pick: (x: number, y: number) => Region | null; // canvas pixel -> region under it
   resize: (w: number, h: number) => void;
   dispose: () => void;
   animated: boolean;
@@ -369,31 +392,31 @@ export function createStage(canvas: HTMLCanvasElement, o: SceneOpts): Stage {
   let fig = buildFigure(o);
   scene.add(fig.root);
   let cam = camera(o.variant ?? "full", canvas.clientWidth / Math.max(1, canvas.clientHeight), o.look.height);
-  const free = (root: THREE.Object3D) =>
-    root.traverse((x) => {
-      const m = x as THREE.Mesh;
-      m.geometry?.dispose();
-      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((y) => y.dispose());
-      else mat?.dispose();
-    });
+  const ray = new THREE.Raycaster();
   const stage: Stage = {
-    animated: fig.shells.length > 0 || fig.halos.length > 0 || Boolean(fig.sparkles) || Boolean(fig.orbit),
+    animated: Boolean(fig.sparkles) || Boolean(fig.orbit),
     update(next) {
       scene.remove(fig.root);
       free(fig.root);
       fig = buildFigure(next);
       scene.add(fig.root);
-      stage.animated = fig.shells.length > 0 || fig.halos.length > 0 || Boolean(fig.sparkles) || Boolean(fig.orbit);
-      const aspect = cam.aspect;
-      cam = camera(next.variant ?? "full", aspect, next.look.height);
+      stage.animated = Boolean(fig.sparkles) || Boolean(fig.orbit);
+      cam = camera(next.variant ?? "full", cam.aspect, next.look.height);
+    },
+    setStrain(s) {
+      paint(fig.meshes, s);
+    },
+    pick(x, y) {
+      const r = canvas.getBoundingClientRect();
+      ray.setFromCamera(new THREE.Vector2((x / r.width) * 2 - 1, -(y / r.height) * 2 + 1), cam);
+      fig.root.updateMatrixWorld(true);
+      const hit = ray.intersectObjects(fig.meshes, false)[0];
+      if (!hit || hit.faceIndex == null) return null;
+      return (hit.object.userData.faceRegions as (Region | null)[])[hit.faceIndex] ?? null;
     },
     render(t, spin) {
       fig.root.rotation.y = spin;
-      const beat = 0.75 + 0.25 * Math.sin(t / 700);
-      for (const m of fig.shells) m.opacity = m.userData.base * beat;
-      for (const h of fig.halos) (h.material as THREE.SpriteMaterial).opacity = h.userData.base * beat;
-      if (fig.sparkles) fig.sparkles.children.forEach((s, i) => ((s as THREE.Mesh).scale.setScalar(0.7 + 0.3 * Math.sin(t / 500 + i * 2))));
+      if (fig.sparkles) fig.sparkles.children.forEach((s, i) => (s as THREE.Mesh).scale.setScalar(0.7 + 0.3 * Math.sin(t / 500 + i * 2)));
       if (fig.orbit) fig.orbit.rotation.y = t / 6000;
       renderer.render(scene, cam);
     },
@@ -418,7 +441,7 @@ let shared: { renderer: THREE.WebGLRenderer; canvas: HTMLCanvasElement } | null 
 const snaps = new Map<string, Promise<string>>();
 
 export function snapshot(o: SceneOpts, px = 192): Promise<string> {
-  const key = JSON.stringify([o.look, o.mood ?? null, o.load ?? null, o.aura ?? 0, o.variant ?? "full", Boolean(o.blocks), px]);
+  const key = JSON.stringify([o.look, o.mood ?? null, o.strain ?? null, o.aura ?? 0, o.variant ?? "full", o.view ?? null, Boolean(o.blocks), px]);
   const hit = snaps.get(key);
   if (hit) return hit;
   const p = new Promise<string>((resolve) => {
@@ -437,16 +460,11 @@ export function snapshot(o: SceneOpts, px = 192): Promise<string> {
     const scene = new THREE.Scene();
     lights(scene);
     const fig = buildFigure(o);
-    fig.root.rotation.y = variant === "bust" ? 0.25 : 0.35;
+    fig.root.rotation.y = o.view === "back" ? Math.PI : o.view === "front" ? 0 : variant === "bust" ? 0.25 : 0.35;
     scene.add(fig.root);
     shared.renderer.render(scene, camera(variant, w / h, o.look.height));
     resolve(shared.canvas.toDataURL("image/png"));
-    scene.traverse((x) => {
-      const m = x as THREE.Mesh;
-      m.geometry?.dispose();
-      const mat = m.material as THREE.Material | undefined;
-      if (mat && !Array.isArray(mat)) mat.dispose();
-    });
+    free(fig.root);
   });
   snaps.set(key, p);
   return p;

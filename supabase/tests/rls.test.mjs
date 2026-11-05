@@ -444,5 +444,26 @@ check("coach reads achievements", r.rows?.length === 1);
 r = await as(A2, `select key from public.achievements where athlete_id = '${A1}'`);
 check("other athletes don't", r.rows?.length === 0);
 
+// ---------------------------------------------------------------- muscles worked
+await db.exec(`insert into public.activity_strain (activity_id, athlete_id, auto) values ('${ACT1}', '${A1}', '{"quads":2,"calves":3}')`);
+r = await as(A1, `select public.set_activity_strain('${ACT1}', '{"quads":3,"glutes":1}') as e`);
+check("athlete edits the muscles worked", r.rows?.[0]?.e === null);
+const strainRow = (await db.query(`select auto, custom, reviewed_at from public.activity_strain where activity_id = '${ACT1}'`)).rows[0];
+check("their map is kept beside the estimate and marked reviewed", strainRow.custom?.quads === 3 && strainRow.auto?.calves === 3 && strainRow.reviewed_at !== null);
+r = await as(A1, `select public.set_activity_strain('${ACT1}', '{"nose":2}') as e`);
+check("unknown muscles are refused", r.rows?.[0]?.e === "Unknown muscle or level.");
+r = await as(A1, `select public.set_activity_strain('${ACT1}', '{"quads":5}') as e`);
+check("levels stay 1-3", r.rows?.[0]?.e === "Unknown muscle or level.");
+r = await as(COACH, `select public.set_activity_strain('${ACT1}', null) as e`);
+check("coach can reset it to the estimate", r.rows?.[0]?.e === null && (await db.query(`select custom from public.activity_strain where activity_id = '${ACT1}'`)).rows[0].custom === null);
+r = await as(STRANGER, `select public.set_activity_strain('${ACT1}', '{"quads":1}') as e`);
+check("strangers can't", r.rows?.[0]?.e === "You can't change that workout.");
+r = await as(A1, `insert into public.activity_strain (activity_id, athlete_id, auto) values ('${ACT2}', '${A2}', '{}')`);
+check("estimates are written by the server only", !!r.error);
+r = await as(COACH, `select auto from public.activity_strain where activity_id = '${ACT1}'`);
+check("coach reads it", r.rows?.length === 1);
+r = await as(STRANGER, `select * from public.activity_strain`);
+check("strangers can't read it", r.rows?.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

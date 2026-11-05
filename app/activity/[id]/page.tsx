@@ -22,6 +22,9 @@ import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
+import MusclesWorked from "@/components/avatar/MusclesWorked";
+import { normalizeStrain } from "@/lib/avatar/strain";
+import { writeAutoStrain } from "@/lib/avatar/strain-store";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -146,6 +149,14 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     // Name only, after the visibility check above passed (pod mates can't read profiles directly).
     createAdminClient().from("profiles").select("full_name, timezone").eq("id", act.athlete_id).maybeSingle(),
   ]);
+
+  // Muscles worked: estimated after the workout; created now if this one predates the feature.
+  let { data: strainRow } = await supabase.from("activity_strain").select("auto, custom, reviewed_at").eq("activity_id", id).maybeSingle();
+  if (!strainRow && (isOwn || isCoach)) {
+    await writeAutoStrain(createAdminClient(), id, { laps: detail?.laps });
+    ({ data: strainRow } = await supabase.from("activity_strain").select("auto, custom, reviewed_at").eq("activity_id", id).maybeSingle());
+  }
+  const { data: ownerAvatar } = await supabase.from("avatars").select("look").eq("athlete_id", act.athlete_id).maybeSingle();
 
   const streams = (detail?.streams ?? null) as Streams | null;
   const laps = ((detail?.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0);
@@ -280,6 +291,22 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
               <p className="mt-1 truncate text-xl font-semibold tabular-nums">{value}</p>
             </div>
           ))}
+        </section>
+      )}
+
+      {strainRow && (
+        <section id="muscles" className="scroll-mt-6">
+          <Card title="Muscles worked">
+            <MusclesWorked
+              activityId={act.id}
+              look={ownerAvatar?.look ?? null}
+              auto={normalizeStrain(strainRow.auto)}
+              custom={strainRow.custom ? normalizeStrain(strainRow.custom) : null}
+              reviewed={Boolean(strainRow.reviewed_at)}
+              editable={isOwn || isCoach}
+              firstName={owner?.full_name?.split(" ")[0] ?? "the athlete"}
+            />
+          </Card>
         </section>
       )}
 

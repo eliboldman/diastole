@@ -35,3 +35,18 @@ export async function saveLook(raw: unknown) {
   const { error } = await supabase.from("avatars").upsert({ athlete_id: me.id, look, updated_at: new Date().toISOString() });
   return error ? { ok: false as const, error: "Couldn't save. Check your connection." } : { ok: true as const };
 }
+
+/**
+ * Save the muscles worked for a workout (athlete or coach). Pass null to go back to the estimate.
+ * "reviewed" marks it confirmed so the Today prompt stops asking.
+ */
+export async function saveStrain(activityId: string, strain: Record<string, number> | null, reviewed = true) {
+  await requireUser();
+  if (!UUID.test(activityId)) return { ok: false as const, error: "Unknown workout." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_activity_strain", { p_activity: activityId, p_custom: strain, p_reviewed: reviewed });
+  if (error) return { ok: false as const, error: "Couldn't save that." };
+  if (data) return { ok: false as const, error: String(data) };
+  revalidatePath(`/activity/${activityId}`);
+  return { ok: true as const };
+}

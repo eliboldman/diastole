@@ -14,6 +14,7 @@ import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/l
 import { getRoster, type AthleteSummary } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, type Units } from "@/lib/activity/format";
+import StrainPrompt from "@/components/avatar/StrainPrompt";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
@@ -89,6 +90,8 @@ export default async function TodayPage() {
     <DashboardShell tone={tone}>
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
+      {/* The coach trains too: their own post-workout check */}
+      <StrainPrompt athleteId={coach.id} />
       <QuickLinks
         links={[
           { href: "/endurance-lab", label: "Build a workout", icon: <Plus size={16} aria-hidden /> },

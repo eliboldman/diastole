@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { bestsOf } from "@/lib/activity/bests";
+import { writeAutoStrain } from "@/lib/avatar/strain-store";
 import { parseFit, type FitActivity } from "@/lib/activity/fit";
 import { formToStore } from "@/lib/activity/form-store";
 
@@ -118,11 +119,14 @@ export async function saveFitDetail(
       record_fields: fit.record_fields,
       form: formToStore(fit.streams, (activity.sport as string | null) ?? sportName(fit)),
       bests: bestsOf(fit.streams, (activity.sport as string | null) ?? sportName(fit)),
+      strength_sets: fit.sets.length ? fit.sets : null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "activity_id" },
   );
   if (error) throw new Error(`Saving activity detail failed: ${error.message}`);
+  // Muscles worked: a fresh estimate from the full file (the athlete's own edits are kept).
+  await writeAutoStrain(admin, activity.id, { sets: fit.sets, laps: fit.laps }).catch((e) => console.warn("strain estimate failed", e));
 }
 
 /**
