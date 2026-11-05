@@ -1,9 +1,11 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
+import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { describe } from "@/lib/workouts/describe";
 import {
   DRILLS,
@@ -532,6 +534,24 @@ export default function WorkoutBuilder({
   const [pending, start] = useTransition();
 
   const editable = !initial || initial.status === "draft";
+
+  // Describe it: Claude turns the coach's words into steps that fill this builder for review.
+  const [prompt, setPrompt] = useState("");
+  const [building, startBuild] = useTransition();
+  const [built, setBuilt] = useState<{ note: string | null; cost: number; undo: { title: string; sport: Sport; steps: UiStep[]; description: string } } | null>(null);
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const buildIt = () =>
+    startBuild(async () => {
+      setBuildError(null);
+      const r = await buildWorkoutFromPrompt({ athleteId, prompt, sport, paceUnit, pool: sport === "swim" ? pool : pool ?? { length: 25, unit: "YARD" } });
+      if (!r.ok) return setBuildError(r.error);
+      setBuilt({ note: r.assumptions, cost: r.costUsd, undo: { title, sport, steps, description } });
+      setTitle(r.title);
+      setSport(r.sport);
+      setSteps(withIds(r.steps));
+      if (r.description) setDescription(r.description);
+      navigator.vibrate?.([8, 30, 8]);
+    });
   const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null });
 
   // Switching sport on an untouched starter workout swaps in that sport's starter.
@@ -558,6 +578,71 @@ export default function WorkoutBuilder({
 
   return (
     <div className="grid gap-5">
+      {editable && (
+        <section className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.04] p-3">
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-2 text-sm font-medium">
+              <Sparkles size={15} className="text-amber-200" aria-hidden /> Describe it
+            </span>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && prompt.trim() && !building) {
+                  e.preventDefault();
+                  buildIt();
+                }
+              }}
+              rows={2}
+              maxLength={1500}
+              placeholder={
+                sport === "swim"
+                  ? "e.g. 300 easy free, 8 x 50 kick on 1:10, 4 x 100 pull at 1:30 pace with 15 s rest, 200 cooldown"
+                  : sport === "bike"
+                    ? "e.g. 15 min easy, 3 x 10 min at 92-95% FTP with 5 min easy, 10 min cooldown"
+                    : "e.g. 15 min easy, 6 x 800 m at 5K pace with 2 min jog, 10 min cooldown"
+              }
+              className={`${field} min-h-16 w-full`}
+            />
+          </label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={buildIt}
+              disabled={building || !prompt.trim()}
+              className="flex min-h-11 items-center gap-2 rounded-full bg-amber-200 px-5 text-sm font-medium text-black transition hover:bg-amber-100 disabled:opacity-50"
+            >
+              <Sparkles size={15} className={building ? "animate-pulse" : ""} /> {building ? "Building…" : "Build workout"}
+            </button>
+            {built && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTitle(built.undo.title);
+                  setSport(built.undo.sport);
+                  setSteps(built.undo.steps);
+                  setDescription(built.undo.description);
+                  setBuilt(null);
+                }}
+                className="min-h-11 rounded-full px-4 text-sm text-white/60 hover:bg-white/[0.06] hover:text-white"
+              >
+                Undo
+              </button>
+            )}
+            <span className="text-xs text-white/45">Fills the builder below for you to check. Nothing is saved or sent.</span>
+          </div>
+          {built && (
+            <p className="mt-2 text-xs text-white/60" aria-live="polite">
+              {`Built (${built.cost < 0.01 ? "under 1¢" : `${(built.cost * 100).toFixed(1)}¢`}). Check each step below.${built.note ? ` Note: ${built.note}` : ""}`}
+            </p>
+          )}
+          {buildError && (
+            <p role="alert" className="mt-2 text-sm text-red-200">
+              {buildError}
+            </p>
+          )}
+        </section>
+      )}
       <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
         <input className={field} placeholder="Workout title, e.g. 4 × 3 min threshold" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!editable} maxLength={100} />
         <select className={sel} value={sport} onChange={(e) => changeSport(e.target.value as Sport)} disabled={!editable} aria-label="Sport">

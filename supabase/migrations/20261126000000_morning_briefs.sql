@@ -35,7 +35,7 @@ revoke all on function public.decide_brief(uuid, text, text, uuid) from public, 
 grant execute on function public.decide_brief(uuid, text, text, uuid) to authenticated;
 
 alter table public.ai_usage drop constraint ai_usage_trigger_check;
-alter table public.ai_usage add constraint ai_usage_trigger_check check (trigger in ('cron', 'manual', 'test', 'form', 'why', 'brief'));
+alter table public.ai_usage add constraint ai_usage_trigger_check check (trigger in ('cron', 'manual', 'test', 'form', 'why', 'brief', 'build'));
 
 -- "Your morning briefs are ready" for the coach (coaching group).
 alter table public.notifications drop constraint notifications_kind_check;
