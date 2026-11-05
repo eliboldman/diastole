@@ -34,7 +34,7 @@ export function describe(steps: Step[], paceUnit: "mi" | "km" = "mi", pool: Pool
         return ` @ ${t.low}–${t.high} W`;
       case "pace_range": {
         const f = paceUnit === "mi" ? MI / 1000 : 1;
-        return ` @ ${clock(t.slowSecPerKm * f)}–${clock(t.fastSecPerKm * f)}/${paceUnit}`;
+        return ` @ ${clock(t.fastSecPerKm * f)}–${clock(t.slowSecPerKm * f)}/${paceUnit}`;
       }
       case "swim_effort":
         return ` · ${SWIM_EFFORTS[t.level].toLowerCase()}`;

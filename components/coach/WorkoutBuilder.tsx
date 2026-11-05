@@ -490,8 +490,9 @@ function PaceInput({ unit, slow, fast, onChange }: { unit: "mi" | "km"; slow: nu
   const read = (v: string) => parseClock(v) / factor;
   return (
     <div className="flex items-center gap-1 text-sm text-white/50">
-      <input key={`s${unit}`} className={`${field} w-16`} defaultValue={show(slow)} aria-label="Slowest pace" onBlur={(e) => onChange(read(e.target.value) || slow, fast)} />–
-      <input key={`f${unit}`} className={`${field} w-16`} defaultValue={show(fast)} aria-label="Fastest pace" onBlur={(e) => onChange(slow, read(e.target.value) || fast)} />
+      {/* Fastest first, then slowest: reads like "7:30 to 8:00 per mile". */}
+      <input key={`f${unit}`} className={`${field} w-16`} defaultValue={show(fast)} aria-label="Fastest pace" onBlur={(e) => onChange(slow, read(e.target.value) || fast)} />–
+      <input key={`s${unit}`} className={`${field} w-16`} defaultValue={show(slow)} aria-label="Slowest pace" onBlur={(e) => onChange(read(e.target.value) || slow, fast)} />
       /{unit}
     </div>
   );
