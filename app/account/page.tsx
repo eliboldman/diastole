@@ -72,13 +72,13 @@ export default async function AccountPage() {
         <ChevronRight size={18} className="shrink-0 text-emerald-200" aria-hidden />
       </Link>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className={card}>
           <h2 className="mb-4 text-lg font-medium">Profile</h2>
           <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} units={profile?.units === "km" ? "km" : "mi"} />
         </section>
 
-        <div className="grid content-start gap-6">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           <section className={card}>
             <h2 className="mb-1 text-lg font-medium">Watch</h2>
             <p className="mb-4 text-sm text-white/55">

@@ -689,3 +689,12 @@ body {
 @keyframes ringFill { from { stroke-dashoffset: var(--ring-from); } to { stroke-dashoffset: var(--ring-to); } }
 .ring-fill { stroke-dashoffset: var(--ring-to); animation: ringFill 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; }
 @media (prefers-reduced-motion: reduce) { .ring-fill { animation: none; } }
+
+/* Single-column grids (no column count set for the current size) can't grow wider than the screen.
+   Without this, one long unbreakable item (a select, a long word) widens every card on phones.
+   In the base layer, so any grid-cols-* utility (including lg:/md:) still wins when it applies. */
+@layer base {
+  :where(.grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

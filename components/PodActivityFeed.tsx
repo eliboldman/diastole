@@ -297,7 +297,7 @@ function FeedCard({ a, podId, timeZone, units, look, with: mates }: { a: FeedIte
   };
 
   return (
-    <article className="relative rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl transition [contain-intrinsic-size:auto_440px] [content-visibility:auto] hover:border-white/15 sm:p-6">
+    <article className="relative min-w-0 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl transition [contain-intrinsic-size:auto_440px] [content-visibility:auto] hover:border-white/15 sm:p-6">
       <span className={`pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r ${accent.glow}`} aria-hidden />
       <header className="flex items-center gap-3">
         <Link href={`/profile/${a.athlete_id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl transition active:scale-[0.98]">
@@ -452,7 +452,7 @@ export default function PodActivityFeed({
       {groups.map((grp) => (
         <section key={grp.label} className="mb-6">
           <h2 className="mb-3 px-1 text-[11px] uppercase tracking-[0.2em] text-white/45">{grp.label}</h2>
-          <div className="stagger grid gap-4">
+          <div className="stagger grid grid-cols-1 gap-4">
             {grp.items.map((a) => (
               <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} with={together(a, items)} />
             ))}
