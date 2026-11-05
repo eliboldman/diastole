@@ -57,12 +57,14 @@ export function fastestOver(t: number[], dist: (number | null)[], meters: number
     // Move the start forward while the window still covers the distance.
     while (j < i && pts[i][1] - pts[j + 1][1] >= meters) j++;
     if (pts[i][1] - pts[j][1] >= meters) {
-      // Interpolate where exactly the distance was reached to avoid sample-size bias.
-      const over = pts[i][1] - pts[j][1] - meters;
+      // Interpolate where exactly the distance was reached inside the last step, but only when the
+      // step actually crossed it (and never trimming more than the step's own time).
+      const before = pts[i - 1][1] - pts[j][1];
       const segD = pts[i][1] - pts[i - 1][1];
       const segT = pts[i][0] - pts[i - 1][0];
-      const trim = segD > 0 ? (over / segD) * segT : 0;
-      best = Math.min(best, pts[i][0] - pts[j][0] - trim);
+      let end = pts[i][0];
+      if (before < meters && segD > 0) end = pts[i - 1][0] + Math.min(1, (meters - before) / segD) * segT;
+      best = Math.min(best, end - pts[j][0]);
     }
   }
   return Number.isFinite(best) && best > 0 ? Math.round(best) : null;

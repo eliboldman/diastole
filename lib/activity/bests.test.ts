@@ -47,4 +47,19 @@ assert.equal(ride.power_20m, 250);
   assert.deepEqual(cleanDistance([0, 5, 10], [100, 20, 35]), [0, 0, 15], "a reset counts as no distance");
 }
 
+// A pause right before the distance is reached must not shave time off (was: 23:20 read as 17:57).
+{
+  // 3 m/s for 500 s (1500 m), then 200 s with the watch nearly still, then 3 m/s again.
+  const t3: number[] = [];
+  const d3: number[] = [];
+  let x3 = 0;
+  for (let s3 = 0; s3 <= 1400; s3 += 5) {
+    t3.push(s3);
+    d3.push(x3);
+    x3 += s3 >= 500 && s3 < 700 ? 0.05 : 15;
+  }
+  const one = fastestOver(t3, d3, 1609.344)!;
+  assert.ok(one >= 536, `mile ${one} can't beat 3 m/s (536 s)`);
+}
+
 console.log("bests: all passed");
