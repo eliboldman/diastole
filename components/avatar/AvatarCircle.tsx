@@ -10,7 +10,7 @@ export default function AvatarCircle({ look, name, size = 40, group = false }: {
       style={{ width: size, height: size, fontSize: size * 0.38 }}
       aria-hidden
     >
-      {group ? <Users size={size * 0.42} /> : look ? <Avatar look={look} variant="bust" className="h-full w-full translate-y-[6%] scale-110" /> : name.charAt(0).toUpperCase()}
+      {group ? <Users size={size * 0.42} /> : look ? <Avatar look={look} variant="bust" className="h-full w-full" /> : name.charAt(0).toUpperCase()}
     </span>
   );
 }
