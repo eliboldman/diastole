@@ -8,6 +8,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
+import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -92,6 +93,13 @@ export default async function WorkoutPage({
         {w ? w.title : "New workout"}
       </h1>
       <p className="mt-2 text-sm text-white/55">For {name}. Drafts stay private until you approve and send.</p>
+      {/* Not for drafts: the athlete can't see those yet. */}
+      {w && !w.deleted_at && w.status !== "draft" && id !== me.id && (
+        <div className="mt-4">
+          <MessageAbout to={id} name={firstName} workoutId={w.id} />
+        </div>
+      )}
+      {w && w.status !== "draft" && <WorkoutMessages workoutId={w.id} me={me.id} names={{ [id]: firstName }} />}
 
       {w && (
         <div className="mt-6">

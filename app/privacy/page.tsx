@@ -116,12 +116,20 @@ export default function PrivacyPage() {
             workout details&rdquo;, and only with pod members who have turned it on too; it is off by
             default. You can leave a pod or turn sharing off at any time, and sharing stops immediately.
           </p>
+          <p>
+            <strong className="text-white/80">Messages:</strong> messages between you and your coach,
+            including photos and voice notes, are seen only by the two of you. Messages in a pod chat,
+            and props, stickers and comments on workouts in a pod&apos;s feed, are seen by that
+            pod&apos;s coach and its current members. Photos and voice notes are stored privately and
+            shown only through short-lived links. You can delete a message you sent; it is removed
+            for everyone, along with its photo or voice note.
+          </p>
           <p> We use a small
             number of service providers to run {SITE.name}, who process data on our behalf and
             may not use it for anything else:
           </p>
           <ul>
-            <li>Supabase: secure database and account sign-in.</li>
+            <li>Supabase: secure database, account sign-in, and private storage for message photos and voice notes.</li>
             <li>Vercel: website hosting.</li>
             <li>OpenFreeMap: map images behind workout routes. Your browser requests the map area being viewed; the route itself is drawn in your browser and never sent to them.</li>
             <li>Anthropic: AI summaries for the coach, as described above.</li>

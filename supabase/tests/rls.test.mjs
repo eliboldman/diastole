@@ -14,6 +14,12 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema public, auth to anon, authenticated;
   create publication supabase_realtime;
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner_id text);
+  alter table storage.objects enable row level security;
+  grant usage on schema storage to authenticated;
+  grant select, insert, delete on storage.objects to authenticated;
   grant execute on function auth.uid() to authenticated;
 `);
 await db.exec(migration);
@@ -302,6 +308,97 @@ await as(COACH, `select public.delete_pod_comment('${cid}')`);
 check("only the author can delete a comment", (await db.query(`select count(*)::int c from public.pod_props where id = '${cid}'`)).rows[0].c === 1);
 await as(A1, `select public.delete_pod_comment('${cid}')`);
 check("author deletes their comment", (await db.query(`select count(*)::int c from public.pod_props where id = '${cid}'`)).rows[0].c === 0);
+
+// ---------------------------------------------------------------- messages
+// State: A1 active in POD, A2 left the pod (still coached by COACH), STRANGER has no coach.
+r = await as(A1, `select public.open_direct_conversation('${COACH}') as id`);
+const DM1 = r.rows?.[0]?.id;
+check("athlete opens a thread with their coach", Boolean(DM1));
+r = await as(COACH, `select public.open_direct_conversation('${A1}') as id`);
+check("coach opening the same pair gets the same thread", r.rows?.[0]?.id === DM1);
+r = await as(A1, `select public.open_direct_conversation('${A2}') as id`);
+check("athletes can't DM each other", r.rows?.[0]?.id === null);
+r = await as(STRANGER, `select public.open_direct_conversation('${COACH}') as id`);
+check("someone without this coach can't open a thread", r.rows?.[0]?.id === null);
+
+const M1 = "00000000-0000-0000-0000-00000000aa01";
+r = await as(A1, `insert into public.messages (id, conversation_id, sender_id, body, created_at) values ('${M1}', '${DM1}', '${A1}', 'Legs felt heavy today', '2000-01-01')`);
+check("athlete sends a message", !r.error);
+check("server sets the time", (await db.query(`select created_at > now() - interval '1 minute' as ok from public.messages where id = '${M1}'`)).rows[0].ok);
+r = await as(A1, `insert into public.messages (conversation_id, sender_id, body) values ('${DM1}', '${COACH}', 'spoof')`);
+check("can't send as someone else", !!r.error);
+r = await as(COACH, `select body from public.messages where conversation_id = '${DM1}'`);
+check("coach reads it", r.rows?.[0]?.body === "Legs felt heavy today");
+r = await as(A2, `select * from public.messages where conversation_id = '${DM1}'`);
+check("another athlete can't read it", r.rows?.length === 0);
+r = await as(A2, `insert into public.messages (conversation_id, sender_id, body) values ('${DM1}', '${A2}', 'hi')`);
+check("non-members can't post", !!r.error);
+r = await as(A1, `insert into public.messages (conversation_id, sender_id, body, activity_id) values ('${DM1}', '${A1}', 'see this', '${ACT2}')`);
+check("can't link a workout you can't see", !!r.error);
+r = await as(A1, `insert into public.messages (conversation_id, sender_id, body, activity_id) values ('${DM1}', '${A1}', 'see this', '${ACT1}')`);
+check("can link your own workout", !r.error);
+r = await as(A1, `insert into public.messages (conversation_id, sender_id, media_kind, media_path) values ('${DM1}', '${A1}', 'photo', '${DM1}/a.jpg')`);
+check("photo message in this thread's folder", !r.error);
+r = await as(A1, `insert into public.messages (conversation_id, sender_id, media_kind, media_path) values ('${DM1}', '${A1}', 'photo', 'elsewhere/a.jpg')`);
+check("media must live in this thread's folder", !!r.error);
+
+const n1 = (await db.query(`select title, body, href, read_at from public.notifications where user_id = '${COACH}' and dedupe_key = 'msg:${DM1}'`)).rows;
+check("coach gets one folded message notification, latest preview", n1.length === 1 && n1[0].body === "📷 Photo" && n1[0].href === `/messages/${DM1}`);
+r = await as(COACH, `select public.get_inbox() as i`);
+const inboxRow = r.rows?.[0]?.i?.find((x) => x.id === DM1);
+check("inbox shows the thread with unread count and preview", inboxRow?.unread === 3 && inboxRow?.last?.media_kind === "photo");
+r = await as(A1, `select public.get_inbox() as i`);
+check("sender has nothing unread", r.rows?.[0]?.i?.find((x) => x.id === DM1)?.unread === 0);
+r = await as(COACH, `select public.unread_message_count() as n`);
+check("coach total unread", r.rows?.[0]?.n === 3);
+await as(COACH, `select public.mark_conversation_read('${DM1}')`);
+r = await as(COACH, `select public.get_inbox() as i`);
+check("reading clears unread", r.rows?.[0]?.i?.find((x) => x.id === DM1)?.unread === 0);
+check("reading clears the notification", (await db.query(`select read_at from public.notifications where dedupe_key = 'msg:${DM1}'`)).rows[0].read_at !== null);
+r = await as(A1, `select public.get_conversation('${DM1}') as c`);
+const conv = r.rows?.[0]?.c;
+check("thread view has title, people and read times", conv?.title && conv?.people?.length === 2 && conv?.reads?.[COACH]);
+r = await as(STRANGER, `select public.get_conversation('${DM1}') as c`);
+check("outsiders get nothing", r.rows?.[0]?.c === null);
+r = await as(A1, `select * from public.conversation_reads where conversation_id = '${DM1}'`);
+check("members see each other's read times (for Seen)", r.rows?.length === 2);
+
+r = await as(COACH, `select public.delete_message('${M1}') as p`);
+check("only the sender can delete", (await db.query(`select deleted_at from public.messages where id = '${M1}'`)).rows[0].deleted_at === null);
+await as(A1, `select public.delete_message('${M1}')`);
+check("sender deletes (soft)", (await db.query(`select deleted_at from public.messages where id = '${M1}'`)).rows[0].deleted_at !== null);
+r = await as(A1, `update public.messages set body = 'edited' where id = '${M1}' returning id`);
+check("no direct edits", !!r.error || r.rows?.length === 0);
+
+// Pod thread
+r = await as(A1, `select public.open_pod_conversation('${POD}') as id`);
+const PODC = r.rows?.[0]?.id;
+check("active member opens the pod thread", Boolean(PODC));
+r = await as(A2, `select public.open_pod_conversation('${POD}') as id`);
+check("former member can't", r.rows?.[0]?.id === null);
+r = await as(COACH, `insert into public.messages (conversation_id, sender_id, body) values ('${PODC}', '${COACH}', 'Team run Saturday')`);
+check("coach posts in the pod thread", !r.error);
+r = await as(A1, `select body from public.messages where conversation_id = '${PODC}'`);
+check("member reads the pod thread", r.rows?.length === 1);
+r = await as(A2, `select body from public.messages where conversation_id = '${PODC}'`);
+check("former member can't read it", r.rows?.length === 0);
+check("pod message notifies members with the pod name", /in Tuesday Group/.test((await db.query(`select title from public.notifications where user_id = '${A1}' and dedupe_key = 'msg:${PODC}'`)).rows[0]?.title ?? ""));
+
+// Storage paths
+r = await as(A1, `insert into storage.objects (bucket_id, name, owner_id) values ('message-media', '${DM1}/x.jpg', '${A1}')`);
+check("member uploads into the thread folder", !r.error);
+r = await as(A2, `insert into storage.objects (bucket_id, name, owner_id) values ('message-media', '${DM1}/y.jpg', '${A2}')`);
+check("non-member can't upload there", !!r.error);
+r = await as(A2, `select name from storage.objects where bucket_id = 'message-media'`);
+check("non-member can't read the files", r.rows?.length === 0);
+r = await as(A1, `insert into storage.objects (bucket_id, name, owner_id) values ('message-media', '../${DM1}/z.jpg', '${A1}')`);
+check("odd paths are refused", !!r.error);
+
+// Coach drops the athlete: the thread closes for both.
+await db.exec(`update public.profiles set coach_id = null where id = '${A1}'`);
+r = await as(A1, `select * from public.messages where conversation_id = '${DM1}'`);
+check("a removed athlete loses the thread", r.rows?.length === 0);
+await db.exec(`update public.profiles set coach_id = '${COACH}' where id = '${A1}'`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

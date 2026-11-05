@@ -21,6 +21,7 @@ import { createAdminClient, createClient, requireUser } from "@/lib/supabase/ser
 import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
+import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -264,6 +265,13 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
           .join(" · ")}
       </p>
 
+      {/* Owner -> their coach; coach -> the athlete. A coach who is their own athlete has no one to message. */}
+      {((isOwn && me.coach_id && me.coach_id !== me.id) || (isCoach && !isOwn)) && (
+        <div className="mt-4">
+          <MessageAbout to={isOwn ? "coach" : act.athlete_id} name={isOwn ? "coach" : (owner?.full_name?.split(" ")[0] ?? "athlete")} activityId={act.id} />
+        </div>
+      )}
+
       {tiles.length > 0 && (
         <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {tiles.map(([label, value]) => (
@@ -323,6 +331,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
           )}
         </Card>
       )}
+
+      {(isOwn || isCoach) && <WorkoutMessages activityId={act.id} me={me.id} names={{ [act.athlete_id]: owner?.full_name?.split(" ")[0] ?? "Athlete" }} />}
 
       {streams && streams.t.length > 1 && (
         <Card title="Over the session">

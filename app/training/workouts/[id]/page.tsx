@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import BackLink from "@/components/layout/BackLink";
+import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -42,6 +43,12 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
 
+      {me.coach_id && me.coach_id !== me.id && (
+        <div className="mt-4">
+          <MessageAbout to="coach" name="coach" workoutId={w.id} />
+        </div>
+      )}
+
       {done && (
         <Link href={`/activity/${done.id}`} className="lift mt-6 flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-emerald-300/25 bg-emerald-300/[0.08] px-4">
           <span className="min-w-0 truncate text-sm">
@@ -68,6 +75,8 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         </ol>
         <p className="mt-4 text-xs text-white/45">On your watch after it syncs. Training guidance from your coach, not medical advice.</p>
       </section>
+
+      <WorkoutMessages workoutId={w.id} me={me.id} names={{}} />
     </DashboardShell>
   );
 }
