@@ -17,10 +17,13 @@ export async function shrinkPhoto(file: File): Promise<{ blob: Blob; w: number; 
   return { blob, w, h };
 }
 
-/** The best audio format this browser records: Opus/WebM on Chrome and Firefox, AAC/MP4 on Safari. */
+/**
+ * The audio format to record. AAC in MP4 first: it plays everywhere (iPhone, Safari, Chrome, Firefox);
+ * WebM/Opus only where AAC recording isn't available (Firefox), since older iPhones can't play it.
+ */
 export function recorderMime(): string | null {
   if (typeof MediaRecorder === "undefined") return null;
-  for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg;codecs=opus"]) {
+  for (const m of ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/aac", "audio/ogg;codecs=opus"]) {
     if (MediaRecorder.isTypeSupported(m)) return m;
   }
   return "";

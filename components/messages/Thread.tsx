@@ -83,7 +83,10 @@ function Photo({ m }: { m: Local }) {
     <>
       <button
         type="button"
-        onClick={() => url && setBig(true)}
+        onClick={(e) => {
+          e.stopPropagation(); // not the bubble's menu
+          if (url) setBig(true);
+        }}
         className="block w-64 max-w-full overflow-hidden rounded-2xl bg-white/[0.06]"
         style={{ aspectRatio: String(Math.min(Math.max(ratio, 0.6), 1.8)) }}
         aria-label="Open photo"
@@ -107,16 +110,47 @@ function Photo({ m }: { m: Local }) {
   );
 }
 
-/** True when this browser can decode the recording (catches a broken file before it's sent). */
-async function playable(blob: Blob) {
-  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctx) return true; // can't check; send it
+const AudioCtx = () =>
+  typeof window === "undefined" ? undefined : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+
+/**
+ * The recording's real length in seconds when this browser can decode it, or null when it can't
+ * (a broken file is caught before it's sent). Undefined when there's no way to check.
+ */
+async function decodedSeconds(blob: Blob): Promise<number | null | undefined> {
+  const Ctx = AudioCtx();
+  if (!Ctx) return undefined;
   const ctx = new Ctx();
   try {
-    await ctx.decodeAudioData(await blob.arrayBuffer());
-    return true;
+    return (await ctx.decodeAudioData(await blob.arrayBuffer())).duration;
   } catch {
-    return false;
+    return null;
+  } finally {
+    void ctx.close();
+  }
+}
+
+/**
+ * Resolves once the mic delivers real sound (any non-zero sample), or after `maxMs`.
+ * Bluetooth headsets take a second or two to switch their mic on; recording before that loses
+ * the start of the note.
+ */
+async function micLive(stream: MediaStream, maxMs = 2500) {
+  const Ctx = AudioCtx();
+  if (!Ctx) return;
+  const ctx = new Ctx();
+  try {
+    const src = ctx.createMediaStreamSource(stream);
+    const an = ctx.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const until = Date.now() + maxMs;
+    while (Date.now() < until) {
+      an.getFloatTimeDomainData(buf);
+      if (buf.some((v) => Math.abs(v) > 1e-4)) return;
+      await new Promise((r) => setTimeout(r, 40));
+    }
   } finally {
     void ctx.close();
   }
@@ -144,7 +178,10 @@ function Voice({ m, mine }: { m: Local; mine: boolean }) {
     <span className="flex w-60 max-w-full items-center gap-3">
       <button
         type="button"
-        onClick={toggle}
+        onClick={(e) => {
+          e.stopPropagation(); // not the bubble's menu
+          toggle();
+        }}
         disabled={!url || failed}
         aria-label={playing ? "Pause voice note" : "Play voice note"}
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${mine ? "bg-black/20" : "bg-emerald-300/20"} text-white disabled:opacity-50`}
@@ -510,6 +547,7 @@ export default function Thread({
   const recStart = useRef(0);
 
   const starting = useRef(false);
+  const [micStarting, setMicStarting] = useState(false);
   async function startRecording() {
     // One recording at a time: a second tap while the mic permission prompt is up used to start
     // a second recorder writing into the same buffer, which produced an unplayable file.
@@ -517,19 +555,23 @@ export default function Thread({
     const mime = recorderMime();
     if (mime === null || !navigator.mediaDevices?.getUserMedia) return show("This browser can't record voice notes.", { ok: false });
     starting.current = true;
+    setMicStarting(true);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       starting.current = false;
+      setMicStarting(false);
       return show("Microphone access is off. Allow it in your browser settings to send voice notes.", { ok: false });
     }
+    await micLive(stream);
     let r: MediaRecorder;
     try {
       r = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
     } catch {
       stream.getTracks().forEach((t) => t.stop());
       starting.current = false;
+      setMicStarting(false);
       return show("This browser can't record voice notes.", { ok: false });
     }
     const parts: Blob[] = []; // this recording's own data, never shared with another
@@ -544,11 +586,13 @@ export default function Thread({
       const started = recStart.current;
       setRec(null);
       if (discard.current) return;
-      const seconds = Math.min(VOICE_MAX_S, Math.round((now() - started) / 100) / 10);
-      if (seconds < 0.8) return show("Hold on a bit longer to record.", { ok: false });
-      const type = baseMime(r.mimeType || mime || "audio/webm");
+      const timed = Math.min(VOICE_MAX_S, (now() - started) / 1000);
+      if (timed < 0.8) return show("Hold on a bit longer to record.", { ok: false });
+      const type = baseMime(r.mimeType || mime || "audio/mp4");
       const blob = new Blob(parts, { type });
-      if (!(await playable(blob))) return show("That recording didn't come out. Try again.", { ok: false });
+      const real = await decodedSeconds(blob);
+      if (real === null) return show("That recording didn't come out. Try again.", { ok: false });
+      const seconds = Math.round(Math.min(VOICE_MAX_S, real && Number.isFinite(real) ? real : timed) * 10) / 10;
       const id = crypto.randomUUID();
       const m = draft({ id, media_kind: "voice", media_path: `${conv.id}/${id}.${extFor(type)}`, media_meta: { seconds, mime: type }, localUrl: URL.createObjectURL(blob) });
       takeAttach();
@@ -560,6 +604,7 @@ export default function Thread({
     // No timeslice: the browser hands over one complete file when recording stops.
     r.start();
     starting.current = false;
+    setMicStarting(false);
     setRec({ started: recStart.current, secs: 0 });
     navigator.vibrate?.(10);
     recTimer.current = setInterval(() => {
@@ -622,7 +667,6 @@ export default function Thread({
     }
     if (typeof data === "string" && data) void supabase.storage.from(BUCKET).remove([data]);
   }
-  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- seen
   const others = conv.people.filter((p) => !p.is_me);
@@ -658,22 +702,21 @@ export default function Thread({
               role={mine ? "button" : undefined}
               tabIndex={mine ? 0 : undefined}
               aria-label={mine ? "Message options" : undefined}
-              onClick={() => (m.status === "failed" ? m.retry?.() : undefined)}
+              onClick={() => {
+                if (m.status === "failed") return m.retry?.();
+                if (mine && !m.status) setMenu(m.id);
+              }}
               onContextMenu={(e) => {
                 if (!mine || m.status) return;
                 e.preventDefault();
                 setMenu(m.id);
               }}
-              onPointerDown={() => {
-                if (!mine || m.status) return;
-                press.current = setTimeout(() => {
-                  navigator.vibrate?.(8);
+              onKeyDown={(e) => {
+                if (mine && !m.status && (e.key === "Enter" || e.key === " " || e.key === "Delete" || e.key === "Backspace")) {
+                  e.preventDefault();
                   setMenu(m.id);
-                }, 450);
+                }
               }}
-              onPointerUp={() => press.current && clearTimeout(press.current)}
-              onPointerLeave={() => press.current && clearTimeout(press.current)}
-              onKeyDown={(e) => mine && (e.key === "Delete" || e.key === "Backspace") && !m.status && setMenu(m.id)}
               className={`select-text break-words ${m.media_kind === "photo" ? "p-1" : "px-4 py-2.5"} ${
                 mine
                   ? "rounded-3xl rounded-br-lg bg-emerald-300/[0.22] text-emerald-50 ring-1 ring-emerald-200/20"
@@ -818,8 +861,15 @@ export default function Thread({
                 <ArrowUp size={19} />
               </button>
             ) : (
-              <button type="button" onClick={() => void startRecording()} aria-label="Record a voice note" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06] hover:text-white">
-                <Mic size={19} />
+              <button
+                type="button"
+                onClick={() => void startRecording()}
+                disabled={micStarting}
+                aria-label={micStarting ? "Starting the microphone" : "Record a voice note"}
+                className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-full text-white/60 hover:bg-white/[0.06] hover:text-white ${micStarting ? "px-3 text-red-200" : "w-11"}`}
+              >
+                <Mic size={19} className={micStarting ? "animate-pulse" : ""} />
+                {micStarting && <span className="text-xs">Starting mic…</span>}
               </button>
             )}
           </form>
