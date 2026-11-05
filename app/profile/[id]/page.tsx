@@ -68,7 +68,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      {coaching && <BackLink href={`/athlete/${id}`} label={person.full_name || "Athlete"} />}
+      {coaching && !own && <BackLink href={`/athlete/${id}`} label={person.full_name || "Athlete"} />}
       <div className="mx-auto max-w-3xl">
         <section className="flex flex-col items-center text-center">
           <div className="relative">
