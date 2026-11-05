@@ -2,6 +2,8 @@ import { CalendarRange, ChevronRight, Upload } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import EmptyState from "@/components/EmptyState";
+
 import DashboardShell from "@/components/layout/DashboardShell";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import { daysBackIso } from "@/lib/activity/zones";
@@ -81,12 +83,9 @@ export default async function TrainingPage() {
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Recent workouts</h2>
         {!done?.length ? (
-          <p className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5 text-sm text-white/55">
-            No workouts yet. They appear here after your watch syncs.{" "}
-            <Link href="/connect" className="text-emerald-200 hover:underline">
-              Watch connection →
-            </Link>
-          </p>
+          <EmptyState emoji="⌚" title="No workouts yet" href="/connect" action="Check your watch connection">
+            Workouts appear here a few minutes after your watch syncs.
+          </EmptyState>
         ) : (
           <ul className="grid gap-2">
             {done.map((a) => (

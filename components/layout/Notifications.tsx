@@ -299,7 +299,17 @@ export default function NotificationHost() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {!loaded ? (
-          <p className="px-3 py-6 text-sm text-white/45">Loading…</p>
+          <ul className="grid gap-1" aria-busy="true" aria-label="Loading notifications">
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i} className="flex items-start gap-3 px-3 py-2.5">
+                <span className="skeleton h-8 w-8 shrink-0 rounded-xl" />
+                <span className="flex-1 space-y-2 pt-1">
+                  <span className="skeleton block h-3 w-3/4 rounded-full" />
+                  <span className="skeleton block h-2.5 w-1/2 rounded-full" />
+                </span>
+              </li>
+            ))}
+          </ul>
         ) : items.length === 0 ? (
           <p className="px-3 py-8 text-center text-sm text-white/45">
             <span className="mb-1 block text-2xl" aria-hidden>

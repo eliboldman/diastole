@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import EmptyState from "@/components/EmptyState";
+
 import { CalendarDays, CalendarRange, Plus } from "lucide-react";
 
 import QuickLinks from "@/components/layout/QuickLinks";
@@ -15,6 +17,7 @@ import { getRoster, type AthleteSummary } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, type Units } from "@/lib/activity/format";
 import StrainPrompt from "@/components/avatar/StrainPrompt";
+import WeeklyProgress from "@/components/WeeklyProgress";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
@@ -91,6 +94,7 @@ export default async function TodayPage() {
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
       {/* The coach trains too: their own post-workout check */}
+      <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
       <StrainPrompt athleteId={coach.id} />
       <QuickLinks
         links={[
@@ -121,11 +125,10 @@ export default async function TodayPage() {
       />
 
       {roster.length === 0 ? (
-        <div className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.055] p-8 text-white/60">
-          No athletes yet.{" "}
-          <Link href="/athletes" className="text-emerald-200 hover:underline">
-            Invite your first athlete →
-          </Link>
+        <div className="mt-10">
+          <EmptyState emoji="🌱" title="Your roster is empty" href="/athletes" action="Invite your first athlete">
+            Each athlete&apos;s readiness, training and messages land here every morning.
+          </EmptyState>
         </div>
       ) : (
         <section className="stagger mt-8 grid gap-4 lg:grid-cols-2">

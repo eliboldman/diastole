@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import EmptyState from "@/components/EmptyState";
+
 import DashboardShell from "@/components/layout/DashboardShell";
 import { DeletePod, InviteToPod, NewPodForm, RemoveMember } from "@/components/PodButtons";
 import { createClient, requireCoach } from "@/lib/supabase/server";
@@ -42,7 +44,11 @@ export default async function PodsPage() {
       </section>
 
       <div className="mt-6 grid gap-4">
-        {!pods?.length && <p className="text-sm text-white/55">No pods yet. Name one above, then invite athletes to it.</p>}
+        {!pods?.length && (
+          <EmptyState emoji="🫶" title="No pods yet">
+            Name one above, then invite athletes. Pods share a feed, props and a group chat; each athlete chooses what else they share.
+          </EmptyState>
+        )}
         {(pods ?? []).map((pod) => {
           const members = pod.pod_members ?? [];
           const inPod = new Set(members.filter((m) => m.status === "active" || m.status === "invited").map((m) => m.athlete_id));

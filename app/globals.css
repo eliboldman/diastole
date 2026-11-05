@@ -664,3 +664,28 @@ body {
   .msg-collapse { animation-delay: 200ms; animation-duration: 1ms; }
 }
 @keyframes msgVanishCalm { to { opacity: 0; } }
+
+/* ---- Experience pass: skeletons, tap feedback, lighter glass on small screens */
+@keyframes skeletonShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.04) 30%, rgba(255, 255, 255, 0.09) 50%, rgba(255, 255, 255, 0.04) 70%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+/* Every tap answers right away. `scale` (not transform) so it stacks with any transform already there. */
+:where(button:not(:disabled), a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"]) {
+  transition-property: scale, background-color, border-color, color, opacity, box-shadow;
+  transition-duration: 140ms;
+}
+:where(button:not(:disabled), a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"]):active { scale: 0.97; }
+@media (max-width: 640px) {
+  /* Heavy blur is the costliest thing on older iPhones; phones get a lighter frosted glass. */
+  .backdrop-blur-3xl, .backdrop-blur-2xl { --tw-backdrop-blur: blur(18px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  :where(button, a[href], [role="button"], [role="tab"], [role="radio"], [role="switch"]):active { scale: 1; }
+}
+@keyframes ringFill { from { stroke-dashoffset: var(--ring-from); } to { stroke-dashoffset: var(--ring-to); } }
+.ring-fill { stroke-dashoffset: var(--ring-to); animation: ringFill 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; }
+@media (prefers-reduced-motion: reduce) { .ring-fill { animation: none; } }

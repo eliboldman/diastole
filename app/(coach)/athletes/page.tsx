@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import EmptyState from "@/components/EmptyState";
+
 import { CalendarRange, Orbit } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -76,7 +78,11 @@ export default async function AthletesPage() {
               </div>
             );
           })}
-          {!athletes?.length && <p className="text-white/55">No athletes yet.</p>}
+          {!athletes?.length && (
+            <EmptyState emoji="👋" title="No athletes yet">
+              Invite your first athlete with the form above. They get an email link, and their watch data shows up here once they connect.
+            </EmptyState>
+          )}
         </section>
       </div>
     </DashboardShell>
