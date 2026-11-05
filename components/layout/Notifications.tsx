@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Orbit,
   PartyPopper,
+  Sunrise,
   Unplug,
   UserPlus,
   Watch,
@@ -39,6 +40,7 @@ const ICON: Record<string, LucideIcon> = {
   garmin_disconnected: Unplug,
   message: MessageCircle,
   checkin_pain: HeartPulse,
+  briefs_ready: Sunrise,
 };
 
 // ---------------------------------------------------------------- one shared store per tab

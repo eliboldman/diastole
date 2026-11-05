@@ -582,5 +582,25 @@ check("why stays under 400 characters", !!r.error);
 await db.exec(`insert into public.ai_usage (coach_id, model, athletes, input_tokens, output_tokens, cost_usd, trigger) values ('${COACH}', 'claude-haiku-5-5', 1, 1, 1, 0, 'why')`);
 check("ai_usage accepts why drafts", true);
 
+// ---------------------------------------------------------------- morning briefs (Phase 7)
+const BR = (await db.query(`insert into public.morning_briefs (coach_id, athlete_id, date, draft, model) values ('${COACH}', '${A1}', current_date, 'Nice work yesterday.', 'claude-opus-5-5') returning id`)).rows[0].id;
+r = await as(A1, `select * from public.morning_briefs`);
+check("athletes never see brief drafts", r.rows?.length === 0);
+r = await as(COACH, `select draft from public.morning_briefs where id = '${BR}'`);
+check("coach reads their briefs", r.rows?.[0]?.draft === "Nice work yesterday.");
+r = await as(A1, `insert into public.morning_briefs (coach_id, athlete_id, date, draft) values ('${COACH}', '${A1}', current_date + 1, 'fake')`);
+check("only the server drafts briefs", !!r.error);
+await as(A1, `select public.decide_brief('${BR}', 'skipped')`);
+check("an athlete can't decide a brief", (await db.query(`select status from public.morning_briefs where id = '${BR}'`)).rows[0].status === "pending");
+await as(COACH, `select public.decide_brief('${BR}', 'deleted')`);
+check("only sent or skipped", (await db.query(`select status from public.morning_briefs where id = '${BR}'`)).rows[0].status === "pending");
+await as(COACH, `select public.decide_brief('${BR}', 'sent', 'Nice work yesterday, edited.', null)`);
+const brow = (await db.query(`select status, final_text, decided_at from public.morning_briefs where id = '${BR}'`)).rows[0];
+check("coach sends it with their edits", brow.status === "sent" && brow.final_text === "Nice work yesterday, edited." && brow.decided_at !== null);
+// The drafter runs server-side with no signed-in user.
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+await db.query(`select public.notify_briefs_ready('${COACH}', 2, current_date)`);
+check("the coach is told briefs are ready", (await db.query(`select title from public.notifications where user_id = '${COACH}' and kind = 'briefs_ready'`)).rows[0]?.title === "2 morning briefs are ready");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

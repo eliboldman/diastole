@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { draftMorningBriefs } from "@/lib/ai/briefs";
 import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
   const results: Record<string, unknown> = {};
   for (const c of coaches ?? []) {
     results[c.id] = await runCoachAssistant(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // Morning briefs: drafted after readiness is fresh; the coach sends or skips each one.
+    results[`${c.id}:briefs`] = await draftMorningBriefs(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Form insights only call Claude when a new pattern shows up across several runs.
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   }
