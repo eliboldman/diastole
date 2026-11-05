@@ -163,6 +163,14 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
           },
           { onConflict: "source,external_id" },
         );
+        // A hand-uploaded file of this same workout is now redundant: drop it so it isn't counted twice.
+        await admin
+          .from("activities")
+          .delete()
+          .eq("athlete_id", athleteId)
+          .eq("source", "upload")
+          .gte("start_time", new Date((start - 60) * 1000).toISOString())
+          .lte("start_time", new Date((start + 60) * 1000).toISOString());
         const { data: saved } = await admin.from("activities").select("id").eq("source", "garmin").eq("external_id", externalId).maybeSingle();
         if (saved) await linkPlannedWorkout(admin, saved.id);
       } else {

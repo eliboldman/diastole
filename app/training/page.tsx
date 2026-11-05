@@ -1,4 +1,4 @@
-import { CalendarRange, ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronRight, Upload } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -44,9 +44,14 @@ export default async function TrainingPage() {
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">Your plan</p>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-4xl font-bold tracking-tight">Training</h1>
-        <Link href="/calendar" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]">
-          <CalendarRange size={16} aria-hidden /> Calendar
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/me/upload" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]">
+            <Upload size={16} aria-hidden /> Upload workout
+          </Link>
+          <Link href="/calendar" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]">
+            <CalendarRange size={16} aria-hidden /> Calendar
+          </Link>
+        </div>
       </div>
 
       <section className="mt-8">

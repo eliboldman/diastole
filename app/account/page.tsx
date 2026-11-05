@@ -75,6 +75,9 @@ export default async function AccountPage() {
                   Import Garmin history
                 </Row>
               )}
+              <Row href="/me/upload" sub="Rouvy, Zwift and other workouts that don't sync on their own">
+                Upload a workout file
+              </Row>
             </div>
           </section>
 

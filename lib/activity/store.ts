@@ -18,13 +18,13 @@ const FAMILY: Record<string, RegExp> = {
 };
 
 /** treadmill + running -> treadmill_running; lap_swimming + swimming -> lap_swimming. */
-function sportName(fit: FitActivity) {
+export function sportName(fit: FitActivity) {
   const { sport, sub_sport: sub } = fit.summary;
   if (!sub || sub === "generic" || !sport) return sport;
   return sub.includes(sport) ? sub : `${sub}_${sport}`;
 }
 
-function summaryColumns(fit: FitActivity) {
+export function summaryColumns(fit: FitActivity) {
   const s = fit.summary;
   return {
     duration_s: s.duration_s,
@@ -97,7 +97,7 @@ export async function saveFitDetail(
   admin: Admin,
   activity: Record<string, unknown> & { id: string; athlete_id: string },
   fit: FitActivity,
-  source: "garmin_fit" | "garmin_export_fit",
+  source: "garmin_fit" | "garmin_export_fit" | "upload_fit",
   name?: string | null,
 ) {
   const gaps = Object.fromEntries(
