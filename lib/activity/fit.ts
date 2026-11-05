@@ -16,7 +16,11 @@ export type StreamKey =
   | "stride" // stride length, m
   | "vr"; // vertical ratio, %
 
-export type Streams = { interval_s: number; t: number[] } & Partial<Record<StreamKey, (number | null)[]>>;
+export type Streams = {
+  interval_s: number;
+  t: number[];
+  pool?: { unit: "METER" | "YARD"; length_m: number }; // pool swims only, as the watch recorded it
+} & Partial<Record<StreamKey, (number | null)[]>>;
 
 export type Lap = {
   start_s: number; // offset from activity start
@@ -31,6 +35,10 @@ export type Lap = {
   ascent_m: number | null;
   intensity: string | null; // active, rest, warmup, cooldown, recovery, interval
   step_index: number | null; // structured workout step this lap belongs to
+  // Pool swims (absent on laps parsed before these were kept)
+  lengths?: number | null; // active lengths
+  strokes?: number | null;
+  stroke?: string | null; // freestyle, backstroke, breaststroke, butterfly, drill, mixed
 };
 
 export type FitSummary = {
@@ -119,6 +127,7 @@ export function parseFit(bytes: Uint8Array): FitActivity {
 
   const s = sessions[0] ?? {};
   const sport = snake(s.sport);
+  const swim = /swim/i.test(sport ?? "");
   const foot = FOOT_SPORTS.test(`${sport ?? ""} ${snake(s.subSport) ?? ""}`);
   const startMs = time(s.startTime) ?? time(records[0]?.timestamp) ?? Date.now();
   const sum = (key: string) => {
@@ -223,7 +232,17 @@ export function parseFit(bytes: Uint8Array): FitActivity {
     ascent_m: n(l.totalAscent),
     intensity: typeof l.intensity === "string" ? l.intensity : null,
     step_index: n(l.wktStepIndex),
+    ...(swim
+      ? {
+          lengths: pos(l.numActiveLengths),
+          strokes: pos(l.totalStrokes ?? l.totalCycles),
+          stroke: (pos(l.totalDistance) && snake(l.swimStroke)) || null,
+        }
+      : {}),
   }));
+
+  const poolLen = pos(s.poolLength);
+  if (swim && poolLen) streams.pool = { unit: s.poolLengthUnit === "statute" ? "YARD" : "METER", length_m: round(poolLen, 2)! };
 
   return { summary, streams, laps, route: trimRoute(gps), record_fields: [...fields].sort() };
 }

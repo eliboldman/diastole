@@ -127,7 +127,7 @@ export default async function MePage() {
                     </span>{" "}
                     {a.name || sportLabel(a.sport)}
                   </span>
-                  <span className="shrink-0 text-xs text-white/55">{[clock(a.duration_s), shortDistance(a.distance_m, me.units)].filter(Boolean).join(" · ")}</span>
+                  <span className="shrink-0 text-xs text-white/55">{[clock(a.duration_s), shortDistance(a.distance_m, me.units, a.sport)].filter(Boolean).join(" · ")}</span>
                 </Link>
               </li>
             ))}

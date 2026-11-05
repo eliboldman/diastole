@@ -4,6 +4,8 @@ import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type Pointe
 
 import type { Streams } from "@/lib/activity/fit";
 import { isFootSport, MILE, paceOf, type Units } from "@/lib/activity/format";
+import { swimClock, unitLabel } from "@/lib/activity/swim";
+import type { PoolUnit } from "@/lib/workouts/garmin-format";
 
 type ChartSeries = {
   key: string;
@@ -54,14 +56,25 @@ function formSeries(streams: Streams): ChartSeries[] {
 }
 
 /** The charts to draw, in reading order, from whatever streams this activity has. */
-function seriesFor(streams: Streams, sport: string | null, u: Units): ChartSeries[] {
+function seriesFor(streams: Streams, sport: string | null, u: Units, swimUnit: PoolUnit | null): ChartSeries[] {
   const per = u === "mi" ? MILE : 1000;
   const foot = isFootSport(sport);
   const out: ChartSeries[] = [];
   if (streams.hr) out.push({ key: "hr", title: "Heart rate", unit: "bpm", values: streams.hr, format: int });
   if (streams.speed) {
+    const per100 = swimUnit === "YARD" ? 91.44 : 100;
     out.push(
-      foot
+      swimUnit
+        ? {
+            key: "pace",
+            title: "Pace",
+            unit: `/100${unitLabel(swimUnit)}`,
+            // seconds per 100; resting at the wall is a gap
+            values: streams.speed.map((v) => (v !== null && v >= 0.2 ? per100 / v : null)),
+            format: (v) => swimClock(v),
+            invert: true,
+          }
+        : foot
         ? {
             key: "pace",
             title: "Pace",
@@ -81,7 +94,8 @@ function seriesFor(streams: Streams, sport: string | null, u: Units): ChartSerie
     );
   }
   if (streams.power) out.push({ key: "power", title: "Power", unit: "W", values: streams.power, format: int });
-  if (streams.cadence) out.push({ key: "cadence", title: "Cadence", unit: foot ? "spm" : "rpm", values: streams.cadence, format: int });
+  if (streams.cadence)
+    out.push({ key: "cadence", title: swimUnit ? "Stroke rate" : "Cadence", unit: swimUnit ? "str/min" : foot ? "spm" : "rpm", values: streams.cadence, format: int });
   if (streams.alt) out.push({ key: "alt", title: "Elevation", unit: "m", values: streams.alt, format: int, area: true });
   return out;
 }
@@ -91,14 +105,16 @@ export default function ActivityCharts({
   sport,
   set = "session",
   units = "mi",
+  swimUnit = null,
 }: {
   streams: Streams;
   sport: string | null;
   set?: "session" | "form";
   units?: Units;
+  swimUnit?: PoolUnit | null;
 }) {
   const t = streams.t;
-  const series = useMemo(() => (set === "form" ? formSeries(streams) : seriesFor(streams, sport, units)), [streams, sport, set, units]);
+  const series = useMemo(() => (set === "form" ? formSeries(streams) : seriesFor(streams, sport, units, swimUnit)), [streams, sport, set, units, swimUnit]);
   const [idx, setIdx] = useState<number | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const end = t[t.length - 1] || 1;

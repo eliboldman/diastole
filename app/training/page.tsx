@@ -98,7 +98,7 @@ export default async function TrainingPage() {
                       {[
                         new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: me.timezone }),
                         clock(a.duration_s),
-                        shortDistance(a.distance_m, me.units),
+                        shortDistance(a.distance_m, me.units, a.sport),
                         a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : null,
                       ]
                         .filter(Boolean)

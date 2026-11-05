@@ -25,7 +25,7 @@ export const metadata: Metadata = { title: "Today · Diastole" };
 function activityLine(a: AthleteSummary["lastActivity"], timeZone: string, units: Units) {
   if (!a) return "No activities yet";
   const mins = a.duration_s ? Math.round(a.duration_s / 60) : null;
-  const km = shortDistance(a.distance_m, units);
+  const km = shortDistance(a.distance_m, units, a.sport);
   const when = new Date(a.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone });
   return [cap(a.sport?.replaceAll("_", " ") ?? "Activity"), mins && `${mins} min`, km, when].filter(Boolean).join(" · ");
 }

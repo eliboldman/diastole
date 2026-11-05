@@ -169,7 +169,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
                     </td>
                     <td className="py-2 pr-3 text-right text-white/70">{a.duration_s ? `${Math.round(a.duration_s / 60)} min` : ""}</td>
                     <td className="py-2 pr-3 text-right text-white/70">
-                      {shortDistance(a.distance_m, me.units) ?? ""}
+                      {shortDistance(a.distance_m, me.units, a.sport) ?? ""}
                     </td>
                     <td className="py-2 text-right text-white/50">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : ""}</td>
                   </tr>

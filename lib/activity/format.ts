@@ -1,6 +1,9 @@
 // Display formatting for activities. Every helper returns null for missing data, so callers can
 // hide the field instead of printing a zero. Distances and paces follow the viewer's units.
 
+import type { PoolUnit } from "../workouts/garmin-format.ts";
+import { isSwim, swimDist, swimPace, swimPool } from "./swim.ts";
+
 export type Units = "mi" | "km";
 export const MILE = 1609.344;
 
@@ -33,10 +36,16 @@ export function distance(meters: number | null | undefined, u: Units, digits = 2
   return `${v.toFixed(v >= 100 ? 0 : digits)} ${u}`;
 }
 
-/** Shorter form for lists: "3.1 mi". Hidden under 100 m. */
-export function shortDistance(meters: number | null | undefined, u: Units) {
+/** Shorter form for lists: "3.1 mi", or "1,425 yd" for swims. Hidden under 100 m. */
+export function shortDistance(meters: number | null | undefined, u: Units, sport?: string | null) {
   if (!has(meters) || meters < 100) return null;
+  if (isSwim(sport)) return swimDist(meters, swimUnitFor(meters, u));
   return distance(meters, u, 1);
+}
+
+/** Yards or meters for a swim with no lap detail: whole 25 yd lengths say yards, else the viewer's units. */
+function swimUnitFor(meters: number, u: Units) {
+  return swimPool(null, [], meters, u).unit;
 }
 
 /** @deprecated use distance(meters, units) */
@@ -56,8 +65,9 @@ export function speedOf(mps: number | null | undefined, u: Units) {
   return u === "mi" ? `${(mps * 2.236936).toFixed(1)} mph` : `${(mps * 3.6).toFixed(1)} km/h`;
 }
 
-/** Pace for foot sports, speed for everything else. */
-export function speedText(mps: number | null | undefined, sport: string | null | undefined, u: Units = "km") {
+/** Pace for foot sports, pace per 100 for swims, speed for everything else. */
+export function speedText(mps: number | null | undefined, sport: string | null | undefined, u: Units = "km", swimUnit?: PoolUnit) {
+  if (isSwim(sport)) return swimPace(mps, swimUnit ?? (u === "mi" ? "YARD" : "METER"));
   if (isFootSport(sport)) {
     const p = paceOf(mps, u);
     return p ? `${p} /${u}` : null;

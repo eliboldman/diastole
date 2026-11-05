@@ -239,7 +239,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     {[
                       new Date(a.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: me.timezone }),
                       a.duration_s && `${Math.round(a.duration_s / 60)} min`,
-                      shortDistance(a.distance_m, me.units),
+                      shortDistance(a.distance_m, me.units, a.sport),
                       a.avg_hr && `${Math.round(a.avg_hr)} bpm avg`,
                     ]
                       .filter(Boolean)

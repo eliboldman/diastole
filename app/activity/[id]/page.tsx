@@ -10,13 +10,15 @@ import RouteMap from "@/components/activity/RouteMap";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { compareWorkout, type ComparedStep } from "@/lib/activity/compare";
 import type { Lap, Streams } from "@/lib/activity/fit";
+import type { SwimRep } from "@/lib/activity/swim";
 import { RUN_SPORT, type FormSummary } from "@/lib/activity/form";
 import { formToStore, recentFormRuns } from "@/lib/activity/form-store";
 import { clock, distance, isFootSport, sportLabel, speedText, whole, type Units } from "@/lib/activity/format";
+import { isSwim, strokeName, swimClock, swimDist, swimPace, swimPool, swimSummary, unitLabel } from "@/lib/activity/swim";
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
-import { clock as dclock, describe, swimDistance } from "@/lib/workouts/describe";
-import { hundredMeters, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
+import { describe } from "@/lib/workouts/describe";
+import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
@@ -102,15 +104,12 @@ function plannedText(p: ComparedStep["planned"], pool: Pool, swim: boolean, u: U
   return line.replace(/^\S+\s/, "").replace(/ @ /, " · ").replace("until lap", "Lap button");
 }
 
-function actualText(c: ComparedStep, sport: string | null, pool: Pool, u: Units) {
+function actualText(c: ComparedStep, sport: string | null, swimUnit: PoolUnit | null, u: Units) {
   const a = c.actual;
   const t = c.planned.target;
-  const per100 = hundredMeters(pool);
   const measured =
-    t?.type === "swim_pace"
-      ? a.avg_speed
-        ? `${dclock(per100 / a.avg_speed)}/100${pool?.unit === "YARD" ? "yd" : "m"}`
-        : null
+    swimUnit && (t?.type === "swim_pace" || !t)
+      ? swimPace(a.avg_speed, swimUnit)
       : t?.type === "pace_range"
         ? speedText(a.avg_speed, sport, u)
         : t?.type === "power_range"
@@ -118,11 +117,9 @@ function actualText(c: ComparedStep, sport: string | null, pool: Pool, u: Units)
           : t?.type === "hr_zone" || t?.type === "hr_range"
             ? whole(a.avg_hr, "bpm")
             : null;
-  const dist = a.distance_m ? (isSwim(sport) ? swimDistance(a.distance_m, pool) : distance(a.distance_m, u)) : null;
+  const dist = swimUnit ? swimDist(a.distance_m, swimUnit) : distance(a.distance_m, u);
   return [clock(a.duration_s), dist, measured].filter(Boolean).join(" · ") || "–";
 }
-
-const isSwim = (sport: string | null) => /swim/i.test(sport ?? "");
 
 export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -168,6 +165,10 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     formHistory = await recentFormRuns(admin, act.athlete_id, { before: act.start_time, timeZone: tz, limit: 25 });
   }
   const foot = isFootSport(act.sport);
+  const swim = isSwim(act.sport);
+  const pool = swim ? swimPool(streams, laps, act.distance_m, u) : null;
+  const swimUnit = pool?.unit ?? null;
+  const swimSum = pool ? swimSummary(laps, pool.unit, pool) : null;
 
   // Zones: the coach's numbers, otherwise an estimate for max HR.
   const setMax = zonesRow?.max_hr ?? null;
@@ -182,7 +183,24 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/training", label: "Training" } : { href: "/me/pods", label: "Pods" };
 
   const when = new Date(act.start_time);
-  const tiles = [
+  const tiles = swimUnit
+    ? [
+        ["Time", clock(act.duration_s)],
+        ["Distance", swimDist(swimSum?.distance_m ?? act.distance_m, swimUnit)],
+        // Pace while swimming (rest excluded), as swimmers quote it; the session average otherwise.
+        ["Avg pace", swimSum?.sec_per_100 ? `${swimClock(swimSum.sec_per_100)} /100${unitLabel(swimUnit)}` : swimPace(act.avg_speed_mps, swimUnit)],
+        ["Swim time", swimSum ? clock(swimSum.swim_s) : null],
+        ["Rest", swimSum?.rest_s ? clock(swimSum.rest_s) : null],
+        ["Best rep pace", swimSum?.best_100 && swimSum.reps.length > 1 ? `${swimClock(swimSum.best_100)} /100${unitLabel(swimUnit)}` : null],
+        ["Avg SWOLF", swimSum?.swolf ? String(swimSum.swolf) : null],
+        ["Stroke rate", whole(swimSum?.stroke_rate ?? act.avg_cadence, "str/min")],
+        ["Pool", pool?.length_m ? `${Math.round(pool.length_m / (swimUnit === "YARD" ? 0.9144 : 1))} ${unitLabel(swimUnit)}` : null],
+        ["Avg HR", whole(act.avg_hr, "bpm")],
+        ["Max HR", whole(act.max_hr, "bpm")],
+        ["Calories", whole(act.calories, "kcal")],
+        ["Training load", whole(act.training_load, "")],
+      ].filter((x): x is [string, string] => Boolean(x[1]))
+    : [
     ["Time", clock(act.duration_s)],
     ["Distance", distance(act.distance_m, u)],
     [foot ? "Avg pace" : "Avg speed", speedText(act.avg_speed_mps, act.sport, u)],
@@ -196,6 +214,20 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
     ["Calories", whole(act.calories, "kcal")],
     ["Training load", whole(act.training_load, "")],
   ].filter((x): x is [string, string] => Boolean(x[1]));
+
+  const swimCols = swimSum
+    ? [
+        { key: "dist", head: "Distance", get: (r: SwimRep) => swimDist(r.distance_m, swimUnit!) },
+        { key: "stroke", head: "Stroke", get: (r: SwimRep) => strokeName(r.stroke) },
+        { key: "time", head: "Time", get: (r: SwimRep) => swimClock(r.time_s, true) },
+        { key: "pace", head: `/100${unitLabel(swimUnit!)}`, get: (r: SwimRep) => swimClock(r.sec_per_100) },
+        { key: "rest", head: "Rest", get: (r: SwimRep) => (r.rest_s ? swimClock(r.rest_s) : null) },
+        { key: "swolf", head: "SWOLF", get: (r: SwimRep) => (r.swolf ? String(r.swolf) : null) },
+        { key: "spl", head: "Str/len", get: (r: SwimRep) => (r.strokes_per_length ? r.strokes_per_length.toFixed(1) : null) },
+        { key: "rate", head: "Str/min", get: (r: SwimRep) => whole(r.stroke_rate, "") },
+        { key: "hr", head: "Avg HR", get: (r: SwimRep) => whole(r.avg_hr, "") },
+      ].filter((c) => swimSum.reps.some((r) => c.get(r)))
+    : [];
 
   const lapCols = [
     { key: "time", head: "Time", get: (l: Lap) => clock(l.duration_s) },
@@ -271,7 +303,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
                       </p>
                       <p className="text-xs text-white/50">Plan: {plannedText(c.planned, planPool, planSwim, u)}</p>
                     </div>
-                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport, planPool, u)}</p>
+                    <p className="min-w-0 flex-1 basis-40 text-sm tabular-nums text-white/80">{actualText(c, act.sport, planPool?.unit ?? swimUnit, u)}</p>
                     {v ? (
                       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${v.cls}`}>
                         <v.icon className="h-3.5 w-3.5" aria-hidden />
@@ -290,7 +322,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
       {streams && streams.t.length > 1 && (
         <Card title="Over the session">
-          <ActivityCharts streams={streams} sport={act.sport} units={u} />
+          <ActivityCharts streams={streams} sport={act.sport} units={u} swimUnit={swimUnit} />
         </Card>
       )}
 
@@ -338,7 +370,54 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
-      {laps.length > 1 && lapCols.length > 0 && (
+      {swimSum && swimCols.length > 0 && (
+        <Card
+          title="Swim splits"
+          aside={
+            <span className="text-sm tabular-nums text-white/55">
+              {swimSum.reps.length} {swimSum.reps.length === 1 ? "rep" : "reps"} · {swimDist(swimSum.distance_m, swimUnit!)}
+            </span>
+          }
+        >
+          <div className="-mx-2 overflow-x-auto px-2">
+            <table className="w-full min-w-[22rem] text-sm tabular-nums">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-white/45">
+                  <th className="py-2 pr-3 font-normal">#</th>
+                  {swimCols.map((c) => (
+                    <th key={c.key} className={`whitespace-nowrap py-2 pr-3 font-normal last:pr-0 ${c.key === "stroke" ? "text-left" : "text-right"}`}>
+                      {c.head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {swimSum.reps.map((r) => (
+                  <tr key={r.n} className="border-t border-white/[0.08]">
+                    <td className="py-2 pr-3 text-white/50">{r.n}</td>
+                    {swimCols.map((c) => (
+                      <td
+                        key={c.key}
+                        className={`whitespace-nowrap py-2 pr-3 last:pr-0 ${c.key === "stroke" ? "text-left text-white/60" : "text-right"} ${
+                          c.key === "pace" ? "font-medium text-white" : c.key === "rest" ? "text-white/50" : "text-white/80"
+                        }`}
+                      >
+                        {c.get(r) ?? ""}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-white/45">
+            Pace is per 100 {swimUnit === "YARD" ? "yards" : "meters"} while swimming. Rest is the time until the next rep starts.
+            {swimCols.some((c) => c.key === "swolf") ? " SWOLF is seconds plus strokes per length; lower is more efficient." : ""}
+          </p>
+        </Card>
+      )}
+
+      {!swimSum && laps.length > 1 && lapCols.length > 0 && (
         <Card title="Laps">
           <div className="-mx-2 overflow-x-auto px-2">
             <table className="w-full min-w-[22rem] text-sm tabular-nums">

@@ -243,7 +243,7 @@ export default function PodFeed({
                           {[
                             a.duration_s &&
                               `${Math.round(a.duration_s / 60)} min`,
-                            shortDistance(a.distance_m, units),
+                            shortDistance(a.distance_m, units, a.sport),
                           ]
                             .filter(Boolean)
                             .join(" · ")}
