@@ -107,6 +107,21 @@ function Photo({ m }: { m: Local }) {
   );
 }
 
+/** True when this browser can decode the recording (catches a broken file before it's sent). */
+async function playable(blob: Blob) {
+  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return true; // can't check; send it
+  const ctx = new Ctx();
+  try {
+    await ctx.decodeAudioData(await blob.arrayBuffer());
+    return true;
+  } catch {
+    return false;
+  } finally {
+    void ctx.close();
+  }
+}
+
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 function Voice({ m, mine }: { m: Local; mine: boolean }) {
@@ -130,18 +145,22 @@ function Voice({ m, mine }: { m: Local; mine: boolean }) {
       <button
         type="button"
         onClick={toggle}
-        disabled={!url}
+        disabled={!url || failed}
         aria-label={playing ? "Pause voice note" : "Play voice note"}
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${mine ? "bg-black/20" : "bg-emerald-300/20"} text-white disabled:opacity-50`}
       >
         {playing ? <Pause size={16} /> : <Play size={16} className="translate-x-px" />}
       </button>
+      {failed ? (
+        <span className="flex-1 text-xs text-white/60">Can&apos;t play this voice note</span>
+      ) : (
       <span className="flex h-8 flex-1 items-center gap-[3px]" aria-hidden>
         {bars.map((h, i) => (
           <span key={i} className={`w-[3px] rounded-full ${i / bars.length < progress ? "bg-white" : "bg-white/35"}`} style={{ height: `${h * 100}%` }} />
         ))}
       </span>
-      <span className="w-9 shrink-0 text-right text-xs tabular-nums text-white/70">{failed ? "!" : mmss(playing || at ? at : total)}</span>
+      )}
+      {!failed && <span className="w-9 shrink-0 text-right text-xs tabular-nums text-white/70">{mmss(playing || at ? at : total)}</span>}
       {url && (
         <audio
           ref={audio}
@@ -449,34 +468,50 @@ export default function Thread({
   // ---- voice notes
   const [rec, setRec] = useState<{ started: number; secs: number } | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
   const discard = useRef(false);
   const recTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const recStart = useRef(0);
 
+  const starting = useRef(false);
   async function startRecording() {
+    // One recording at a time: a second tap while the mic permission prompt is up used to start
+    // a second recorder writing into the same buffer, which produced an unplayable file.
+    if (starting.current || recorder.current?.state === "recording") return;
     const mime = recorderMime();
     if (mime === null || !navigator.mediaDevices?.getUserMedia) return show("This browser can't record voice notes.", { ok: false });
+    starting.current = true;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      starting.current = false;
       return show("Microphone access is off. Allow it in your browser settings to send voice notes.", { ok: false });
     }
-    const r = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
-    chunks.current = [];
+    let r: MediaRecorder;
+    try {
+      r = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
+    } catch {
+      stream.getTracks().forEach((t) => t.stop());
+      starting.current = false;
+      return show("This browser can't record voice notes.", { ok: false });
+    }
+    const parts: Blob[] = []; // this recording's own data, never shared with another
     discard.current = false;
-    r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
-    r.onstop = () => {
+    r.ondataavailable = (e) => {
+      if (e.data.size) parts.push(e.data);
+    };
+    r.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
       if (recTimer.current) clearInterval(recTimer.current);
+      if (recorder.current === r) recorder.current = null;
       const started = recStart.current;
       setRec(null);
       if (discard.current) return;
       const seconds = Math.min(VOICE_MAX_S, Math.round((now() - started) / 100) / 10);
       if (seconds < 0.8) return show("Hold on a bit longer to record.", { ok: false });
       const type = baseMime(r.mimeType || mime || "audio/webm");
-      const blob = new Blob(chunks.current, { type });
+      const blob = new Blob(parts, { type });
+      if (!(await playable(blob))) return show("That recording didn't come out. Try again.", { ok: false });
       const id = crypto.randomUUID();
       const m = draft({ id, media_kind: "voice", media_path: `${conv.id}/${id}.${extFor(type)}`, media_meta: { seconds, mime: type }, localUrl: URL.createObjectURL(blob) });
       takeAttach();
@@ -485,7 +520,9 @@ export default function Thread({
     };
     recorder.current = r;
     recStart.current = now();
-    r.start(250);
+    // No timeslice: the browser hands over one complete file when recording stops.
+    r.start();
+    starting.current = false;
     setRec({ started: recStart.current, secs: 0 });
     navigator.vibrate?.(10);
     recTimer.current = setInterval(() => {
