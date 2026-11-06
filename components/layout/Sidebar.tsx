@@ -197,22 +197,30 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
   );
 
   const drawer = (
-    <div className={`fixed inset-0 z-[80] md:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+    <div
+      className={`fixed inset-0 z-[80] md:hidden ${open ? "" : "pointer-events-none"}`}
+      aria-hidden={!open}
+      // Swipe left anywhere (menu or the dimmed page beside it) to close, as soon as the swipe is clear.
+      onTouchStart={(e) => (touch.current = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null)}
+      onTouchMove={(e) => {
+        const t = touch.current;
+        if (!t) return;
+        const dx = e.touches[0].clientX - t.x;
+        const dy = Math.abs(e.touches[0].clientY - t.y);
+        if (dy > 40 && dy > -dx) touch.current = null; // scrolling the menu
+        else if (dx < -40 && -dx > dy * 1.5) {
+          touch.current = null;
+          setOpen(false);
+        }
+      }}
+      onTouchEnd={() => (touch.current = null)}
+    >
       <div className={`absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`} onClick={() => setOpen(false)} />
       <nav
         id="mobile-menu"
         aria-label="Main"
         role="dialog"
         aria-modal="true"
-        onTouchStart={(e) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
-        onTouchEnd={(e) => {
-          const t = touch.current;
-          touch.current = null;
-          if (!t) return;
-          const dx = e.changedTouches[0].clientX - t.x;
-          const dy = e.changedTouches[0].clientY - t.y;
-          if (dx < -60 && Math.abs(dx) > Math.abs(dy)) setOpen(false); // swipe left to close
-        }}
         className={`absolute inset-y-0 left-0 flex w-[min(20rem,82vw)] flex-col overflow-y-auto border-r border-white/10 bg-panel/95 px-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
