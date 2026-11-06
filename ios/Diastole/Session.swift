@@ -11,7 +11,7 @@ final class Session {
     enum State: Equatable {
         case loading
         case signedOut          // show the web sign-in page full screen
-        case signedIn(Role)     // show the tab bar for this role
+        case signedIn(Role)     // show the app for this role
     }
 
     private(set) var state: State = .loading

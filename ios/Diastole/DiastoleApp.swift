@@ -25,7 +25,7 @@ struct RootView: View {
             case .signedOut:
                 SignInScreen()
             case .signedIn(let role):
-                MainTabs(role: role).id(role)
+                MainScreen(role: role).id(role)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: session.state)

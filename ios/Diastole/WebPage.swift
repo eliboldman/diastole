@@ -3,7 +3,7 @@ import UIKit
 import WebKit
 
 /// One web view showing Diastole pages. All pages share the default data store, so they share the
-/// web sign-in. The page knows it's inside the app (html[data-app="ios"]) and hides its own tab bar.
+/// web sign-in. The page knows it's inside the app (html[data-app="ios"]).
 final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     let root: URL
@@ -45,7 +45,7 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     @objc private func pulled() { webView.reload() }
 
-    /// The tab was tapped again: back to this tab's first page, or to the top if already there.
+    /// Back to the first page, or to the top if already there.
     func reselect() {
         if webView.url?.path == root.path {
             webView.evaluateJavaScript("window.scrollTo({ top: 0, behavior: 'smooth' })")
