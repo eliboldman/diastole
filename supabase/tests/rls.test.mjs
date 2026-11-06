@@ -604,7 +604,7 @@ check("the coach is told briefs are ready", (await db.query(`select title from p
 
 // ---------------------------------------------------------------- Phase 9a: fueling mode
 r = await as(A1, `select mode from public.fuel_settings where athlete_id = '${A1}'`);
-check("no fueling row until the coach picks (app defaults to plates)", r.rows?.length === 0);
+check("no fueling row until the coach picks (app defaults to full numbers)", r.rows?.length === 0);
 r = await as(A1, `select public.set_fuel_mode('${A1}', 'full') as e`);
 check("athlete can't change their own fueling mode", !!r.rows?.[0]?.e);
 r = await as(A1, `insert into public.fuel_settings (athlete_id, mode) values ('${A1}', 'full')`);
@@ -621,6 +621,44 @@ r = await as(A2, `select * from public.fuel_settings`);
 check("other athletes can't see it", r.rows?.length === 0);
 r = await as(STRANGER, `select * from public.fuel_settings`);
 check("strangers can't see it", r.rows?.length === 0);
+
+// ---------------------------------------------------------------- Phase 9b: meal logs and body weight
+r = await as(A1, `insert into public.athlete_body (athlete_id, weight_kg) values ('${A1}', 68.5)`);
+check("athlete saves their weight", !r.error);
+r = await as(A1, `insert into public.athlete_body (athlete_id, weight_kg) values ('${A2}', 70)`);
+check("athlete can't set someone else's weight", !!r.error);
+r = await as(A1, `update public.athlete_body set weight_kg = 10 where athlete_id = '${A1}'`);
+check("silly weights are refused", !!r.error);
+r = await as(COACH, `select weight_kg from public.athlete_body where athlete_id = '${A1}'`);
+check("coach reads their athlete's weight", Number(r.rows?.[0]?.weight_kg) === 68.5);
+r = await as(COACH, `update public.athlete_body set weight_kg = 90 where athlete_id = '${A1}'`);
+check("coach can't change the athlete's weight", (await db.query(`select weight_kg from public.athlete_body where athlete_id = '${A1}'`)).rows[0].weight_kg == 68.5);
+r = await as(A2, `select * from public.athlete_body`);
+check("pod mates and other athletes can't see weight", r.rows?.length === 0);
+r = await as(STRANGER, `select * from public.athlete_body`);
+check("strangers can't see weight", r.rows?.length === 0);
+
+r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, label, items, carbs_g, protein_g, fat_g) values ('${A1}', current_date, 'Bowl', '[{"name":"rice"}]', 60, 30, 10) returning id, kcal`);
+check("athlete logs a meal; kcal is computed", !r.error && Number(r.rows?.[0]?.kcal) === 450);
+const MEAL = r.rows?.[0]?.id;
+r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, carbs_g) values ('${A2}', current_date, 10)`);
+check("athlete can't log for someone else", !!r.error);
+r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, kcal) values ('${A1}', current_date, 5)`);
+check("kcal can't be typed in", !!r.error);
+r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, carbs_g) values ('${A1}', current_date, -5)`);
+check("negative amounts are refused", !!r.error);
+r = await as(COACH, `select label from public.meal_logs where id = '${MEAL}'`);
+check("coach reads their athlete's meals", r.rows?.[0]?.label === "Bowl");
+await as(COACH, `delete from public.meal_logs where id = '${MEAL}'`);
+check("coach can't delete an athlete's meal", (await db.query(`select count(*)::int as n from public.meal_logs where id = '${MEAL}'`)).rows[0].n === 1);
+r = await as(A2, `select * from public.meal_logs`);
+check("other athletes can't see meals", r.rows?.length === 0);
+r = await as(STRANGER, `select * from public.meal_logs`);
+check("strangers can't see meals", r.rows?.length === 0);
+await as(A1, `delete from public.meal_logs where id = '${MEAL}'`);
+check("athlete removes their own meal", (await db.query(`select count(*)::int as n from public.meal_logs where id = '${MEAL}'`)).rows[0].n === 0);
+r = await db.query(`select column_default from information_schema.columns where table_name = 'fuel_settings' and column_name = 'mode'`);
+check("new fueling rows default to full numbers", String(r.rows[0]?.column_default).includes("full"));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

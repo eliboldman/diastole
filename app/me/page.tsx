@@ -87,7 +87,7 @@ export default async function MePage() {
         )}
       </section>
 
-      <FuelToday athleteId={me.id} today={today} />
+      <FuelToday athleteId={me.id} today={today} timeZone={me.timezone} />
 
       <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
         <h2 className="text-lg font-medium">Coming up</h2>

@@ -8,7 +8,9 @@ import FormInsights, { type InsightView } from "@/components/coach/FormInsights"
 import RecentCheckins from "@/components/coach/RecentCheckins";
 import ZonesForm from "@/components/coach/ZonesForm";
 import FuelModePicker from "@/components/coach/FuelModePicker";
-import { getFuelMode } from "@/lib/fuel/data";
+import FuelLog from "@/components/fuel/FuelLog";
+import FuelWeek from "@/components/fuel/FuelWeek";
+import { getFuelDays, getFuelMode, getMealDay, getMealWeek } from "@/lib/fuel/data";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { paceOf, shortDistance } from "@/lib/activity/format";
 import { FORM, type FormMetric } from "@/lib/activity/form";
@@ -79,6 +81,10 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
       .limit(20),
     getFuelMode(id),
   ]);
+  const athleteTz = profile.timezone || "America/Chicago";
+  const athleteToday = new Date().toLocaleDateString("en-CA", { timeZone: athleteTz });
+  const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
+  const mealDay = await getMealDay(id, athleteToday, athleteTz, fuelToday.level);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
     return {
@@ -231,6 +237,9 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           <h2 className="text-lg font-medium">Fueling</h2>
           <p className="mb-4 mt-1 text-sm text-white/55">What {(profile.full_name || "this athlete").split(" ")[0]} sees on Fuel and with each workout. Guidance follows their planned training; you can change this anytime.</p>
           <FuelModePicker athleteId={profile.id} firstName={(profile.full_name || "This athlete").split(" ")[0]} mode={fuelMode} />
+          {/* Coach always sees numbers, even when the athlete's mode hides them. */}
+          <FuelLog day={mealDay} mode={fuelMode === "workout" ? "full" : fuelMode} timeZone={athleteTz} units="mi" viewer="coach" firstName={(profile.full_name || "This athlete").split(" ")[0]} />
+          <FuelWeek week={mealWeek} />
         </section>
       </div>
     </DashboardShell>

@@ -64,6 +64,12 @@ export default function PrivacyPage() {
               <strong className="text-white/80">Coaching data:</strong> planned workouts, readiness
               scores we calculate, and notes the coach adds.
             </li>
+            <li>
+              <strong className="text-white/80">Meals and body weight</strong> (only if the athlete logs
+              them): the foods and the carb, protein and fat amounts the athlete confirms, and the body
+              weight they enter to size daily targets. Only the athlete and their coach can see these;
+              they are never shared with pods. Meal photos are not stored.
+            </li>
           </ul>
           <p>
             We collect data from the date an athlete connects onward. For completed outdoor workouts we
@@ -87,6 +93,11 @@ export default function PrivacyPage() {
             data, including running-form measurements like cadence and ground contact time, and to
             suggest training adjustments or drills. Suggestions are reviewed by the coach before
             anything is changed or sent to an athlete. Routes and location are never sent.
+          </p>
+          <p>
+            When an athlete logs a meal, the photo and any description they add are sent to Claude to
+            estimate the foods and amounts, shown back to the athlete to confirm. The photo is shrunk on
+            the athlete&apos;s phone first, used only for that estimate, and never saved by Diastole.
           </p>
         </Section>
 
@@ -132,7 +143,7 @@ export default function PrivacyPage() {
             <li>Supabase: secure database, account sign-in, and private storage for message photos and voice notes.</li>
             <li>Vercel: website hosting.</li>
             <li>OpenFreeMap: map images behind workout routes. Your browser requests the map area being viewed; the route itself is drawn in your browser and never sent to them.</li>
-            <li>Anthropic: AI summaries for the coach, as described above.</li>
+            <li>Anthropic: AI summaries for the coach and meal estimates for athletes, as described above.</li>
           </ul>
           <p>We may disclose data if required by law.</p>
         </Section>

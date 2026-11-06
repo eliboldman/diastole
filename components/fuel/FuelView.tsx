@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { LEVEL_STYLE, sessionLength } from "@/components/fuel/levels";
 import Plate from "@/components/fuel/Plate";
@@ -32,7 +33,7 @@ function Sessions({ day, mode }: { day: FuelDayView; mode: FuelMode }) {
 }
 
 /** The Fuel page body: today's fuel level and plate, fueling around sessions, and the week. */
-export default function FuelView({ mode, days }: { mode: FuelMode; days: FuelDayView[] }) {
+export default function FuelView({ mode, days, log }: { mode: FuelMode; days: FuelDayView[]; log?: ReactNode }) {
   const [day, tomorrow] = days;
   const next = day.workouts.length ? null : days.slice(1).find((d) => d.workouts.length);
   const level = FUEL_DAYS[day.level];
@@ -43,6 +44,8 @@ export default function FuelView({ mode, days }: { mode: FuelMode; days: FuelDay
     <>
       <h1 className="text-4xl font-bold tracking-tight">Fuel</h1>
       <p className="mt-2 text-sm text-white/55">Food follows training: what to eat around today&rsquo;s sessions.</p>
+
+      {log}
 
       {mode !== "workout" && (
         <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">

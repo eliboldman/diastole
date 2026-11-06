@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { setFuelMode } from "@/lib/fuel/actions";
 import { FUEL_MODES, type FuelMode } from "@/lib/fuel/plan";
 
-const ORDER: FuelMode[] = ["plates", "full", "workout"];
+const ORDER: FuelMode[] = ["full", "plates", "workout"];
 
 /** How this athlete sees fueling. Saves as soon as you pick. */
 export default function FuelModePicker({ athleteId, firstName, mode }: { athleteId: string; firstName: string; mode: FuelMode }) {

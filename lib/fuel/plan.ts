@@ -6,11 +6,11 @@ import type { Duration, Pool, Sport, Step, Target } from "../workouts/garmin-for
 
 export type FuelMode = "full" | "plates" | "workout";
 export const FUEL_MODES: Record<FuelMode, { label: string; help: string }> = {
-  plates: { label: "Plate pictures", help: "Workout fueling plus plate pictures and foods, no numbers." },
-  full: { label: "Full numbers", help: "Everything, with grams of carbs and protein and fluid amounts." },
+  full: { label: "Full numbers", help: "Everything: meal logging with carbs, protein and fat, daily rings, grams and fluid amounts." },
+  plates: { label: "Plate pictures", help: "Meal logging and rings without numbers, plus plate pictures and foods." },
   workout: { label: "Workout fueling only", help: "Only before, during and after guidance for workouts." },
 };
-export const DEFAULT_FUEL_MODE: FuelMode = "plates";
+export const DEFAULT_FUEL_MODE: FuelMode = "full";
 export const asFuelMode = (v: unknown): FuelMode => (v === "full" || v === "plates" || v === "workout" ? v : DEFAULT_FUEL_MODE);
 
 export type Zones = { threshold_speed_mps?: number | null; ftp_w?: number | null } | null;
