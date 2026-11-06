@@ -36,6 +36,7 @@ create trigger push_on_refresh after update of created_at on public.notification
   execute function private.push_notification();
 
 -- Sound per notification group, chosen in Me -> Notifications. Missing = the Diastole default.
+-- 'coach' is the sound for anything the athlete's own coach sends (default: duck quack).
 alter table public.profiles add column push_sounds jsonb not null default '{}';
 
 create or replace function public.set_push_sound(p_group text, p_sound text)
@@ -44,8 +45,8 @@ language plpgsql security definer set search_path = ''
 as $$
 begin
   if auth.uid() is null then return 'Sign in first.'; end if;
-  if p_group not in ('props', 'comments', 'messages', 'pods', 'workouts', 'coaching') then return 'Unknown group.'; end if;
-  if p_sound not in ('heartbeat', 'chime', 'pop', 'tone', 'tick', 'default', 'none') then return 'Unknown sound.'; end if;
+  if p_group not in ('coach', 'props', 'comments', 'messages', 'pods', 'workouts', 'coaching') then return 'Unknown group.'; end if;
+  if p_sound not in ('quack', 'heartbeat', 'chime', 'pop', 'tone', 'tick', 'default', 'none') then return 'Unknown sound.'; end if;
   update public.profiles set push_sounds = push_sounds || jsonb_build_object(p_group, p_sound) where id = auth.uid();
   return null;
 end;

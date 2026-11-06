@@ -712,6 +712,8 @@ r = await as(A1, `select public.set_push_sound('messages', 'airhorn') as e`);
 check("unknown sounds are refused", !!r.rows?.[0]?.e);
 r = await as(A1, `select public.set_push_sound('everything', 'pop') as e`);
 check("unknown groups are refused", !!r.rows?.[0]?.e);
+r = await as(A1, `select public.set_push_sound('coach', 'quack') as e`);
+check("set the from-your-coach sound", r.rows?.[0]?.e === null);
 check("sound saved on the profile", (await db.query(`select push_sounds from public.profiles where id = '${A1}'`)).rows[0].push_sounds.messages === "heartbeat");
 
 console.log(`\n${pass} passed, ${fail} failed`);

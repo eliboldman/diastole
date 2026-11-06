@@ -50,6 +50,27 @@ export default function NotifySettings({ initial, coach, sounds: initialSounds =
   };
   return (
     <ul className="grid gap-2">
+      {!coach && (
+        <li className="flex min-h-11 items-center justify-between gap-3 border-b border-white/[0.06] pb-2">
+          <span className="min-w-0 flex-1 text-sm text-white/80">
+            From your coach
+            <span className="block text-xs text-white/45">Messages, workouts and briefs your coach sends</span>
+          </span>
+          <select
+            value={asSound(sounds.coach, "coach")}
+            onChange={(e) => pickSound("coach", e.target.value as SoundId)}
+            disabled={pending}
+            className="min-h-9 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] px-2 text-[16px] text-white/80 sm:text-xs"
+            aria-label="Sound for notifications from your coach"
+          >
+            {SOUNDS.map((x) => (
+              <option key={x.id} value={x.id} className="bg-panel">
+                {x.label}
+              </option>
+            ))}
+          </select>
+        </li>
+      )}
       {GROUPS.filter((g) => !g.coach || coach).map((g) => {
         const on = prefs[g.id] !== false;
         return (

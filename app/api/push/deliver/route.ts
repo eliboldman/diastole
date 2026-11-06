@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { apnsConfigured, isDeadToken, sendPush, type ApnsEnv } from "@/lib/push/apns";
-import { apnsSound, asSound, groupOf } from "@/lib/push/sounds";
+import { apnsSound, asSound, groupOf, soundGroup } from "@/lib/push/sounds";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Pinged by the database when a bell notification is created or refreshed (see migration 20261201).
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!apnsConfigured()) return NextResponse.json({ ok: true, skipped: "not configured" });
 
   const admin = createAdminClient();
-  const { data: n } = await admin.from("notifications").select("id, user_id, kind, title, body, href, meta, created_at, pushed_at, read_at, dismissed_at").eq("id", id).maybeSingle();
+  const { data: n } = await admin.from("notifications").select("id, user_id, actor_id, kind, title, body, href, meta, created_at, pushed_at, read_at, dismissed_at").eq("id", id).maybeSingle();
   if (!n || n.read_at || n.dismissed_at) return NextResponse.json({ ok: true, skipped: "gone" });
   if (Date.now() - new Date(n.created_at).getTime() > FRESH_MS) return NextResponse.json({ ok: true, skipped: "stale" });
   if (n.pushed_at && n.pushed_at >= n.created_at) return NextResponse.json({ ok: true, skipped: "already pushed" });
@@ -33,13 +33,17 @@ export async function POST(request: NextRequest) {
 
   const [{ data: tokens }, { data: profile }, { count: unread }] = await Promise.all([
     admin.from("push_tokens").select("token, environment").eq("user_id", n.user_id).eq("platform", "ios"),
-    admin.from("profiles").select("push_sounds").eq("id", n.user_id).maybeSingle(),
+    admin.from("profiles").select("push_sounds, coach_id").eq("id", n.user_id).maybeSingle(),
     admin.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", n.user_id).is("read_at", null).is("dismissed_at", null),
   ]);
   if (!tokens?.length) return NextResponse.json({ ok: true, skipped: "no devices" });
 
-  const group = groupOf(n.kind, n.meta as Record<string, unknown> | null);
-  const sound = apnsSound(group ? asSound((profile?.push_sounds as Record<string, unknown> | null)?.[group], group) : "tone");
+  const meta = n.meta as Record<string, unknown> | null;
+  const group = groupOf(n.kind, meta);
+  // Anything the athlete's own coach sends (messages, workouts, briefs) plays the coach sound.
+  const fromOwnCoach = Boolean(n.actor_id && profile?.coach_id && n.actor_id === profile.coach_id && n.actor_id !== n.user_id);
+  const sg = soundGroup(n.kind, meta, fromOwnCoach);
+  const sound = apnsSound(sg ? asSound((profile?.push_sounds as Record<string, unknown> | null)?.[sg], sg) : "tone");
   const payload = {
     aps: {
       alert: { title: n.title, ...(n.body ? { body: n.body } : {}) },
