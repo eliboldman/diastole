@@ -1,7 +1,9 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct DiastoleApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session = Session()
 
     var body: some Scene {
@@ -15,6 +17,7 @@ struct DiastoleApp: App {
 
 struct RootView: View {
     @Environment(Session.self) private var session
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -29,6 +32,13 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: session.state)
+        .onChange(of: session.state, initial: true) { _, state in
+            if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut { PushCenter.shared.signedInChanged(false) }
+        }
+        // Opening the app clears the badge; the bell inside shows what's unread.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { UNUserNotificationCenter.current().setBadgeCount(0) }
+        }
     }
 }
 

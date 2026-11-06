@@ -144,6 +144,7 @@ export default function PrivacyPage() {
             <li>Vercel: website hosting.</li>
             <li>OpenFreeMap: map images behind workout routes. Your browser requests the map area being viewed; the route itself is drawn in your browser and never sent to them.</li>
             <li>Anthropic: AI summaries for the coach and meal estimates for athletes, as described above.</li>
+            <li>Apple: push notifications to the Diastole iPhone app, if you allow them. Apple receives the notification&apos;s title and text to deliver it to your phone.</li>
           </ul>
           <p>We may disclose data if required by law.</p>
         </Section>

@@ -15,5 +15,6 @@ struct MainScreen: View {
         WebContainer(page: page)
             .ignoresSafeArea()
             .background(Theme.canvas)
+            .onAppear { PushCenter.shared.attach(page) }
     }
 }

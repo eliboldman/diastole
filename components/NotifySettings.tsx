@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 
-import { setNotifyPrefs, type NotifyPrefs } from "@/lib/activity/actions";
+import { setNotifyPrefs, setPushSound, type NotifyPrefs } from "@/lib/activity/actions";
+import { asSound, SOUNDS, type PushGroup, type SoundId } from "@/lib/push/sounds";
 
 const GROUPS: { id: keyof NotifyPrefs; label: string; coach?: boolean }[] = [
   { id: "messages", label: "Messages" },
@@ -13,9 +14,27 @@ const GROUPS: { id: keyof NotifyPrefs; label: string; coach?: boolean }[] = [
   { id: "coaching", label: "Coaching alerts (suggestions, form, new athletes)", coach: true },
 ];
 
-/** Which notifications reach the bell (and later, your phone). The database skips the ones turned off. */
-export default function NotifySettings({ initial, coach }: { initial: NotifyPrefs; coach: boolean }) {
+/** Which notifications reach the bell and your phone, and the sound each plays in the iPhone app. */
+export default function NotifySettings({ initial, coach, sounds: initialSounds = {} }: { initial: NotifyPrefs; coach: boolean; sounds?: Record<string, unknown> }) {
   const [prefs, setPrefs] = useState(initial);
+  const [sounds, setSounds] = useState(initialSounds);
+  const pickSound = (group: PushGroup, sound: SoundId) => {
+    const before = sounds;
+    setSounds({ ...sounds, [group]: sound });
+    // Preview it (the app plays the same sound on the lock screen).
+    if (sound !== "none" && sound !== "default") {
+      try {
+        void new Audio(`/sounds/${sound}.m4a`).play().catch(() => {});
+      } catch {}
+    }
+    start(async () => {
+      try {
+        await setPushSound(group, sound);
+      } catch {
+        setSounds(before);
+      }
+    });
+  };
   const [pending, start] = useTransition();
   const flip = (id: keyof NotifyPrefs) => {
     const next = { ...prefs, [id]: prefs[id] === false };
@@ -34,8 +53,28 @@ export default function NotifySettings({ initial, coach }: { initial: NotifyPref
       {GROUPS.filter((g) => !g.coach || coach).map((g) => {
         const on = prefs[g.id] !== false;
         return (
-          <li key={g.id} className="flex min-h-11 items-center justify-between gap-3">
-            <span className="text-sm text-white/80">{g.label}</span>
+          <li key={g.id} className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="min-w-0 flex-1 text-sm text-white/80">
+              {g.label}
+              {on && (
+                <label className="mt-1 flex items-center gap-2 text-xs text-white/45">
+                  <span>Sound</span>
+                  <select
+                    value={asSound(sounds[g.id], g.id as PushGroup)}
+                    onChange={(e) => pickSound(g.id as PushGroup, e.target.value as SoundId)}
+                    disabled={pending}
+                    className="min-h-9 rounded-xl border border-white/10 bg-white/[0.06] px-2 text-[16px] text-white/80 sm:text-xs"
+                    aria-label={`Sound for ${g.label}`}
+                  >
+                    {SOUNDS.map((x) => (
+                      <option key={x.id} value={x.id} className="bg-panel">
+                        {x.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </span>
             <button
               type="button"
               role="switch"

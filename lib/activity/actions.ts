@@ -72,3 +72,11 @@ export async function setNotifyPrefs(prefs: NotifyPrefs) {
   const { error } = await supabase.rpc("set_notify_prefs", { p_prefs: prefs });
   if (error) throw new Error("Couldn't save notification settings.");
 }
+
+/** Which sound a group of push notifications plays on the iPhone app. */
+export async function setPushSound(group: string, sound: string) {
+  await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_push_sound", { p_group: group, p_sound: sound });
+  if (error || data) throw new Error((data as string | null) ?? "Couldn't save that sound.");
+}

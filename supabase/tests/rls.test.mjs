@@ -3,7 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 
 const db = new PGlite();
 const migration = readdirSync(new URL("../migrations/", import.meta.url)).sort()
-  .map((f) => readFileSync(new URL(`../migrations/${f}`, import.meta.url), "utf8")).join("\n");
+  .map((f) => readFileSync(new URL(`../migrations/${f}`, import.meta.url), "utf8")).join("\n")
+  // PGlite has no pg_net; a stub below records the pings instead.
+  .replace(/create extension if not exists pg_net[^;]*;/g, "");
 
 // Minimal stand-in for Supabase's auth schema and roles.
 await db.exec(`
@@ -21,6 +23,10 @@ await db.exec(`
   grant usage on schema storage to authenticated;
   grant select, insert, delete on storage.objects to authenticated;
   grant execute on function auth.uid() to authenticated;
+  create schema net;
+  create table net.pings (id bigint generated always as identity, url text, body jsonb);
+  create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
+    returns bigint language sql as $$ insert into net.pings (url, body) values (url, body) returning id $$;
 `);
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
@@ -687,6 +693,26 @@ const snrow = (await db.query(`select status, decided_at from public.safety_note
 check("coach marks it talked about", r.rows?.[0]?.e === null && snrow.status === "talked" && snrow.decided_at !== null);
 r = await as(A1, `select public.notify_safety_note('${SN}')`);
 check("signed-in users can't send safety notifications", !!r.error);
+
+// ---------------------------------------------------------------- push notifications
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+await db.query(`delete from net.pings`);
+await as(A1, `select public.register_push_token('${"a".repeat(64)}', 'ios', 'sandbox', '0.1')`);
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+await db.query(`select private.notify('${A1}', 'message', 'New message', 'hi', '/messages', 'push-test', '{}'::jsonb, '${A2}')`);
+let pings = (await db.query(`select body from net.pings`)).rows;
+check("a new notification pings the push server with only its id", pings.length === 1 && Object.keys(pings[0].body).join() === "id");
+await db.query(`select private.notify('${A1}', 'message', 'New message', 'hi again', '/messages', 'push-test', '{}'::jsonb, '${A2}')`);
+check("a folded repeat (same row refreshed) pings again", (await db.query(`select count(*)::int as n from net.pings`)).rows[0].n === 2);
+await db.query(`select private.notify('${A2}', 'message', 'New message', 'hi', '/messages', null, '{}'::jsonb, '${A1}')`);
+check("no ping for someone without the app", (await db.query(`select count(*)::int as n from net.pings`)).rows[0].n === 2);
+r = await as(A1, `select public.set_push_sound('messages', 'heartbeat') as e`);
+check("set a push sound", r.rows?.[0]?.e === null);
+r = await as(A1, `select public.set_push_sound('messages', 'airhorn') as e`);
+check("unknown sounds are refused", !!r.rows?.[0]?.e);
+r = await as(A1, `select public.set_push_sound('everything', 'pop') as e`);
+check("unknown groups are refused", !!r.rows?.[0]?.e);
+check("sound saved on the profile", (await db.query(`select push_sounds from public.profiles where id = '${A1}'`)).rows[0].push_sounds.messages === "heartbeat");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

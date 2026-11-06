@@ -39,7 +39,7 @@ export default async function AccountPage() {
   const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
@@ -160,8 +160,8 @@ export default async function AccountPage() {
 
           <section className={card}>
             <h2 className="mb-1 text-lg font-medium">Notifications</h2>
-            <p className="mb-3 text-sm text-white/55">Choose what reaches your bell. Clear any notification with a swipe or its ✕.</p>
-            <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} />
+            <p className="mb-3 text-sm text-white/55">Choose what reaches your bell and your phone, and how each sounds in the Diastole app. Pick a sound to hear it.</p>
+            <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} sounds={(profile?.push_sounds ?? {}) as Record<string, unknown>} />
           </section>
         </div>
 

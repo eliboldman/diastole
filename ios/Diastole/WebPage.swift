@@ -77,7 +77,10 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
         decisionHandler(.cancel)
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { refresh.endRefreshing() }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        refresh.endRefreshing()
+        PushCenter.shared.pageLoaded(self)
+    }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
