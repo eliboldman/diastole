@@ -25,7 +25,8 @@
     "test:swim": "node lib/activity/swim.test.ts",
     "test:bests": "node lib/activity/bests.test.ts",
     "test:strain": "node lib/avatar/strain.test.ts",
-    "test:aisteps": "node lib/workouts/ai-steps.test.ts"
+    "test:aisteps": "node lib/workouts/ai-steps.test.ts",
+    "test:fuel": "node lib/fuel/plan.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",

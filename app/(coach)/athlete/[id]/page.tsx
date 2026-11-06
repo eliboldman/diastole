@@ -7,6 +7,8 @@ import WorkoutList from "@/components/coach/WorkoutList";
 import FormInsights, { type InsightView } from "@/components/coach/FormInsights";
 import RecentCheckins from "@/components/coach/RecentCheckins";
 import ZonesForm from "@/components/coach/ZonesForm";
+import FuelModePicker from "@/components/coach/FuelModePicker";
+import { getFuelMode } from "@/lib/fuel/data";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { paceOf, shortDistance } from "@/lib/activity/format";
 import { FORM, type FormMetric } from "@/lib/activity/form";
@@ -59,7 +61,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   const me = await requireCoach();
   const supabase = await createClient();
-  const [{ data: zones }, { data: recentMax }, { data: insightRows }] = await Promise.all([
+  const [{ data: zones }, { data: recentMax }, { data: insightRows }, fuelMode] = await Promise.all([
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", id).maybeSingle(),
     supabase
       .from("activities")
@@ -75,6 +77,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
       .gte("created_at", daysBackIso(60))
       .order("created_at", { ascending: false })
       .limit(20),
+    getFuelMode(id),
   ]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
@@ -222,6 +225,12 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             thresholdHr={zones?.threshold_hr ?? null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
+        </section>
+
+        <section id="fuel" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Fueling</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">What {(profile.full_name || "this athlete").split(" ")[0]} sees on Fuel and with each workout. Guidance follows their planned training; you can change this anytime.</p>
+          <FuelModePicker athleteId={profile.id} firstName={(profile.full_name || "This athlete").split(" ")[0]} mode={fuelMode} />
         </section>
       </div>
     </DashboardShell>

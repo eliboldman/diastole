@@ -602,5 +602,25 @@ await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false)
 await db.query(`select public.notify_briefs_ready('${COACH}', 2, current_date)`);
 check("the coach is told briefs are ready", (await db.query(`select title from public.notifications where user_id = '${COACH}' and kind = 'briefs_ready'`)).rows[0]?.title === "2 morning briefs are ready");
 
+// ---------------------------------------------------------------- Phase 9a: fueling mode
+r = await as(A1, `select mode from public.fuel_settings where athlete_id = '${A1}'`);
+check("no fueling row until the coach picks (app defaults to plates)", r.rows?.length === 0);
+r = await as(A1, `select public.set_fuel_mode('${A1}', 'full') as e`);
+check("athlete can't change their own fueling mode", !!r.rows?.[0]?.e);
+r = await as(A1, `insert into public.fuel_settings (athlete_id, mode) values ('${A1}', 'full')`);
+check("athlete can't write fueling settings directly", !!r.error);
+r = await as(STRANGER, `select public.set_fuel_mode('${A1}', 'full') as e`);
+check("a stranger can't change someone's fueling mode", !!r.rows?.[0]?.e);
+r = await as(COACH, `select public.set_fuel_mode('${A1}', 'workout') as e`);
+check("coach sets an athlete's fueling mode", !r.error && r.rows?.[0]?.e === null);
+r = await as(COACH, `select public.set_fuel_mode('${A1}', 'bogus') as e`);
+check("unknown modes are refused", !!r.rows?.[0]?.e);
+r = await as(A1, `select mode from public.fuel_settings where athlete_id = '${A1}'`);
+check("athlete reads their mode", r.rows?.[0]?.mode === "workout");
+r = await as(A2, `select * from public.fuel_settings`);
+check("other athletes can't see it", r.rows?.length === 0);
+r = await as(STRANGER, `select * from public.fuel_settings`);
+check("strangers can't see it", r.rows?.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

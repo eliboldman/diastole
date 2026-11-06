@@ -5,6 +5,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
+import FuelToday from "@/components/fuel/FuelToday";
 import AthleteShell from "@/components/AthleteShell";
 import { FlagBadge, FlagRow } from "@/components/coach/Flags";
 import { RespondToInvite } from "@/components/PodButtons";
@@ -85,6 +86,8 @@ export default async function MePage() {
           </div>
         )}
       </section>
+
+      <FuelToday athleteId={me.id} today={today} />
 
       <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
         <h2 className="text-lg font-medium">Coming up</h2>

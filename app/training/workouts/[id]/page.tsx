@@ -3,10 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import SessionFuel from "@/components/fuel/SessionFuel";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
+import { getFuelMode } from "@/lib/fuel/data";
+import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
@@ -29,9 +32,14 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
     supabase.from("activities").select("id, name, sport").eq("planned_workout_id", id).limit(1).maybeSingle(),
   ]);
   if (!w) notFound();
+  const [{ data: zones }, mode] = await Promise.all([
+    supabase.from("athlete_zones").select("threshold_speed_mps, ftp_w").eq("athlete_id", w.athlete_id).maybeSingle(),
+    getFuelMode(w.athlete_id),
+  ]);
 
   const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
   const lines = describe(w.steps as Step[], me.units, pool, w.sport === "swim");
+  const session = estimateSession(w.steps as Step[], w.sport, zones, pool);
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
@@ -83,6 +91,16 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         </ol>
         <p className="mt-4 text-xs text-white/45">On your watch after it syncs. Training guidance from your coach, not medical advice.</p>
       </section>
+
+      {!done && (
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+          <h2 className="text-lg font-medium">Fueling</h2>
+          <div className="mt-3">
+            <SessionFuel session={session} mode={mode} />
+          </div>
+          <p className="mt-4 text-xs text-white/45">{FUEL_DISCLAIMER}</p>
+        </section>
+      )}
 
       <WorkoutMessages workoutId={w.id} me={me.id} names={{}} />
     </DashboardShell>
