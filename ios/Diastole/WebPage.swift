@@ -8,6 +8,8 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     let root: URL
     private let refresh = UIRefreshControl()
+    /// window.webkit.messageHandlers.diastole: requests from Diastole's own pages (Apple Health connect/sync).
+    private let bridge = PageBridge()
 
     init(root: URL) {
         self.root = root
@@ -19,6 +21,7 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
         config.userContentController.addUserScript(
             WKUserScript(source: "document.documentElement.dataset.app = 'ios';", injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
+        config.userContentController.add(bridge, name: "diastole")
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
 
@@ -80,6 +83,7 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh.endRefreshing()
         PushCenter.shared.pageLoaded(self)
+        HealthSync.shared.maybeSync(self)
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
@@ -141,4 +145,14 @@ struct WebContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
+/// Messages from the page. Held weakly by nobody else, so the web view doesn't keep its page alive.
+final class PageBridge: NSObject, WKScriptMessageHandler {
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        // Only Diastole's own top-level pages may ask.
+        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == AppConfig.baseURL.host(),
+              let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        HealthSync.shared.handle(type)
+    }
 }

@@ -724,5 +724,16 @@ await as(A1, `select public.mark_welcomed()`);
 check("finishing the welcome tour is remembered", !!(await db.query(`select welcomed_at from public.profiles where id = '${A1}'`)).rows[0].welcomed_at);
 check("it only marks your own profile", !(await db.query(`select welcomed_at from public.profiles where id = '${A2}'`)).rows[0].welcomed_at);
 
+// Apple Watch: the iPhone app confirms what it scheduled or removed, for the signed-in athlete only.
+const AW = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at) values ('${A1}', '${COACH}', '2026-12-01', 'run', 'Apple run', 'approved', now()) returning id`)).rows[0].id;
+const AW2 = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at) values ('${A2}', '${COACH}', '2026-12-01', 'run', 'Not yours', 'approved', now()) returning id`)).rows[0].id;
+const AWD = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, deleted_at, removal_status) values ('${A1}', '${COACH}', '2026-12-02', 'run', 'Removed', 'sent', now(), now(), 'pending_sync') returning id`)).rows[0].id;
+r = await as(A1, `select public.apple_ack_workouts(array['${AW}', '${AW2}']::uuid[], array['${AWD}']::uuid[])`);
+check("apple ack runs", !r.error);
+const aw = (await db.query(`select id, status, external_id, removal_status from public.planned_workouts where id in ('${AW}', '${AW2}', '${AWD}')`)).rows;
+check("acked workout is marked on the watch", aw.find((x) => x.id === AW)?.status === "sent" && aw.find((x) => x.id === AW)?.external_id === `apple:${AW}`);
+check("another athlete's workout is untouched", aw.find((x) => x.id === AW2)?.status === "approved");
+check("acked removal is confirmed", aw.find((x) => x.id === AWD)?.removal_status === "removed");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

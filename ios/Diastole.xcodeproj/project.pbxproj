@@ -194,8 +194,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Diastole;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Diastole reads your workouts, heart rate variability, resting heart rate and sleep from Apple Health so your coach can see how you're recovering.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Diastole puts workouts from your coach in the Workout app on your Apple Watch.";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Diastole uses the camera so you can send photos to your coach and pod.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Diastole uses the microphone to record voice notes in Messages.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -230,8 +232,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Diastole;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Diastole reads your workouts, heart rate variability, resting heart rate and sleep from Apple Health so your coach can see how you're recovering.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Diastole puts workouts from your coach in the Workout app on your Apple Watch.";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Diastole uses the camera so you can send photos to your coach and pod.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Diastole uses the microphone to record voice notes in Messages.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

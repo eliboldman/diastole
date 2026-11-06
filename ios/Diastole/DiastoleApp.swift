@@ -33,11 +33,17 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: session.state)
         .onChange(of: session.state, initial: true) { _, state in
-            if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut { PushCenter.shared.signedInChanged(false) }
+            if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut {
+                PushCenter.shared.signedInChanged(false)
+                HealthSync.shared.signedOut()
+            }
         }
         // Opening the app clears the badge; the bell inside shows what's unread.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { UNUserNotificationCenter.current().setBadgeCount(0) }
+            if phase == .active {
+                UNUserNotificationCenter.current().setBadgeCount(0)
+                HealthSync.shared.maybeSync()
+            }
         }
     }
 }

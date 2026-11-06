@@ -1,5 +1,6 @@
 "use server";
 
+import { sendToApple } from "@/lib/apple/send";
 import { revalidatePath } from "next/cache";
 
 import { sendWorkoutToGarmin } from "@/lib/garmin/training";
@@ -111,7 +112,9 @@ export async function deliver(workoutId: string, athleteId: string): Promise<Act
     }
   }
   if (device?.source === "apple") {
-    return { ok: true, id: workoutId, message: "Approved. The athlete's iPhone app will pick it up." };
+    const failed = await sendToApple(supabase, workoutId);
+    if (failed) return { ok: false, error: failed };
+    return { ok: true, id: workoutId, message: "Sent. It goes on their Apple Watch the next time they open the Diastole app." };
   }
   return { ok: true, id: workoutId, message: "Approved. The athlete has no device connected yet." };
 }

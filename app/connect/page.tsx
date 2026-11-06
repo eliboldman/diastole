@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import AppleConnect from "@/components/AppleConnect";
 import OnboardingProgress from "@/components/OnboardingProgress";
 import AthleteShell from "@/components/AthleteShell";
 import PublicShell from "@/components/PublicShell";
@@ -183,12 +184,9 @@ export default async function ConnectPage({
           <DeviceCard
             title="Apple Watch"
             connected={connected.has("apple")}
-            body="Install the Diastole iPhone app, sign in with this same email, and allow access to Health data."
-            action={
-              <span className={`${buttonClass} pointer-events-none opacity-40`}>
-                iPhone app coming soon
-              </span>
-            }
+            body="In the Diastole iPhone app, tap Connect and allow Apple Health access. Your workouts, sleep, HRV and resting heart rate sync each time you open the app, and workouts from your coach show up in the Workout app on your watch."
+            disconnect={<AppleConnect connected garmin={connected.has("garmin")} />}
+            action={<AppleConnect connected={false} garmin={connected.has("garmin")} />}
           />
         </div>
 

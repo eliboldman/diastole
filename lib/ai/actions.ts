@@ -1,5 +1,6 @@
 "use server";
 
+import { sendToApple } from "@/lib/apple/send";
 import { revalidatePath } from "next/cache";
 
 import { runCoachAssistant, type AiModel, AI_MODELS } from "@/lib/ai/coach";
@@ -73,14 +74,10 @@ export async function approveSuggestion(id: string): Promise<AiResult> {
       } catch (e) {
         notes.push(`New session saved, but sending to Garmin failed: ${(e as Error).message}`);
       }
-    } else
-      notes.push(
-        isTest
-          ? "Test athlete: new session saved, nothing sent to any watch."
-          : device?.source === "apple"
-            ? "New session waiting for the iPhone app."
-            : "New session saved (no device yet).",
-      );
+    } else if (device?.source === "apple") {
+      const failed = await sendToApple(supabase, created.id);
+      notes.push(failed ?? "New session sent; it goes on their Apple Watch when they next open the Diastole app.");
+    } else notes.push(isTest ? "Test athlete: new session saved, nothing sent to any watch." : "New session saved (no device yet).");
   }
 
   // 2. Then remove the planned session it replaces (rest / replace / easier swap), from the schedule and the watch,
