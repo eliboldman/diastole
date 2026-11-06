@@ -20,7 +20,8 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods)(\/|$)|^\/activity\// },
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
-    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log)(\/|$)/ },
+    // A coach's own athlete pages (day, training, fuel) live under Me.
+    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log|training|fuel)(\/|$)/ },
   ],
   athlete: [
     { label: "Today", href: "/me", icon: Sun, match: /^\/me$/ },
@@ -38,6 +39,9 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
     { label: "Pods", href: "/pods", icon: Orbit },
+    { label: "My day", href: "/me", icon: Sun },
+    { label: "My training", href: "/training", icon: Dumbbell },
+    { label: "My fuel", href: "/fuel", icon: Utensils },
   ],
   athlete: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },

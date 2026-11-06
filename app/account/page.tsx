@@ -72,6 +72,28 @@ export default async function AccountPage() {
         <ChevronRight size={18} className="shrink-0 text-emerald-200" aria-hidden />
       </Link>
 
+      {/* Coaches train too: everything an athlete has, one tap away, without a second account */}
+      {isCoach && (
+        <section className={`${card} mt-6`}>
+          <h2 className="mb-1 text-lg font-medium">Your own training</h2>
+          <p className="mb-4 text-sm text-white/55">Everything your athletes see, for you.</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Row href="/me" sub="Readiness, next workouts, check-ins">
+              My day
+            </Row>
+            <Row href="/training" sub="Your planned and past workouts">
+              My training
+            </Row>
+            <Row href="/fuel" sub="Workout fueling and fuel days">
+              My fuel
+            </Row>
+            <Row href="/me/pods" sub="Pods you train in">
+              My pods
+            </Row>
+          </div>
+        </section>
+      )}
+
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className={card}>
           <h2 className="mb-4 text-lg font-medium">Profile</h2>
@@ -158,10 +180,7 @@ export default async function AccountPage() {
         {isCoach && (
           <section className={`${card} lg:col-span-2`}>
             <h2 className="mb-4 text-lg font-medium">Coach tools</h2>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <Row href="/me" sub="You're also an athlete on your roster">
-                My athlete view
-              </Row>
+            <div className="grid gap-2 sm:grid-cols-2">
               <Row href="/garmin-log" sub="Every push Garmin sends">
                 Garmin deliveries
               </Row>
