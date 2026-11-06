@@ -1,9 +1,9 @@
 "use client";
 
-import { BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -123,6 +123,39 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const router = useRouter();
+  const [inApp, setInApp] = useState(false);
+
+  // In the iPhone app (not Safari, where this swipe means "back"): swiping right from the left edge opens the menu.
+  useEffect(() => {
+    if (document.documentElement.dataset.app !== "ios") return;
+    const t = setTimeout(() => setInApp(true), 0);
+    let start: { x: number; y: number } | null = null;
+    const down = (e: TouchEvent) => {
+      const p = e.touches[0];
+      start = e.touches.length === 1 && p.clientX <= 28 ? { x: p.clientX, y: p.clientY } : null;
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      const dx = e.touches[0].clientX - start.x;
+      const dy = Math.abs(e.touches[0].clientY - start.y);
+      if (dy > 40 && dy > dx) start = null; // a scroll, not a swipe
+      else if (dx > 50 && dx > dy * 1.5) {
+        start = null;
+        setOpen(true);
+      }
+    };
+    const up = () => (start = null);
+    document.addEventListener("touchstart", down, { passive: true });
+    document.addEventListener("touchmove", move, { passive: true });
+    document.addEventListener("touchend", up, { passive: true });
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("touchstart", down);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
+    };
+  }, []);
 
   // Portal target exists only in the browser; deferred so it isn't a synchronous effect update.
   useEffect(() => {
@@ -189,6 +222,19 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
           <Image src="/logo.png" alt="" width={30} height={30} className="rounded-lg" />
           <span className="font-semibold">Diastole</span>
         </Link>
+        {/* The app uses the edge swipe for this menu, so going back lives here instead. */}
+        {inApp && (
+          <button
+            tabIndex={open ? 0 : -1}
+            onClick={() => {
+              setOpen(false);
+              router.back();
+            }}
+            className="mb-2 flex min-h-12 w-full items-center gap-4 rounded-2xl border border-white/10 px-4 text-[15px] text-white/80 transition active:scale-[0.98]"
+          >
+            <ArrowLeft size={19} /> Back
+          </button>
+        )}
         <div className="space-y-1">{items.map((item) => link(item, isActive(pathname, item)))}</div>
         {shortcuts.length > 0 && (
           <>

@@ -24,7 +24,8 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = true
+        // The left-edge swipe opens the page menu (handled by the page), so no swipe-back here; the menu has Back.
+        webView.allowsBackForwardNavigationGestures = false
         webView.allowsLinkPreview = false
         webView.isOpaque = false
         webView.backgroundColor = Theme.canvasUI
