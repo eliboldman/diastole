@@ -73,7 +73,7 @@ export function buildMetricCards(o: { zones: Zone[]; days: Day[]; acts: Act[]; u
       history: [...pts].reverse().slice(0, 30).map((p) => ({ date: short(p.t, o.timeZone), text: `${Math.round(p.v)} ${unit}` })),
     } satisfies MetricCard;
   };
-  const vo2 = o.days.filter((d) => d.vo2_max !== null);
+  const vo2 = o.days.filter((d) => d.vo2_max != null);
   cards.push(
     vo2.length
       ? {
