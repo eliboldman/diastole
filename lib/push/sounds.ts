@@ -1,12 +1,13 @@
 // Push sounds (original Diastole sounds bundled in the iPhone app as .caf, previews on the web as .m4a).
 // Pure module so both the settings page and the server use the same list.
 
-export type SoundId = "quack" | "heartbeat" | "chime" | "pop" | "tone" | "tick" | "default" | "none";
+export type SoundId = "quack" | "walker" | "heartbeat" | "chime" | "pop" | "tone" | "tick" | "default" | "none";
 // "coach" isn't a notification group: it's the sound for anything the athlete's own coach sends.
 export type PushGroup = "coach" | "messages" | "comments" | "props" | "workouts" | "pods" | "coaching";
 
 export const SOUNDS: { id: SoundId; label: string }[] = [
   { id: "quack", label: "Duck quack" },
+  { id: "walker", label: "Walker" },
   { id: "heartbeat", label: "Heartbeat" },
   { id: "chime", label: "Chime" },
   { id: "pop", label: "Pop" },

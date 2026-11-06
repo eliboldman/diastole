@@ -716,5 +716,8 @@ r = await as(A1, `select public.set_push_sound('coach', 'quack') as e`);
 check("set the from-your-coach sound", r.rows?.[0]?.e === null);
 check("sound saved on the profile", (await db.query(`select push_sounds from public.profiles where id = '${A1}'`)).rows[0].push_sounds.messages === "heartbeat");
 
+r = await as(A1, `select public.set_push_sound('pods', 'walker') as e`);
+check("the recorded Walker sound can be picked", r.rows?.[0]?.e === null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
