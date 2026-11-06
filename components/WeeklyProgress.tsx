@@ -23,24 +23,29 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
   const sunday = new Date(monday.getTime() + 6 * DAY).toISOString().slice(0, 10);
   const fourWeeksAgo = new Date(monday.getTime() - 28 * DAY).toISOString();
   const [{ data: acts }, { data: planned }, { data: recentWins }] = await Promise.all([
-    supabase.from("activities").select("start_time, duration_s").eq("athlete_id", athleteId).gte("start_time", fourWeeksAgo),
+    supabase.from("activities").select("start_time, duration_s, planned_workout_id").eq("athlete_id", athleteId).gte("start_time", fourWeeksAgo),
     supabase
       .from("planned_workouts")
       .select("id")
       .eq("athlete_id", athleteId)
       .gte("scheduled_date", mondayIso.slice(0, 10))
       .lte("scheduled_date", sunday)
-      .neq("status", "draft")
+      .not("status", "in", "(draft,skipped)")
       .is("deleted_at", null),
     supabase.from("achievements").select("id, key, value, achieved_at, activity_id").eq("athlete_id", athleteId).gte("achieved_at", ago(7 * DAY)),
   ]);
   const real = (acts ?? []).filter((a) => (a.duration_s ?? 0) >= 300);
   const thisWeek = real.filter((a) => a.start_time >= mondayIso);
   const before = real.filter((a) => a.start_time < mondayIso);
-  const usual = Math.round(before.length / 4);
-  const target = Math.max(1, planned?.length || usual || 3);
-  const done = thisWeek.length;
   const hours = thisWeek.reduce((t, a) => t + (a.duration_s ?? 0), 0) / 3600;
+  // With a plan: planned sessions done out of planned (anything else is "extra").
+  // Without one: all workouts against the athlete's usual week.
+  const plannedIds = new Set((planned ?? []).map((p) => p.id));
+  const hasPlan = plannedIds.size > 0;
+  const plannedDone = new Set(thisWeek.map((a) => a.planned_workout_id).filter((id): id is string => !!id && plannedIds.has(id))).size;
+  const done = hasPlan ? plannedDone : thisWeek.length;
+  const extra = hasPlan ? thisWeek.filter((a) => !a.planned_workout_id || !plannedIds.has(a.planned_workout_id)).length : 0;
+  const target = hasPlan ? plannedIds.size : Math.max(1, Math.round(before.length / 4) || 3);
   const pct = Math.min(1, done / target);
 
   // Celebrate real improvements only (a first-ever value is a baseline, not a milestone).
@@ -65,7 +70,7 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
     <>
       <Celebrate moments={moments} />
       <section className="row-in mt-6 flex items-center gap-5 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
-        <svg viewBox="0 0 80 80" className="h-20 w-20 shrink-0 -rotate-90" role="img" aria-label={`${done} of ${target} workouts this week`}>
+        <svg viewBox="0 0 80 80" className="h-20 w-20 shrink-0 -rotate-90" role="img" aria-label={hasPlan ? `${done} of ${target} planned workouts done this week` : `${done} workouts this week, usual week about ${target}`}>
           <circle cx="40" cy="40" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
           <circle
             cx="40"
@@ -82,11 +87,15 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
         </svg>
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.15em] text-white/50">This week</p>
-          <p className="mt-0.5 text-2xl font-semibold tabular-nums">{`${done} of ${target}`}</p>
+          <p className="mt-0.5 text-2xl font-semibold tabular-nums">{hasPlan ? `${done} of ${target} planned` : `${done} workout${done === 1 ? "" : "s"}`}</p>
           <p className="text-sm text-white/55">
-            {pct >= 1
-              ? `Week done. ${hours.toFixed(1)} h of training.`
-              : `${planned?.length ? "planned workouts" : "workouts, like a usual week"} · ${hours.toFixed(1)} h so far`}
+            {[
+              hasPlan ? (pct >= 1 ? "Plan done" : null) : `usual week is about ${target}`,
+              extra ? `+ ${extra} other activit${extra === 1 ? "y" : "ies"}` : null,
+              `${hours.toFixed(1)} h${pct >= 1 || !hasPlan ? "" : " so far"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </section>

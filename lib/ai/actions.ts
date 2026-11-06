@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { runCoachAssistant, type AiModel, AI_MODELS } from "@/lib/ai/coach";
-import { removeWorkoutFromGarmin, sendWorkoutToGarmin } from "@/lib/garmin/training";
+import { sendWorkoutToGarmin } from "@/lib/garmin/training";
 import { createClient, requireCoach } from "@/lib/supabase/server";
+import { retireWorkout } from "@/lib/workouts/retire";
 import type { Sport, Step } from "@/lib/workouts/garmin-format";
 
 export type AiResult = { ok: true; message: string; redirectTo?: string } | { ok: false; error: string };
@@ -44,23 +45,7 @@ export async function approveSuggestion(id: string): Promise<AiResult> {
   const isTest = Boolean(athlete?.is_test);
   const device = isTest ? null : realDevice;
 
-  // 1. Retire the planned session it replaces (rest / replace / easier swap).
-  if (s.target_workout_id && s.action !== "keep") {
-    const { data: old } = await supabase.from("planned_workouts").select("id, status, external_id").eq("id", s.target_workout_id).maybeSingle();
-    if (old && old.status !== "skipped") {
-      if (old.external_id && device?.source === "garmin") {
-        try {
-          await removeWorkoutFromGarmin(old.id);
-          notes.push("Removed the original session from Garmin.");
-        } catch (e) {
-          return { ok: false, error: (e as Error).message };
-        }
-      }
-      await supabase.from("planned_workouts").update({ status: "skipped" }).eq("id", old.id);
-    }
-  }
-
-  // 2. Create and deliver the proposed session, if any.
+  // 1. Create and deliver the proposed session, if any.
   let resultId: string | null = null;
   const w = s.proposed_workout as ProposedWorkout | null;
   if (w && s.action !== "keep" && s.action !== "rest") {
@@ -96,6 +81,18 @@ export async function approveSuggestion(id: string): Promise<AiResult> {
             ? "New session waiting for the iPhone app."
             : "New session saved (no device yet).",
       );
+  }
+
+  // 2. Then remove the planned session it replaces (rest / replace / easier swap), from the schedule and the watch,
+  //    so the athlete never sees both. It goes to "Recently removed", where it can be restored.
+  if (s.target_workout_id && s.action !== "keep") {
+    if (isTest) {
+      await supabase.from("planned_workouts").update({ deleted_at: new Date().toISOString(), removal_status: "removed" }).eq("id", s.target_workout_id).is("deleted_at", null);
+    } else {
+      const r = await retireWorkout(supabase, s.target_workout_id);
+      if (r.ok) notes.push("Removed the original session.");
+      else if (r.athleteId) notes.push(`Removed the original session here, but not from the watch yet: ${r.error} Retry from “Recently removed”.`);
+    }
   }
 
   await supabase

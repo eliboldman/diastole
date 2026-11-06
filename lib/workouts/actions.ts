@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { removeWorkoutFromGarmin, resendWorkoutToGarmin } from "@/lib/garmin/training";
+import { resendWorkoutToGarmin } from "@/lib/garmin/training";
+import { removeFromDevice, retireWorkout } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts/adjust";
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
@@ -145,39 +146,10 @@ function guessType(title: string) {
 
 // ---------------------------------------------------------------- delete / undo
 
-async function removeFromDevice(supabase: Supa, w: WorkoutRow) {
-  const device = await deviceOf(supabase, w.athlete_id);
-  if (w.status === "draft" || !device) return { removal_status: "removed", removal_error: null };
-  if (device === "garmin") {
-    if (!w.external_id) return { removal_status: "removed", removal_error: null };
-    try {
-      await removeWorkoutFromGarmin(w.id);
-      return { removal_status: "pending_sync", removal_error: null };
-    } catch (e) {
-      return { removal_status: "failed", removal_error: (e as Error).message.slice(0, 300) };
-    }
-  }
-  // Apple: the iOS app removes it from WorkoutKit on its next sync and marks it 'removed'.
-  return { removal_status: "pending_sync", removal_error: null };
-}
-
-async function deleteOne(supabase: Supa, id: string): Promise<{ ok: boolean; athleteId?: string; error?: string }> {
-  const w = await load(supabase, id);
-  if (!w) return { ok: false, error: "Workout not found." };
-  if (w.deleted_at) return { ok: true, athleteId: w.athlete_id };
-  const { error } = await supabase.from("planned_workouts").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) return { ok: false, error: error.message };
-  const removal = await removeFromDevice(supabase, w);
-  await supabase.from("planned_workouts").update(removal).eq("id", id);
-  return removal.removal_status === "failed"
-    ? { ok: false, athleteId: w.athlete_id, error: removal.removal_error ?? "Device removal failed." }
-    : { ok: true, athleteId: w.athlete_id };
-}
-
 export async function deleteWorkout(id: string): Promise<Result> {
   await requireCoach();
   const supabase = await createClient();
-  const r = await deleteOne(supabase, id);
+  const r = await retireWorkout(supabase, id);
   refresh(r.athleteId, id);
   if (!r.ok && !r.athleteId) return { ok: false, error: r.error ?? "Couldn't delete." };
   return r.ok
@@ -193,7 +165,7 @@ export async function deleteWorkouts(ids: string[]): Promise<Result> {
   let failed = 0;
   const athletes = new Set<string>();
   for (const id of ids) {
-    const r = await deleteOne(supabase, id);
+    const r = await retireWorkout(supabase, id);
     if (r.athleteId) athletes.add(r.athleteId);
     if (!r.ok) failed += 1;
   }

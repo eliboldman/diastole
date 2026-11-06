@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { sendWorkoutToGarmin } from "@/lib/garmin/training";
 import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
+import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 
@@ -83,7 +84,11 @@ export async function approveAndSend(input: WorkoutInput): Promise<ActionResult>
     .eq("status", "draft");
   if (error) return { ok: false, error: error.message };
 
-  return deliver(saved.id, input.athleteId);
+  // An edited AI suggestion replaces a session: take the old one off the schedule and the watch.
+  const sent = await deliver(saved.id, input.athleteId);
+  const replaced = await retireReplacedBy(supabase, saved.id);
+  if (replaced) revalidatePath("/workouts");
+  return sent.ok && replaced ? { ...sent, message: `${sent.message ?? ""} ${replaced}`.trim() } : sent;
 }
 
 /** Send (or retry sending) an already-approved workout. */
