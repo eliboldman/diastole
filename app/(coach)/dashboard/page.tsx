@@ -18,6 +18,7 @@ import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, type Units } from "@/lib/activity/format";
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import MorningBriefs from "@/components/coach/MorningBriefs";
+import SafetyNotes from "@/components/coach/SafetyNotes";
 import WeeklyProgress from "@/components/WeeklyProgress";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
@@ -97,6 +98,7 @@ export default async function TodayPage() {
       {/* The coach trains too: their own post-workout check */}
       <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
       <CheckinPrompt athleteId={coach.id} />
+      <SafetyNotes />
       <MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} />
       <QuickLinks
         links={[

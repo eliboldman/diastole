@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { draftMorningBriefs } from "@/lib/ai/briefs";
 import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
+import { runSafetyNet } from "@/lib/fuel/safety-run";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Vercel Cron calls this once each morning (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
     results[`${c.id}:briefs`] = await draftMorningBriefs(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Form insights only call Claude when a new pattern shows up across several runs.
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // Private fueling safety net: rules only, coach-only notes.
+    results[`${c.id}:safety`] = await runSafetyNet(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   }
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;

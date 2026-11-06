@@ -660,5 +660,33 @@ check("athlete removes their own meal", (await db.query(`select count(*)::int as
 r = await db.query(`select column_default from information_schema.columns where table_name = 'fuel_settings' and column_name = 'mode'`);
 check("new fueling rows default to full numbers", String(r.rows[0]?.column_default).includes("full"));
 
+// ---------------------------------------------------------------- Phase 9c: private safety notes
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+const SN = (await db.query(`insert into public.safety_notes (coach_id, athlete_id, created_on, updated_on, signals, signal_count, summary) values ('${COACH}', '${A1}', current_date, current_date, '{}', 2, 'Logged intake about 60% of target') returning id`)).rows[0].id;
+await db.query(`select public.notify_safety_note('${SN}')`);
+check("the coach gets a private bell note", (await db.query(`select title from public.notifications where user_id = '${COACH}' and kind = 'safety_note'`)).rows[0]?.title?.startsWith("A private fueling note about"));
+check("the athlete gets no notification about it", (await db.query(`select count(*)::int as n from public.notifications where user_id = '${A1}' and kind = 'safety_note'`)).rows[0].n === 0);
+r = await as(A1, `select * from public.safety_notes`);
+check("the athlete can never read notes about them", r.rows?.length === 0);
+r = await as(A2, `select * from public.safety_notes`);
+check("other athletes and pod mates can't read them", r.rows?.length === 0);
+r = await as(STRANGER, `select * from public.safety_notes`);
+check("strangers can't read them", r.rows?.length === 0);
+r = await as(COACH, `select summary from public.safety_notes where id = '${SN}'`);
+check("their coach reads the note", r.rows?.[0]?.summary === "Logged intake about 60% of target");
+r = await as(COACH, `insert into public.safety_notes (coach_id, athlete_id, created_on, updated_on, signals, signal_count, summary) values ('${COACH}', '${A1}', current_date + 1, current_date + 1, '{}', 2, 'x')`);
+check("only the morning job writes notes", !!r.error);
+r = await as(A1, `select public.decide_safety_note('${SN}', 'dismissed') as e`);
+check("the athlete can't dismiss a note", !!r.rows?.[0]?.e);
+r = await as(STRANGER, `select public.decide_safety_note('${SN}', 'dismissed') as e`);
+check("a stranger can't dismiss a note", !!r.rows?.[0]?.e);
+r = await as(COACH, `select public.decide_safety_note('${SN}', 'deleted') as e`);
+check("only talked or dismissed", !!r.rows?.[0]?.e);
+r = await as(COACH, `select public.decide_safety_note('${SN}', 'talked') as e`);
+const snrow = (await db.query(`select status, decided_at from public.safety_notes where id = '${SN}'`)).rows[0];
+check("coach marks it talked about", r.rows?.[0]?.e === null && snrow.status === "talked" && snrow.decided_at !== null);
+r = await as(A1, `select public.notify_safety_note('${SN}')`);
+check("signed-in users can't send safety notifications", !!r.error);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

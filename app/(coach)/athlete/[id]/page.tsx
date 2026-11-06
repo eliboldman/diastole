@@ -8,6 +8,7 @@ import FormInsights, { type InsightView } from "@/components/coach/FormInsights"
 import RecentCheckins from "@/components/coach/RecentCheckins";
 import ZonesForm from "@/components/coach/ZonesForm";
 import FuelModePicker from "@/components/coach/FuelModePicker";
+import SafetyNotes from "@/components/coach/SafetyNotes";
 import FuelLog from "@/components/fuel/FuelLog";
 import FuelWeek from "@/components/fuel/FuelWeek";
 import { getFuelDays, getFuelMode, getMealDay, getMealWeek } from "@/lib/fuel/data";
@@ -233,6 +234,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           />
         </section>
 
+        <SafetyNotes athleteId={profile.id} />
         <section id="fuel" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
           <h2 className="text-lg font-medium">Fueling</h2>
           <p className="mb-4 mt-1 text-sm text-white/55">What {(profile.full_name || "this athlete").split(" ")[0]} sees on Fuel and with each workout. Guidance follows their planned training; you can change this anytime.</p>
