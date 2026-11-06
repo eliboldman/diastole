@@ -1,10 +1,11 @@
 "use client";
 
-import { BookOpen, CalendarDays, CalendarRange, Dumbbell, Ellipsis, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import NotificationHost, { NotificationButton } from "@/components/layout/Notifications";
 import SearchHost, { SearchButton } from "@/components/layout/SearchDialog";
@@ -104,97 +105,121 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
       <SearchHost />
       <NotificationHost />
 
-      {/* Mobile: slim top bar + bottom tab bar in thumb reach */}
+      {/* Mobile: slim top bar. Tapping the logo slides out every page from the left. */}
       <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-canvas/80 pt-[env(safe-area-inset-top)] backdrop-blur-2xl md:hidden">
-        <div className="flex h-12 items-center justify-between pl-4 pr-1">
-          <Link href={home} className="flex min-h-11 items-center gap-2">
-            <Image src="/logo.png" alt="" width={26} height={26} className="rounded-md" />
-            <span className="text-sm font-semibold">Diastole</span>
-          </Link>
+        <div className="flex h-12 items-center justify-between pl-2 pr-1">
+          <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
           <div className="flex items-center">
             <SearchButton />
             <NotificationButton />
           </div>
         </div>
       </header>
-
-      <MobileTabs pathname={pathname} tabs={items.slice(0, 5)} more={items.slice(5)} />
     </>
   );
 }
 
-function MobileTabs({ pathname, tabs, more }: { pathname: string; tabs: Item[]; more: Item[] }) {
+function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; items: Item[]; shortcuts: Item[]; home: string }) {
   const [open, setOpen] = useState(false);
-  const moreActive = more.some((m) => isActive(pathname, m));
+  const [mounted, setMounted] = useState(false);
+  const touch = useRef<{ x: number; y: number } | null>(null);
 
-  // Close the sheet whenever the route changes. Deferred so it isn't a synchronous effect update.
+  // Portal target exists only in the browser; deferred so it isn't a synchronous effect update.
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+  // Close whenever the route changes.
   useEffect(() => {
     const t = setTimeout(() => setOpen(false), 0);
     return () => clearTimeout(t);
   }, [pathname]);
+  // While open: Escape closes, and the page behind doesn't scroll.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
-  const tab = (active: boolean) =>
-    `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] transition active:scale-90 ${
-      active ? "text-emerald-100" : "text-white/55"
-    }`;
+  const link = (item: Item, active: boolean) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      tabIndex={open ? 0 : -1}
+      aria-current={active ? "page" : undefined}
+      onClick={() => setOpen(false)}
+      className={`flex min-h-12 items-center gap-4 rounded-2xl px-4 text-[15px] transition active:scale-[0.98] ${
+        active ? "bg-emerald-300/[0.12] text-white" : "text-white/70 hover:bg-white/[0.05]"
+      }`}
+    >
+      <item.icon size={19} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-emerald-200" : ""} />
+      {item.label}
+    </Link>
+  );
+
+  const drawer = (
+    <div className={`fixed inset-0 z-[80] md:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+      <div className={`absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`} onClick={() => setOpen(false)} />
+      <nav
+        id="mobile-menu"
+        aria-label="Main"
+        role="dialog"
+        aria-modal="true"
+        onTouchStart={(e) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
+        onTouchEnd={(e) => {
+          const t = touch.current;
+          touch.current = null;
+          if (!t) return;
+          const dx = e.changedTouches[0].clientX - t.x;
+          const dy = e.changedTouches[0].clientY - t.y;
+          if (dx < -60 && Math.abs(dx) > Math.abs(dy)) setOpen(false); // swipe left to close
+        }}
+        className={`absolute inset-y-0 left-0 flex w-[min(20rem,82vw)] flex-col overflow-y-auto border-r border-white/10 bg-panel/95 px-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-2xl transition-transform duration-300 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{ transitionTimingFunction: "var(--ease-soft)" }}
+      >
+        <Link href={home} tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} className="mb-4 flex min-h-12 items-center gap-3 px-3">
+          <Image src="/logo.png" alt="" width={30} height={30} className="rounded-lg" />
+          <span className="font-semibold">Diastole</span>
+        </Link>
+        <div className="space-y-1">{items.map((item) => link(item, isActive(pathname, item)))}</div>
+        {shortcuts.length > 0 && (
+          <>
+            <div className="mx-3 my-3 border-t border-white/[0.08]" />
+            <div className="space-y-1">{shortcuts.map((item) => link(item, pathname === item.href || pathname.startsWith(`${item.href}/`)))}</div>
+          </>
+        )}
+        <div className="mx-3 my-3 border-t border-white/[0.08]" />
+        <form action="/auth/signout" method="post">
+          <button tabIndex={open ? 0 : -1} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-4 text-[15px] text-white/50 hover:bg-white/[0.05]">
+            <LogOut size={19} /> Sign out
+          </button>
+        </form>
+      </nav>
+    </div>
+  );
 
   return (
     <>
-      {more.length > 0 && open && <div className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-[2px] md:hidden" onClick={() => setOpen(false)} aria-hidden />}
-      {more.length > 0 && (
-        <div
-          className={`fixed inset-x-3 z-[56] rounded-[28px] border border-white/10 bg-panel/95 p-2 shadow-2xl backdrop-blur-2xl transition-all duration-300 md:hidden ${
-            open ? "pointer-events-auto bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] opacity-100" : "pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] opacity-0"
-          }`}
-          style={{ transitionTimingFunction: "var(--ease-soft)" }}
-          aria-hidden={!open}
-        >
-          {more.map((m) => (
-            <Link
-              key={m.href}
-              href={m.href}
-              tabIndex={open ? 0 : -1}
-              className={`flex min-h-12 items-center gap-3 rounded-2xl px-4 text-sm transition active:scale-[0.98] ${
-                isActive(pathname, m) ? "bg-white/[0.08] text-white" : "text-white/75 hover:bg-white/[0.05]"
-              }`}
-            >
-              <m.icon size={18} /> {m.label}
-            </Link>
-          ))}
-          <form action="/auth/signout" method="post">
-            <button tabIndex={open ? 0 : -1} className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-sm text-white/55 hover:bg-white/[0.05]">
-              <LogOut size={18} /> Sign out
-            </button>
-          </form>
-        </div>
-      )}
-
-      <nav
-        aria-label="Main"
-        className="web-tabs fixed inset-x-0 bottom-0 z-[57] border-t border-white/[0.08] bg-canvas/85 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] backdrop-blur-2xl md:hidden"
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-h-11 items-center gap-2 rounded-2xl px-2 transition active:scale-95"
+        aria-expanded={open}
+        aria-controls="mobile-menu"
+        aria-label="Open menu"
       >
-        <div className="flex">
-          {tabs.map((t) => {
-            const active = isActive(pathname, t);
-            return (
-              <Link key={t.href} href={t.href} className={tab(active)} aria-current={active ? "page" : undefined}>
-                <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${active ? "bg-emerald-300/15" : ""}`}>
-                  <t.icon size={20} strokeWidth={active ? 2.2 : 1.8} />
-                </span>
-                <span className="max-w-full truncate">{t.short ?? t.label}</span>
-              </Link>
-            );
-          })}
-          {more.length > 0 && (
-            <button onClick={() => setOpen((o) => !o)} className={tab(open || moreActive)} aria-expanded={open} aria-label="More">
-              <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${open || moreActive ? "bg-emerald-300/15" : ""}`}>
-                <Ellipsis size={20} />
-              </span>
-              More
-            </button>
-          )}
-        </div>
-      </nav>
+        <Image src="/logo.png" alt="" width={26} height={26} className="rounded-md" />
+        <span className="text-sm font-semibold">Diastole</span>
+        <ChevronDown size={14} className={`text-white/45 transition-transform ${open ? "-rotate-90" : ""}`} aria-hidden />
+      </button>
+      {mounted && createPortal(drawer, document.body)}
     </>
   );
 }

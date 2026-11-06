@@ -812,7 +812,7 @@ export default function Thread({
       <div ref={bottom} />
 
       {/* Composer: sticks above the mobile tab bar */}
-      <div className="tabs-above sticky bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-20 mt-2 md:bottom-6">
+      <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-20 mt-2 md:bottom-6">
         {attach && (
           <div className="mb-2">
             <WorkoutChip w={attach} onRemove={() => setAttach(null)} />

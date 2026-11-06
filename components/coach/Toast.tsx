@@ -27,7 +27,7 @@ export function useToast(ms = 8000) {
     <div
       key={toast.id}
       role="status"
-      className="toast-in tabs-above fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-panel/95 px-4 py-3 text-sm shadow-2xl backdrop-blur-xl md:bottom-6"
+      className="toast-in fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-panel/95 px-4 py-3 text-sm shadow-2xl backdrop-blur-xl md:bottom-6"
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${toast.ok ? "bg-emerald-300" : "bg-red-400"}`} aria-hidden />
       <span className="min-w-0 flex-1 text-white/85">{toast.text}</span>
