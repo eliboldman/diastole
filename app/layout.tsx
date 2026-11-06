@@ -35,6 +35,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The iOS app adds data-app="ios" before hydration.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

@@ -167,7 +167,7 @@ function MobileTabs({ pathname, tabs, more }: { pathname: string; tabs: Item[]; 
 
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-[57] border-t border-white/[0.08] bg-canvas/85 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] backdrop-blur-2xl md:hidden"
+        className="web-tabs fixed inset-x-0 bottom-0 z-[57] border-t border-white/[0.08] bg-canvas/85 px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] backdrop-blur-2xl md:hidden"
       >
         <div className="flex">
           {tabs.map((t) => {

@@ -698,3 +698,10 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Inside the iOS app (the app sets html[data-app="ios"] before the page loads) a native tab bar
+   replaces the web one, so hide ours and drop the room we leave for it. Safe-area insets there
+   already include the native tab bar. */
+html[data-app="ios"] .web-tabs { display: none; }
+html[data-app="ios"] .tabs-pad { padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem); }
+html[data-app="ios"] .tabs-above { bottom: calc(env(safe-area-inset-bottom) + 0.75rem); }

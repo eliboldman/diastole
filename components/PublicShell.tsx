@@ -20,7 +20,7 @@ export default function PublicShell({
         stressOpacity={0.15}
       />
 
-      <div className="page-breathe-in relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6 sm:px-8 sm:py-8">
+      <div className="page-breathe-in relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:pt-[max(2rem,env(safe-area-inset-top))] sm:pb-8">
         <header className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <Image
