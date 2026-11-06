@@ -198,6 +198,9 @@ export default async function AccountPage() {
             <LogOut size={16} aria-hidden /> Sign out
           </button>
         </form>
+        <Link href="/me?welcome=1" className="text-sm text-white/45 hover:text-white">
+          Replay the welcome tour
+        </Link>
         <Link href="/privacy" className="text-sm text-white/45 hover:text-white">
           Privacy policy
         </Link>

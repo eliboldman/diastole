@@ -719,5 +719,10 @@ check("sound saved on the profile", (await db.query(`select push_sounds from pub
 r = await as(A1, `select public.set_push_sound('pods', 'walker') as e`);
 check("the recorded Walker sound can be picked", r.rows?.[0]?.e === null);
 
+// Welcome tour
+await as(A1, `select public.mark_welcomed()`);
+check("finishing the welcome tour is remembered", !!(await db.query(`select welcomed_at from public.profiles where id = '${A1}'`)).rows[0].welcomed_at);
+check("it only marks your own profile", !(await db.query(`select welcomed_at from public.profiles where id = '${A2}'`)).rows[0].welcomed_at);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

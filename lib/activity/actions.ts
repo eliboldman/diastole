@@ -80,3 +80,10 @@ export async function setPushSound(group: string, sound: string) {
   const { data, error } = await supabase.rpc("set_push_sound", { p_group: group, p_sound: sound });
   if (error || data) throw new Error((data as string | null) ?? "Couldn't save that sound.");
 }
+
+/** The welcome tour was finished or skipped: don't show it again. */
+export async function markWelcomed() {
+  await requireUser();
+  const supabase = await createClient();
+  await supabase.rpc("mark_welcomed");
+}

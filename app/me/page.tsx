@@ -5,6 +5,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
+import Welcome from "@/components/Welcome";
 import FuelToday from "@/components/fuel/FuelToday";
 import AthleteShell from "@/components/AthleteShell";
 import { FlagBadge, FlagRow } from "@/components/coach/Flags";
@@ -20,23 +21,28 @@ const SHARED_WITH_POD = [
   "Nothing else unless you choose it in My pods: readiness, your workouts and PRs, and (each separately) HRV, sleep or stress",
 ];
 
-export default async function MePage() {
+export default async function MePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const me = await requireUser();
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
 
-  const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }] = await Promise.all([
+  const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
+
+    supabase.from("profiles").select("welcomed_at").eq("id", me.id).maybeSingle(),
+    searchParams,
   ]);
 
   const invites = (memberships ?? []).filter((m) => m.status === "invited");
   const pods = (memberships ?? []).filter((m) => m.status === "active");
   const podName = (m: (typeof invites)[number]) => (m.pods as unknown as { name: string } | null)?.name ?? "Pod";
   const firstName = me.full_name?.split(" ")[0];
+  // Athletes see the welcome tour once; anyone can replay it from Me (?welcome=1).
+  const showWelcome = replay === "1" || (me.role === "athlete" && !welcome?.welcomed_at);
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
@@ -44,6 +50,7 @@ export default async function MePage() {
       <h1 className="mt-3 text-3xl font-medium tracking-tight sm:text-4xl">Today</h1>
       <WeeklyProgress athleteId={me.id} timeZone={me.timezone} />
       <CheckinPrompt athleteId={me.id} />
+      {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
 
       {invites.map((inv) => (
         <section key={inv.pod_id} className="mt-6 rounded-[28px] border border-amber-200/20 bg-amber-200/[0.04] p-6">
