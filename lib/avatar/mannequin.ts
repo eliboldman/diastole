@@ -5,7 +5,8 @@
 // shaded per workout and tapped to edit. Proportions come only from the athlete's sliders.
 import * as THREE from "three";
 
-import type { Look } from "./look";
+import { buildHead } from "./head";
+import { GEAR_COLOR, SKIN, SUIT, hexOf, type Look } from "./look";
 import { PAIN_COLOR, type Pain, type PainLevel, type Spot } from "./pain";
 import { REGIONS, type Level, type Region, type Strain } from "./strain";
 
@@ -24,23 +25,36 @@ export type SceneOpts = {
 
 // ---------------------------------------------------------------- colors
 
-const BASE = new THREE.Color(0x2fa47c);
-// Each region a touch lighter or darker, so the segments read even when nothing is worked.
-const REGION_SHADE: Record<Region, THREE.Color> = Object.fromEntries(
-  REGIONS.map((r, i) => {
-    const c = BASE.clone();
-    const hsl = { h: 0, s: 0, l: 0 };
-    c.getHSL(hsl);
-    const offs = [0.035, -0.03, 0.015, -0.045, 0.045, -0.015, 0.025, -0.035];
-    c.setHSL(hsl.h + ((i % 3) - 1) * 0.006, hsl.s, hsl.l + offs[i % offs.length]);
-    return [r, c];
-  }),
-) as Record<Region, THREE.Color>;
 export const STRAIN_COLOR: Record<Level, string> = { 1: "#fcd34d", 2: "#fb923c", 3: "#f87171" };
 const STRAIN = { 1: new THREE.Color(STRAIN_COLOR[1]), 2: new THREE.Color(STRAIN_COLOR[2]), 3: new THREE.Color(STRAIN_COLOR[3]) } as const;
-const UNSEG = BASE.clone().offsetHSL(0, -0.04, 0.02); // head, hands, feet
 const PAIN = { 1: new THREE.Color(PAIN_COLOR[1]), 2: new THREE.Color(PAIN_COLOR[2]), 3: new THREE.Color(PAIN_COLOR[3]) } as const;
-const MUTED = BASE.clone().offsetHSL(0, -0.12, -0.04); // pain mode: everything not marked recedes
+
+/** The body's colors, from the suit the athlete picked (plus skin for hands and neck, and shoes). */
+type Palette = { shades: Record<Region, THREE.Color>; unseg: THREE.Color; muted: THREE.Color; skin: THREE.Color; shoes: THREE.Color };
+const palettes = new Map<string, Palette>();
+function palette(look: Look): Palette {
+  const key = `${look.suit}|${look.skin}|${look.shoes}`;
+  const hit = palettes.get(key);
+  if (hit) return hit;
+  const base = new THREE.Color(hexOf(SUIT, look.suit));
+  // Each region a touch lighter or darker, so the segments read even when nothing is worked.
+  const hsl = { h: 0, s: 0, l: 0 };
+  base.getHSL(hsl);
+  const offs = [0.035, -0.03, 0.015, -0.045, 0.045, -0.015, 0.025, -0.035];
+  const shades = Object.fromEntries(
+    REGIONS.map((r, i) => [r, base.clone().setHSL(hsl.h + ((i % 3) - 1) * 0.006, hsl.s, Math.min(0.92, hsl.l + offs[i % offs.length]))]),
+  ) as Record<Region, THREE.Color>;
+  const p: Palette = {
+    shades,
+    unseg: base.clone().offsetHSL(0, -0.04, 0.02),
+    muted: base.clone().offsetHSL(0, -0.12, -0.04), // pain mode: everything not marked recedes
+    // Mint skin is the original all-green mannequin.
+    skin: look.skin === "mint" ? base.clone().offsetHSL(0, -0.04, 0.02) : new THREE.Color(hexOf(SKIN, look.skin)),
+    shoes: new THREE.Color(hexOf(GEAR_COLOR, look.shoes)),
+  };
+  palettes.set(key, p);
+  return p;
+}
 
 // ---------------------------------------------------------------- geometry
 
@@ -167,6 +181,8 @@ type Paint = { mode: "strain" | "pain"; strain: Strain; pain: Pain };
 
 function paint(meshes: THREE.Mesh[], p: Paint) {
   for (const m of meshes) {
+    const pal = m.userData.pal as Palette;
+    const tone = m.userData.tone as "skin" | "shoes" | undefined; // what unsegmented faces of this part are
     const regions = m.userData.faceRegions as (Region | null)[];
     const spots = m.userData.faceSpots as (Spot | null)[];
     const col = (m.geometry as THREE.BufferGeometry).attributes.color as THREE.BufferAttribute;
@@ -176,10 +192,10 @@ function paint(meshes: THREE.Mesh[], p: Paint) {
       if (p.mode === "pain") {
         const s = spots[f];
         const lvl = s ? (p.pain[s] as PainLevel | undefined) : undefined;
-        color = lvl ? PAIN[lvl] : MUTED;
+        color = lvl ? PAIN[lvl] : tone && !r ? pal[tone].clone().lerp(pal.muted, 0.35) : pal.muted;
       } else {
         const lvl = r ? p.strain[r] : undefined;
-        color = lvl ? STRAIN[lvl] : r ? REGION_SHADE[r] : UNSEG;
+        color = lvl ? STRAIN[lvl] : r ? pal.shades[r] : tone ? pal[tone] : pal.unseg;
       }
       for (let k = 0; k < 3; k++) col.setXYZ(f * 3 + k, color.r, color.g, color.b);
     }
@@ -189,6 +205,21 @@ function paint(meshes: THREE.Mesh[], p: Paint) {
 
 // ---------------------------------------------------------------- the figure
 
+function watch(look: Look, blocks: boolean) {
+  const g = new THREE.Group();
+  g.position.y = -0.235;
+  const band = new THREE.Mesh(
+    blocks ? new THREE.BoxGeometry(0.075, 0.03, 0.07) : new THREE.CylinderGeometry(0.0335, 0.0335, 0.026, 24, 1, true),
+    new THREE.MeshStandardMaterial({ color: hexOf(GEAR_COLOR, look.watchColor), roughness: 0.5, side: THREE.DoubleSide }),
+  );
+  if (!blocks) band.scale.z = 0.8;
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.01, 24), new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.2, metalness: 0.4 }));
+  face.rotation.x = Math.PI / 2;
+  face.position.z = blocks ? 0.038 : 0.029;
+  g.add(band, face);
+  return g;
+}
+
 type Built = { root: THREE.Group; meshes: THREE.Mesh[]; sparkles: THREE.Group | null; orbit: THREE.Group | null };
 
 function buildFigure(o: SceneOpts): Built {
@@ -197,10 +228,13 @@ function buildFigure(o: SceneOpts): Built {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: blocks ? 0.7 : 0.42, metalness: 0.06, flatShading: blocks });
   const meshes: THREE.Mesh[] = [];
   // Position first (some regions depend on where the part sits), then segment.
-  const part = (g: THREE.BufferGeometry, classify: Classify, at?: (m: THREE.Mesh) => void, spotOf?: ClassifySpot) => {
+  const pal = palette(o.look);
+  const part = (g: THREE.BufferGeometry, classify: Classify, at?: (m: THREE.Mesh) => void, spotOf?: ClassifySpot, tone?: "skin" | "shoes") => {
     const m = new THREE.Mesh(g, mat);
     at?.(m);
     segment(m, classify, spotOf);
+    m.userData.pal = pal;
+    if (tone) m.userData.tone = tone;
     meshes.push(m);
     return m;
   };
@@ -224,7 +258,7 @@ function buildFigure(o: SceneOpts): Built {
   } else body.add(part(torsoGeometry(), torsoRegion, undefined, torsoSpot));
 
   body.add(
-    part(blocks ? box(0.08, 0.1, 0.08, false) : new THREE.CylinderGeometry(0.043, 0.05, 0.12, 24, 2), neckRegion, (m) => (m.position.y = 1.53), fixedSpot("neck")),
+    part(blocks ? box(0.08, 0.1, 0.08, false) : new THREE.CylinderGeometry(0.043, 0.05, 0.12, 24, 2), neckRegion, (m) => (m.position.y = 1.53), fixedSpot("neck"), "skin"),
   );
 
   for (const side of [-1, 1]) {
@@ -243,8 +277,10 @@ function buildFigure(o: SceneOpts): Built {
       part(blocks ? box(0.05, 0.1, 0.03) : taper(0.03, 0.022, 0.08, 16, 2), always(null), (m) => {
         m.scale.z = blocks ? 1 : 0.55;
         m.position.y = -0.27;
-      }, fixedSpot(`wrist_${sideOf(side)}`)),
+      }, fixedSpot(`wrist_${sideOf(side)}`), "skin"),
     );
+    // The watch: a band and face on the chosen wrist (the figure's left is +x).
+    if (o.look.watch !== "none" && (o.look.watch === "left") === side > 0) elbow.add(watch(o.look, blocks));
     shoulder.add(elbow);
     body.add(shoulder);
   }
@@ -265,36 +301,15 @@ function buildFigure(o: SceneOpts): Built {
           m.scale.set(1.15, 1, 0.75);
         }
         m.position.set(0, -0.44, 0.03);
-      }, fixedSpot(`foot_${sideOf(side)}`)),
+      }, fixedSpot(`foot_${sideOf(side)}`), "shoes"),
     );
     hip.add(knee);
     body.add(hip);
   }
 
-  // Head: one smooth egg, narrower at the chin, tipped slightly forward.
-  const head = new THREE.Group();
+  // Head: the drawn face, hair and headwear (lib/avatar/head.ts). Not shaded by training.
+  const head = buildHead(o.look, o.mood ?? null, blocks);
   head.position.y = 1.59 * height;
-  const skullGeo = blocks ? box(0.2, 0.24, 0.21, false) : new THREE.SphereGeometry(0.1, 32, 24);
-  if (!blocks) {
-    const p = skullGeo.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) {
-      const y = p.getY(i);
-      if (y < 0) {
-        p.setX(i, p.getX(i) * (1 + y * 2.2));
-        p.setZ(i, p.getZ(i) * (1 + y * 1.2));
-      }
-    }
-  }
-  head.add(
-    part(skullGeo, always(null), (m) => {
-      if (blocks) m.position.y = 0.12;
-      else {
-        m.scale.set(0.95, 1.25, 1.05);
-        m.position.set(0, 0.1, 0.012);
-        m.rotation.x = -0.08;
-      }
-    }),
-  );
   if (o.mood === "tired") head.rotation.x = 0.16;
   root.add(head);
 
@@ -387,9 +402,10 @@ function lights(scene: THREE.Scene) {
 
 function camera(variant: "full" | "bust", aspect: number, height: number) {
   if (variant === "bust") {
+    // Head and shoulders, with the face filling most of the frame (hair and headwear included).
     const c = new THREE.PerspectiveCamera(28, aspect, 0.1, 20);
-    c.position.set(0, 1.62 * height, 1.12);
-    c.lookAt(0, 1.58 * height, 0);
+    c.position.set(0, 1.7 * height, 1.0);
+    c.lookAt(0, 1.665 * height, 0);
     return c;
   }
   const c = new THREE.PerspectiveCamera(24, aspect, 0.1, 20);

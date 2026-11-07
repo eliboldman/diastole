@@ -27,6 +27,7 @@ type Props = AvatarState & {
   mode?: "strain" | "pain"; // which layer shows and gets tapped
   onPick?: (hit: Hit) => void; // live only: tap the body
   still?: boolean; // a picture instead of a live figure (lists of workouts)
+  live?: boolean; // a live, spinnable bust (the creator's close-up on the face)
   className?: string;
   title?: string;
 };
@@ -211,9 +212,9 @@ function Still({ opts, className, title }: { opts: SceneOpts; className: string;
   );
 }
 
-export default function Avatar({ look, mood = null, strain, pain, mode, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, className = "", title }: Props) {
+export default function Avatar({ look, mood = null, strain, pain, mode, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, live = false, className = "", title }: Props) {
   const opts: SceneOpts = { look: normalizeLook(look), mood, strain, pain, mode, aura, variant, blocks, view };
-  if (variant === "bust" || still) return <Still opts={opts} className={className} title={title} />;
+  if ((variant === "bust" && !live) || still) return <Still opts={opts} className={className} title={title} />;
   return (
     <span className="relative inline-flex flex-col items-center">
       <Live opts={opts} className={className} title={title} onPick={onPick} />
