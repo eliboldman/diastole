@@ -41,6 +41,7 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   if (error) return { error: "Couldn't save those numbers. Try again." };
   revalidatePath(`/athlete/${athleteId}`);
   revalidatePath(`/profile/${athleteId}`);
+  revalidatePath("/account");
   revalidatePath("/activity/[id]", "page");
   return { ok: true };
 }
@@ -61,7 +62,7 @@ export async function setPodSharing(s: PodSharing) {
   });
   if (error) throw new Error("Couldn't update sharing.");
   revalidatePath("/me/pods");
-  revalidatePath("/account");
+  revalidatePath("/account/settings");
 }
 
 export type NotifyPrefs = Partial<Record<"props" | "comments" | "messages" | "pods" | "workouts" | "coaching", boolean>>;

@@ -155,7 +155,7 @@ export async function saveAiSettings(input: { enabled: boolean; model: string; c
     updated_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/account");
+  revalidatePath("/account/settings");
   return { ok: true, message: "Saved." };
 }
 

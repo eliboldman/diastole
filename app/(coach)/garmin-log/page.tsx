@@ -82,7 +82,7 @@ export default async function GarminLogPage() {
 
   return (
     <DashboardShell>
-      <BackLink href="/account" label="Me" />
+      <BackLink href="/account/settings" label="Settings" />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Garmin deliveries</h1>
       <p className="mt-2 max-w-prose text-sm text-white/55">
         Every push Garmin sends, kept for 90 days. If nothing has arrived for half a day, check the sharing toggles in Garmin

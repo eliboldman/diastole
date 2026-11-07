@@ -18,7 +18,7 @@ export default async function EditAvatarPage() {
   ]);
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <BackLink href={`/profile/${me.id}`} label="Your profile" />
+      <BackLink href="/account" label="Me" />
       <h1 className="mt-3 mb-6 text-3xl font-bold tracking-tight">Your avatar</h1>
       <AvatarCreator initial={avatar?.look ?? null} state={{ mood: today.mood, strain: today.strain, aura: progress.aura, badges: progress.badges }} />
     </DashboardShell>

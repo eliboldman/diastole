@@ -1,244 +1,120 @@
-import { ChevronRight, LogOut } from "lucide-react";
+import { ChevronRight, Settings } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
-import AiSettingsForm from "@/app/(coach)/settings/AiSettingsForm";
-import SettingsForm from "@/app/(coach)/settings/SettingsForm";
-import Avatar from "@/components/avatar/Avatar";
+import { FlagBadge } from "@/components/coach/Flags";
 import DashboardShell from "@/components/layout/DashboardShell";
-import NotifySettings from "@/components/NotifySettings";
-import PodSharing from "@/components/PodSharing";
-import SyncedAgo from "@/components/SyncedAgo";
-import ThemePicker from "@/components/ThemePicker";
-import WeekPrefsEditor from "@/components/WeekPrefsEditor";
-import CoachingGuide from "@/components/coach/CoachingGuide";
-import { cleanWeek } from "@/lib/week-prefs";
-import { asTheme } from "@/lib/themes";
-import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
-import { createClient, requireUser } from "@/lib/supabase/server";
+import ProfileView from "@/components/profile/ProfileView";
+import FormTrends from "@/components/readiness/FormTrends";
+import { ReadinessAreas, ReadinessTrend } from "@/components/readiness/ReadinessDetail";
+import { FORM, type FormMetric } from "@/lib/activity/form";
+import { recentFormRuns } from "@/lib/activity/form-store";
+import type { ReadinessRow, WellnessPoint } from "@/lib/coach-data";
+import { familyOf, oneFamily } from "@/lib/readiness/source";
+import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Me · Diastole" };
 
-const card = "rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl";
-const row = "lift flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm";
+const card = "mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6";
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
-function Row({ href, children, sub }: { href: string; children: ReactNode; sub?: ReactNode }) {
-  return (
-    <Link href={href} className={row}>
-      <span className="min-w-0">
-        <span className="block truncate">{children}</span>
-        {sub && <span className="block truncate text-xs text-white/45">{sub}</span>}
-      </span>
-      <ChevronRight size={16} className="shrink-0 text-white/40" aria-hidden />
-    </Link>
-  );
-}
+type CoachNote = { id: string; issue_key: string; summary: string; evidence: string | null; drills: string[] | null; created_at: string };
 
-/** "Me": profile, units, watch, pods and sharing for everyone; coaching settings and tools for coaches. */
-export default async function AccountPage() {
+/**
+ * The Me tab: your avatar and numbers, plus the same readiness, recovery and running-form analysis
+ * your coach sees (without the AI tools). Settings live one tap away.
+ */
+export default async function MePage() {
   const me = await requireUser();
-  const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }, { data: myWeek }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme")
-      .eq("id", me.id)
-      .single(),
-    supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
-    supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
-    isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd, philosophy").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
-    isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
-    supabase.from("avatars").select("look").eq("athlete_id", me.id).maybeSingle(),
-    supabase.from("athlete_week").select("days").eq("athlete_id", me.id).maybeSingle(),
+  const [{ data: readiness }, { data: wellness }, { data: device }, formRuns, { data: notes }] = await Promise.all([
+    supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", me.id).order("date", { ascending: false }).limit(14),
+    supabase.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, stress_avg").eq("athlete_id", me.id).gte("date", daysAgo(28)).order("date"),
+    supabase.from("device_connections").select("source").eq("athlete_id", me.id).maybeSingle(),
+    // Your own runs, so the service role is fine here (it also back-fills older runs' summaries).
+    recentFormRuns(createAdminClient(), me.id, { limit: 30, timeZone: me.timezone }),
+    supabase.rpc("my_form_insights"),
   ]);
-  const ai = { ...DEFAULT_SETTINGS, ...(aiRow ?? {}) };
-  const pods = (memberships ?? []).map((m) => ({ id: m.pod_id, status: m.status, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
+  const rows = (readiness ?? []) as ReadinessRow[];
+  const trend = oneFamily(wellness ?? [], familyOf(device?.source ?? "garmin")) as WellnessPoint[];
+  const coachNotes = (notes ?? []) as CoachNote[];
+  const today = rows[0];
 
-  return (
-    <DashboardShell role={isCoach ? "coach" : "athlete"}>
-      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Account</p>
-      <h1 className="mt-3 break-words text-4xl font-bold tracking-tight">{profile?.full_name || "Me"}</h1>
-      <p className="mt-1 truncate text-sm text-white/50">{me.email}</p>
-
-      {/* The avatar and metrics page: the one obvious thing to open here */}
+  const header = (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Me</p>
       <Link
-        href={`/profile/${me.id}`}
-        className="lift mt-6 flex items-center gap-4 rounded-[28px] border border-emerald-300/20 bg-emerald-300/[0.05] p-3 pr-5 backdrop-blur-xl"
+        href="/account/settings"
+        className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1]"
       >
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10">
-          <Avatar look={avatar?.look ?? null} variant="bust" className="h-16 w-16" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium">{avatar ? "Your avatar and metrics" : "Create your avatar"}</span>
-          <span className="block truncate text-sm text-white/55">FTP, threshold pace, PRs, streaks and today&apos;s readiness</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-emerald-200" aria-hidden />
+        <Settings size={16} aria-hidden /> Settings
       </Link>
+    </div>
+  );
 
-      <Link href="/me/story" className="lift mt-3 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
+  const analysis = (
+    <>
+      <ReadinessAreas
+        today={today}
+        title={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-medium">Readiness</h2>
+            <FlagBadge flag={today?.overall ?? "unknown"} />
+          </div>
+        }
+      />
+      <ReadinessTrend trend={trend} readiness={rows} />
+
+      <section id="form" className={`${card} scroll-mt-6`}>
+        <h2 className="text-lg font-medium">Running form</h2>
+        <p className="mb-4 mt-1 text-sm text-white/55">Your latest run for each metric, compared with your usual and common ranges. Tap a run in Training for the full breakdown.</p>
+        <FormTrends runs={formRuns} />
+      </section>
+
+      {coachNotes.length > 0 && (
+        <section className={card}>
+          <h2 className="text-lg font-medium">Form notes</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">The form summaries your coach sees about your recent runs.</p>
+          <ul className="space-y-3">
+            {coachNotes.map((n) => {
+              const [metric, kind] = n.issue_key.split(":");
+              return (
+                <li key={n.id} className="rounded-2xl border border-white/[0.09] bg-white/[0.04] p-4">
+                  <p className="text-xs uppercase tracking-[0.15em] text-white/50">
+                    {FORM[metric as FormMetric]?.label ?? metric} · {kind === "fatigue" ? "drifts late in runs" : "across recent runs"} ·{" "}
+                    {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: me.timezone })}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-white/80">{n.summary}</p>
+                  {n.evidence && <p className="mt-2 text-xs text-white/50">{n.evidence}</p>}
+                  {n.drills && n.drills.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
+                      {n.drills.map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <Link href="/me/story" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
         <span className="min-w-0">
           <span className="block font-medium">Season story</span>
           <span className="block truncate text-sm text-white/55">Your training in one shareable picture</span>
         </span>
         <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
       </Link>
+      <p className="mt-3 text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
+    </>
+  );
 
-      {/* Coaches train too: everything an athlete has, one tap away, without a second account */}
-      {isCoach && (
-        <section className={`${card} mt-6`}>
-          <h2 className="mb-1 text-lg font-medium">Your own training</h2>
-          <p className="mb-4 text-sm text-white/55">Everything your athletes see, for you.</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <Row href="/me" sub="Readiness, next workouts, check-ins">
-              My day
-            </Row>
-            <Row href="/training" sub="Your planned and past workouts">
-              My training
-            </Row>
-            <Row href="/fuel" sub="Workout fueling and fuel days">
-              My fuel
-            </Row>
-            <Row href="/races" sub="Race plans and fueling tools">
-              My races
-            </Row>
-            <Row href="/me/pods" sub="Pods you train in">
-              My pods
-            </Row>
-          </div>
-        </section>
-      )}
-
-      <section className={`${card} mt-6`}>
-        <h2 className="mb-1 text-lg font-medium">My week</h2>
-        <p className="mb-4 text-sm text-white/55">{isCoach ? "Which disciplines you like on which days." : "Which disciplines you like on which days, and how much time you have. Your coach plans around it."}</p>
-        <WeekPrefsEditor initial={cleanWeek(myWeek?.days)} />
-      </section>
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className={card}>
-          <h2 className="mb-4 text-lg font-medium">Profile</h2>
-          <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} units={profile?.units === "km" ? "km" : "mi"} />
-        </section>
-
-        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          <section className={card}>
-            <h2 className="mb-1 text-lg font-medium">Watch</h2>
-            <p className="mb-4 text-sm text-white/55">
-              {device ? (
-                <>
-                  {device.source === "garmin" ? "Garmin" : "Apple Watch"} connected · <SyncedAgo at={device.last_synced_at} />
-                </>
-              ) : (
-                "No watch connected yet."
-              )}
-            </p>
-            <div className="grid gap-2">
-              <Row href="/connect">{device ? "Manage watch connection" : "Connect Garmin or Apple Watch"}</Row>
-              {device?.source === "garmin" && (
-                <Row href="/me/import" sub="Past months of health data, plus charts and laps for past workouts">
-                  Import Garmin history
-                </Row>
-              )}
-              <Row href="/me/upload" sub="Rouvy, Zwift and other workouts that don't sync on their own">
-                Upload a workout file
-              </Row>
-            </div>
-          </section>
-
-          <section className={card}>
-            <h2 className="mb-4 text-lg font-medium">Pods</h2>
-            {pods.length === 0 ? (
-              <p className="text-sm text-white/55">{isCoach ? "You coach pods; you're not a member of one." : "You're not in a pod yet. Your coach sets them up."}</p>
-            ) : (
-              <div className="grid gap-2">
-                {pods.map((p) => (
-                  <Row key={p.id} href={p.status === "invited" ? "/me/pods" : `/me/pods/${p.id}`} sub={p.status === "invited" ? "Invitation waiting" : undefined}>
-                    {p.name}
-                  </Row>
-                ))}
-              </div>
-            )}
-            {pods.some((p) => p.status === "active") && (
-              <div className="mt-5 border-t border-white/10 pt-5">
-                <PodSharing
-                  initial={{
-                    level: (profile?.pod_share_level ?? 0) as 0 | 1 | 2,
-                    details: Boolean(profile?.share_workout_details),
-                    hrv: Boolean(profile?.pod_share_hrv),
-                    sleep: Boolean(profile?.pod_share_sleep),
-                    stress: Boolean(profile?.pod_share_stress),
-                  }}
-                />
-              </div>
-            )}
-            {isCoach && (
-              <div className="mt-4">
-                <Row href="/pods">Manage your pods</Row>
-              </div>
-            )}
-          </section>
-
-          <section className={card}>
-            <h2 className="mb-1 text-lg font-medium">Appearance</h2>
-            <p className="mb-3 text-sm text-white/55">Pick a color theme. Readiness colors stay the same in every theme.</p>
-            <ThemePicker initial={asTheme(profile?.theme)} />
-          </section>
-
-          <section className={card}>
-            <h2 className="mb-1 text-lg font-medium">Notifications</h2>
-            <p className="mb-3 text-sm text-white/55">Choose what reaches your bell and your phone, and how each sounds in the Diastole app. Pick a sound to hear it.</p>
-            <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} sounds={(profile?.push_sounds ?? {}) as Record<string, unknown>} />
-          </section>
-        </div>
-
-        {isCoach && (
-          <section id="coaching" className={`${card} scroll-mt-6 lg:col-span-2`}>
-            <h2 className="mb-1 text-lg font-medium">Coaching assistant</h2>
-            <p className="mb-4 text-sm text-white/50">
-              Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. When a running-form issue shows up across
-              several runs, Claude also suggests drills or library workouts. Their readiness, wellness, training and running-form data (never routes) is sent to Anthropic for
-              this.
-            </p>
-            <AiSettingsForm enabled={ai.ai_enabled} model={ai.ai_model} cap={Number(ai.ai_monthly_cap_usd)} spent={spent} />
-            <div className="mt-6 border-t border-white/10 pt-6">
-              <h3 className="font-medium">Coaching guide</h3>
-              <p className="mb-3 mt-1 text-sm text-white/55">Your philosophy and rules. Every suggested workout follows it. Notes about one athlete belong on that athlete&apos;s page.</p>
-              <CoachingGuide initial={(aiRow as { philosophy?: string | null } | null)?.philosophy ?? ""} />
-            </div>
-          </section>
-        )}
-
-        {isCoach && (
-          <section className={`${card} lg:col-span-2`}>
-            <h2 className="mb-4 text-lg font-medium">Coach tools</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Row href="/garmin-log" sub="Every push Garmin sends">
-                Garmin deliveries
-              </Row>
-              <Row href="/lab" sub="Fake athletes for trying the AI">
-                AI test mode
-              </Row>
-            </div>
-          </section>
-        )}
-      </div>
-
-      <div className="mt-8 flex flex-wrap items-center gap-4">
-        <form action="/auth/signout" method="post">
-          <button className="flex min-h-12 items-center gap-2 rounded-2xl border border-white/15 px-5 text-sm text-white/75 hover:bg-white/[0.06]">
-            <LogOut size={16} aria-hidden /> Sign out
-          </button>
-        </form>
-        <Link href="/me?welcome=1" className="text-sm text-white/45 hover:text-white">
-          Replay the welcome tour
-        </Link>
-        <Link href="/privacy" className="text-sm text-white/45 hover:text-white">
-          Privacy policy
-        </Link>
-      </div>
+  return (
+    <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
+      <ProfileView id={me.id} me={me} header={header} analysis={analysis} />
     </DashboardShell>
   );
 }

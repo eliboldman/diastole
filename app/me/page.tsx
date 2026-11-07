@@ -94,6 +94,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <FlagRow flags={readiness as Record<"recovery" | "sleep" | "stress" | "load", Flag>} />
           </div>
         )}
+        <Link href="/account" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
+          Recovery, trends and running form →
+        </Link>
       </section>
 
       <FuelToday athleteId={me.id} today={today} timeZone={me.timezone} />

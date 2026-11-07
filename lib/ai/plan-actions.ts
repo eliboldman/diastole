@@ -16,7 +16,7 @@ export async function savePhilosophy(text: string): Promise<Result> {
   const supabase = await createClient();
   const { error } = await supabase.from("coach_settings").upsert({ coach_id: me.id, philosophy: text.trim().slice(0, 20000) || null }, { onConflict: "coach_id" });
   if (error) return { ok: false, error: "Couldn't save the guide." };
-  revalidatePath("/account");
+  revalidatePath("/account/settings");
   return { ok: true };
 }
 
@@ -59,7 +59,7 @@ export async function saveWeekPrefs(athleteId: string | null, days: unknown): Pr
   const supabase = await createClient();
   const { error } = await supabase.from("athlete_week").upsert({ athlete_id: id, days: cleanWeek(days), updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
   if (error) return { ok: false, error: "Couldn't save your week." };
-  revalidatePath("/account");
+  revalidatePath("/account/settings");
   revalidatePath(`/athlete/${id}`);
   return { ok: true };
 }

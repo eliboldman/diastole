@@ -103,7 +103,7 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
       {msg?.text === "guide" ? (
         <p className="mt-3 text-sm text-amber-100">
           Add your coaching guide first: every suggestion follows it.{" "}
-          <Link href="/account#coaching" className="font-medium text-emerald-200 underline">
+          <Link href="/account/settings#coaching" className="font-medium text-emerald-200 underline">
             Me → Coaching assistant
           </Link>
         </p>
