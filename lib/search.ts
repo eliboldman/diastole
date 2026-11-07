@@ -16,6 +16,7 @@ const PAGES: { title: string; href: string; roles: ("coach" | "athlete")[]; word
   { title: "Calendar", href: "/calendar", roles: ["coach", "athlete"], words: "calendar month schedule" },
   { title: "Training", href: "/training", roles: ["athlete"], words: "workouts activities runs" },
   { title: "Pods", href: "/pods", roles: ["coach"], words: "groups teams" },
+  { title: "Weekly digest", href: "/digest", roles: ["coach"], words: "summary week report compliance missed" },
   { title: "My pods", href: "/me/pods", roles: ["athlete"], words: "groups teams sharing" },
   { title: "Me", href: "/account", roles: ["coach", "athlete"], words: "profile avatar readiness form recovery hrv sleep metrics prs" },
   { title: "Settings", href: "/account/settings", roles: ["coach", "athlete"], words: "account settings units timezone name device notifications theme pods sharing sign out" },

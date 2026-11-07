@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import DashboardShell from "@/components/layout/DashboardShell";
 import PodActivityFeed from "@/components/PodActivityFeed";
 import PodFeed, { type PodFeedData, type PodPropsData } from "@/components/PodFeed";
-import PodTabs from "@/components/PodTabs";
+import PodChallenges, { type Challenge } from "@/components/PodChallenges";
+import PodTabs, { type PodView } from "@/components/PodTabs";
 import { FEED_PAGE, type FeedItem } from "@/lib/pod-feed-types";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import BackLink from "@/components/layout/BackLink";
@@ -13,16 +14,18 @@ export default async function CoachPodFeedPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string }>; // ?view=feed; members is the default
+  searchParams: Promise<{ view?: string }>; // ?view=feed | challenges; members is the default
 }) {
   const coach = await requireCoach();
   const { id } = await params;
-  const view = (await searchParams).view === "feed" ? "feed" : "members";
+  const v = (await searchParams).view;
+  const view: PodView = v === "feed" || v === "challenges" ? v : "members";
   const supabase = await createClient();
-  const [{ data }, { data: props }, { data: activities }] = await Promise.all([
+  const [{ data }, { data: props }, { data: activities }, { data: challenges }] = await Promise.all([
     supabase.rpc("get_pod_feed", { p_pod: id }),
     view === "members" ? supabase.rpc("get_pod_props", { p_pod: id }) : Promise.resolve({ data: null }),
     view === "feed" ? supabase.rpc("get_pod_activity_feed", { p_pod: id, p_limit: FEED_PAGE }) : Promise.resolve({ data: null }),
+    view === "challenges" ? supabase.rpc("get_pod_challenges", { p_pod: id }) : Promise.resolve({ data: null }),
   ]);
   if (!data) notFound();
   const feed = data as PodFeedData;
@@ -38,7 +41,9 @@ export default async function CoachPodFeedPage({
         <PodTabs base={`/pods/${id}`} view={view} />
       </div>
       <div className="mt-6">
-        {view === "feed" ? (
+        {view === "challenges" ? (
+          <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin={false} isCoach today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} units={coach.units} />
+        ) : view === "feed" ? (
           <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
         ) : (
           <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} />

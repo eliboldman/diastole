@@ -9,6 +9,9 @@ assert.equal(groupOf("pod_props", { comment: true }), "comments");
 assert.equal(groupOf("pod_props", {}), "props");
 assert.equal(groupOf("workout_sent", null), "workouts");
 assert.equal(groupOf("pod_invite", null), "pods");
+assert.equal(groupOf("pod_challenge", null), "pods");
+assert.equal(groupOf("workout_pack", null), "workouts");
+assert.equal(groupOf("weekly_digest", null), "coaching");
 assert.equal(groupOf("safety_note", null), "coaching");
 assert.equal(groupOf("garmin_disconnected", null), null);
 assert.equal(asSound("airhorn", "messages"), "heartbeat");
@@ -25,7 +28,7 @@ assert.equal(apnsSound("default"), "default");
 assert.equal(apnsSound("none"), undefined);
 
 // Every coaching kind the database groups as 'coaching' is grouped the same way here.
-const sql = readFileSync(new URL("../../supabase/migrations/20261209000000_athlete_zones_self.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../../supabase/migrations/20261213000000_digest_pack_shoes_challenges.sql", import.meta.url), "utf8");
 const kinds = sql.match(/when p_kind in \(([^)]*)\) then 'coaching'/)![1].match(/'([a-z_]+)'/g)!.map((k) => k.slice(1, -1));
 for (const k of kinds) assert.equal(groupOf(k, null), "coaching", k);
 // And every bundled sound exists in the app and on the web.

@@ -19,3 +19,18 @@ export async function saveCloset(athleteId: string, raw: unknown) {
   revalidatePath(`/athlete/${athleteId}`);
   return { ok: true as const, gear };
 }
+
+/** Which shoes a run was in (null = back to the default pair). The athlete or their coach. */
+export async function setActivityShoe(activityId: string, shoeId: string | null) {
+  await requireUser();
+  if (!UUID.test(activityId) || (shoeId !== null && !/^[\w-]{1,40}$/.test(shoeId))) return { ok: false as const };
+  const supabase = await createClient();
+  const { data: act } = await supabase.from("activities").select("athlete_id").eq("id", activityId).maybeSingle();
+  if (!act) return { ok: false as const };
+  const { error } = shoeId
+    ? await supabase.from("activity_shoes").upsert({ activity_id: activityId, athlete_id: act.athlete_id, shoe_id: shoeId }, { onConflict: "activity_id" })
+    : await supabase.from("activity_shoes").delete().eq("activity_id", activityId);
+  if (error) return { ok: false as const };
+  revalidatePath("/account");
+  return { ok: true as const };
+}

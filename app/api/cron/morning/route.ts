@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { draftMorningBriefs } from "@/lib/ai/briefs";
 import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
+import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) return new NextResponse("Unauthorized", { status: 401 });
 
   const admin = createAdminClient();
-  const { data: coaches } = await admin.from("profiles").select("id").eq("role", "coach");
+  const { data: coaches } = await admin.from("profiles").select("id, timezone").eq("role", "coach");
   const results: Record<string, unknown> = {};
   for (const c of coaches ?? []) {
     results[c.id] = await runCoachAssistant(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
@@ -31,6 +32,17 @@ export async function GET(request: NextRequest) {
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Private fueling safety net: rules only, coach-only notes.
     results[`${c.id}:safety`] = await runSafetyNet(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // Mondays (coach's time): the weekly digest for last week.
+    const tz = c.timezone || "America/Chicago";
+    if (new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: tz }) === "Mon") {
+      results[`${c.id}:digest`] = await (async () => {
+        const week = lastWeekStart(tz);
+        const d = await buildDigest(admin, c.id, week);
+        if (!d.athletes.length) return { status: "skipped" };
+        await admin.rpc("server_notify", { p_user: c.id, p_kind: "weekly_digest", p_title: "Your weekly digest", p_body: digestLine(d), p_href: `/digest?week=${week}`, p_key: `digest:${week}` });
+        return { status: "sent" };
+      })().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    }
   }
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;

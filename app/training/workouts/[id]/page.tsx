@@ -9,6 +9,7 @@ import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMess
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
 import { cleanCloset, isEmptyCloset, packFor } from "@/lib/closet";
+import { getShoeMileage } from "@/lib/shoes";
 import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -45,7 +46,8 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const closet = cleanCloset(gearRow?.gear);
   const own = me.id === w.athlete_id;
   // The step text counts too ("pull buoy", "at the track", "105% FTP").
-  const pack = packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet);
+  const mileage = w.sport === "run" ? await getShoeMileage(supabase, w.athlete_id, closet, me.timezone) : {};
+  const pack = packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet, mileage);
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>

@@ -43,7 +43,12 @@ export type BikeKind = (typeof BIKE_KINDS)[number][0];
 export type TrainerKind = (typeof TRAINER_KINDS)[number][0];
 export type ExtraKey = (typeof EXTRAS)[number][0];
 
-export type Shoe = { id: string; model: string; kind: ShoeKind };
+/**
+ * `start_m`: distance already on the shoes when added. `since`: the day they were added (runs
+ * before it don't count). `default`: unassigned runs count toward this pair. `retired`: kept for
+ * history, left out of packing.
+ */
+export type Shoe = { id: string; model: string; kind: ShoeKind; start_m: number; since: string | null; default: boolean; retired: boolean };
 export type Bike = { id: string; model: string; kind: BikeKind };
 export type Closet = {
   shoes: Shoe[];
@@ -65,8 +70,22 @@ export function cleanCloset(raw: unknown): Closet {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const list = (v: unknown) => (Array.isArray(v) ? v.slice(0, 12) : []);
   const shoes = list(r.shoes)
-    .map((s: Record<string, unknown>, i) => ({ id: id(s?.id, i), model: text(s?.model, 60), kind: oneOf(s?.kind, SHOE_KINDS, "daily") }))
+    .map((s: Record<string, unknown>, i) => ({
+      id: id(s?.id, i),
+      model: text(s?.model, 60),
+      kind: oneOf(s?.kind, SHOE_KINDS, "daily"),
+      start_m: typeof s?.start_m === "number" && Number.isFinite(s.start_m) ? Math.min(Math.max(0, Math.round(s.start_m)), 5_000_000) : 0,
+      since: typeof s?.since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.since) ? s.since : null,
+      default: s?.default === true,
+      retired: s?.retired === true,
+    }))
     .filter((s) => s.model);
+  // At most one default, and never a retired pair.
+  let seenDefault = false;
+  for (const sh of shoes) {
+    if (sh.default && !sh.retired && !seenDefault) seenDefault = true;
+    else sh.default = false;
+  }
   const bikes = list(r.bikes)
     .map((b: Record<string, unknown>, i) => ({ id: id(b?.id, i), model: text(b?.model, 60), kind: oneOf(b?.kind, BIKE_KINDS, "road") }))
     .filter((b) => b.model);
@@ -89,7 +108,8 @@ const label = (list: readonly (readonly [string, string])[], k: string) => list.
 export function closetForPrompt(c: Closet): string[] | null {
   if (isEmptyCloset(c)) return null;
   const lines: string[] = [];
-  lines.push(c.shoes.length ? `Shoes: ${c.shoes.map((s) => `${s.model} (${label(SHOE_KINDS, s.kind).toLowerCase()})`).join("; ")}` : "Shoes: none listed");
+  const shoes = c.shoes.filter((s) => !s.retired);
+  lines.push(shoes.length ? `Shoes: ${shoes.map((s) => `${s.model} (${label(SHOE_KINDS, s.kind).toLowerCase()})`).join("; ")}` : "Shoes: none listed");
   lines.push(c.bikes.length ? `Bikes: ${c.bikes.map((b) => `${b.model} (${label(BIKE_KINDS, b.kind)})`).join("; ")}` : "Bikes: none");
   lines.push(`Indoor trainer: ${c.trainer.kind === "none" ? "none" : `${label(TRAINER_KINDS, c.trainer.kind)}${c.trainer.model ? `, ${c.trainer.model}` : ""}`}`);
   const have = EXTRAS.filter(([k]) => c.extras[k]).map(([k, l]) => `${l}${c.extras[k]!.model ? ` (${c.extras[k]!.model})` : ""}`);
@@ -98,6 +118,40 @@ export function closetForPrompt(c: Closet): string[] | null {
   lines.push(`Does not have: ${missing.join(", ")}`);
   if (c.notes) lines.push(`Athlete's note: ${c.notes}`);
   return lines;
+}
+
+// ---------------------------------------------------------------- shoe mileage
+
+/** Common replacement window for running shoes: a heads-up at 300 mi, "time to replace" at 400 mi. */
+export const SHOE_WORN_M = 482_803;
+export const SHOE_REPLACE_M = 643_738;
+
+/** The pair unassigned runs count toward: the marked default, else the first daily trainer, else the first pair. */
+export function defaultShoe(c: Closet): Shoe | null {
+  const active = c.shoes.filter((s) => !s.retired);
+  return active.find((s) => s.default) ?? active.find((s) => s.kind === "daily") ?? active[0] ?? null;
+}
+
+export type RunForShoes = { id: string; date: string; distance_m: number | null };
+
+/** Meters on each pair: starting distance + runs assigned to it + unassigned runs (default pair, on or after its `since`). */
+export function shoeMileage(c: Closet, runs: RunForShoes[], assigned: Record<string, string>): Record<string, number> {
+  const out: Record<string, number> = Object.fromEntries(c.shoes.map((s) => [s.id, s.start_m]));
+  const def = defaultShoe(c);
+  for (const r of runs) {
+    const d = r.distance_m ?? 0;
+    if (d <= 0) continue;
+    const to = assigned[r.id];
+    if (to) {
+      if (to in out) out[to] += d;
+    } else if (def && (!def.since || r.date >= def.since)) out[def.id] += d;
+  }
+  for (const k of Object.keys(out)) out[k] = Math.round(out[k]);
+  return out;
+}
+
+export function shoeWear(m: number): "fresh" | "worn" | "replace" {
+  return m >= SHOE_REPLACE_M ? "replace" : m >= SHOE_WORN_M ? "worn" : "fresh";
 }
 
 // ---------------------------------------------------------------- what to pack
@@ -111,7 +165,8 @@ const has = (s: string, re: RegExp) => re.test(s);
  * A packing list for one workout from its sport and wording plus the athlete's closet. Rule-based
  * and conservative: it names the athlete's own gear where it can, and general items otherwise.
  */
-export function packFor(w: PackWorkout, c: Closet): PackItem[] {
+export function packFor(w: PackWorkout, closet: Closet, mileage: Record<string, number> = {}): PackItem[] {
+  const c = { ...closet, shoes: closet.shoes.filter((s) => !s.retired) };
   const sport = (w.sport ?? "").toLowerCase();
   const words = `${w.title ?? ""} ${w.description ?? ""}`.toLowerCase();
   const out: PackItem[] = [];
@@ -125,10 +180,14 @@ export function packFor(w: PackWorkout, c: Closet): PackItem[] {
     const fast = has(words, /race|tempo|threshold|interval|vo2|repeats?|strides|fartlek|time trial|\btt\b|goal pace/);
     const treadmill = has(words, /treadmill/);
     const pick = trail ? shoe("trail") : track ? shoe("spikes") ?? shoe("race") : fast ? shoe("race") : null;
-    const daily = shoe("daily") ?? c.shoes[0];
+    const daily = defaultShoe(c);
     if (pick) out.push({ item: pick.model, why: trail ? "Trail shoes for this route" : track ? "Fast shoes for the track" : "Workout shoes for the fast parts" });
     if (daily && daily !== pick) out.push({ item: daily.model, why: pick ? "To warm up and cool down in" : undefined });
     if (!pick && !daily) out.push({ item: trail ? "Trail shoes" : "Running shoes" });
+    for (const p of out) {
+      const sh = c.shoes.find((x) => x.model === p.item);
+      if (sh && mileage[sh.id] !== undefined && shoeWear(mileage[sh.id]) === "replace") p.why = `${p.why ? `${p.why}. ` : ""}These are past 400 miles: time to think about a new pair`;
+    }
     if (track && !c.extras.track) out.push({ item: "Find a track", why: "This one is written for a track" });
     if (treadmill) out.push({ item: c.extras.treadmill ? "Treadmill" : "Treadmill (you haven't listed access)" });
   } else if (/cycl|bik|ride|spin/.test(sport)) {

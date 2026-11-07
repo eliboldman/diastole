@@ -793,6 +793,67 @@ check("other athletes can't write it", !!r.error);
 r = await as(A1, `update public.athlete_gear set gear = '[]' where athlete_id = '${A1}'`);
 check("closet must be an object", !!r.error);
 
+// ---------------------------------------------------------------- shoes, server notify, pod challenges
+r = await as(A1, `insert into public.activity_shoes (activity_id, athlete_id, shoe_id) values ('${ACT1}', '${A1}', 'peg41') returning shoe_id`);
+check("athlete picks shoes for their run", r.rows?.[0]?.shoe_id === "peg41");
+r = await as(A1, `insert into public.activity_shoes (activity_id, athlete_id, shoe_id) values ('${ACT2}', '${A1}', 'peg41')`);
+check("can't claim someone else's run", !!r.error);
+r = await as(A1, `insert into public.activity_shoes (activity_id, athlete_id, shoe_id) values ('${ACT2}', '${A2}', 'x')`);
+check("can't set another athlete's shoes", !!r.error);
+r = await as(COACH, `select shoe_id from public.activity_shoes where activity_id = '${ACT1}'`);
+check("coach sees which shoes", r.rows?.[0]?.shoe_id === "peg41");
+r = await as(A1, `select public.server_notify('${A2}', 'workout_pack', 't', 'b', '/', 'k')`);
+check("signed-in users can't call server_notify", !!r.error);
+
+r = await as(COACH, "insert into public.pods (coach_id, name) values (auth.uid(), 'Challenge pod') returning id");
+const CPOD = r.rows?.[0]?.id;
+await db.exec(`
+  insert into public.pod_members (pod_id, athlete_id, status) values ('${CPOD}', '${A1}', 'active'), ('${CPOD}', '${A2}', 'active');
+  insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s, distance_m) values
+    ('${A1}', 'garmin', 'ch1', 'running', now(), 3600, 10000),
+    ('${A1}', 'garmin', 'ch2', 'cycling', now(), 7200, 60000),
+    ('${A2}', 'garmin', 'ch3', 'running', now(), 1800, 5000);
+`);
+r = await as(A1, `insert into public.pod_challenges (pod_id, created_by, title, metric, sport, mode, goal, starts_on, ends_on)
+  values ('${CPOD}', '${A1}', 'Team hours', 'hours', 'any', 'team', 10, current_date - 1, current_date + 5) returning id`);
+const CH = r.rows?.[0]?.id;
+check("a pod member starts a challenge", !!CH);
+const chNotes = (await db.query(`select user_id from public.notifications where kind = 'pod_challenge' and dedupe_key = 'challenge:${CH}'`)).rows.map((x) => x.user_id);
+check("the pod (not the creator) is notified", chNotes.includes(A2) && chNotes.includes(COACH) && !chNotes.includes(A1));
+r = await as(STRANGER, `insert into public.pod_challenges (pod_id, created_by, title, metric, mode, goal, starts_on, ends_on) values ('${CPOD}', '${STRANGER}', 'x', 'hours', 'team', 1, current_date, current_date)`);
+check("outsiders can't start one", !!r.error);
+r = await as(A1, `insert into public.pod_challenges (pod_id, created_by, title, metric, mode, starts_on, ends_on) values ('${CPOD}', '${A1}', 'x', 'hours', 'team', current_date, current_date)`);
+check("a team challenge needs a goal", !!r.error);
+r = await as(A1, `select public.get_pod_challenges('${CPOD}') as c`);
+check("nobody counted before joining", r.rows?.[0]?.c?.[0]?.entries?.length === 0);
+await as(A1, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${A1}')`);
+await as(A2, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${A2}')`);
+r = await as(A2, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${A1}')`);
+check("you can only join as yourself", !!r.error);
+r = await as(COACH, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${COACH}')`);
+check("the coach organizes but doesn't join", !!r.error);
+r = await as(A2, `select public.get_pod_challenges('${CPOD}') as c`);
+const ch = r.rows?.[0]?.c?.[0];
+const chA1 = ch?.entries?.find((e) => e.athlete_id === A1);
+const chA2 = ch?.entries?.find((e) => e.athlete_id === A2);
+check("totals count every joined member's workouts", Number(chA1?.value) === 3 && Number(chA2?.value) === 0.5);
+check("leader first", ch?.entries?.[0]?.athlete_id === A1);
+r = await as(STRANGER, `select public.get_pod_challenges('${CPOD}') as c`);
+check("outsiders see no challenges", (r.rows?.[0]?.c ?? []).length === 0);
+r = await as(A1, `insert into public.pod_challenges (pod_id, created_by, title, metric, sport, mode, starts_on, ends_on)
+  values ('${CPOD}', '${A1}', 'Run km', 'distance', 'run', 'leaderboard', current_date - 1, current_date + 5) returning id`);
+const CH2 = r.rows?.[0]?.id;
+await as(A1, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH2}', '${A1}')`);
+r = await as(A1, `select public.get_pod_challenges('${CPOD}') as c`);
+check("sport filter: only runs count toward run distance", Number(r.rows?.[0]?.c?.find((x) => x.id === CH2)?.entries?.[0]?.value) === 10);
+r = await as(A2, `delete from public.pod_challenges where id = '${CH}' returning id`);
+check("members can't delete someone else's challenge", !r.rows?.length);
+await as(A2, `delete from public.pod_challenge_entries where challenge_id = '${CH}' and athlete_id = '${A2}'`);
+r = await as(A1, `select public.get_pod_challenges('${CPOD}') as c`);
+check("leaving removes you from the board", r.rows?.[0]?.c?.find((x) => x.id === CH)?.entries?.length === 1);
+r = await as(COACH, `delete from public.pod_challenges where id = '${CH}' returning id`);
+check("the coach can delete any challenge in their pod", r.rows?.length === 1);
+
 // Page layouts (Customize)
 r = await as(A1, `update public.profiles set layout = '{"me":{"order":["prs"],"hidden":["form"]}}' where id = '${A1}' returning layout`);
 check("athlete saves their own page layout", r.rows?.[0]?.layout?.me?.hidden?.[0] === "form");

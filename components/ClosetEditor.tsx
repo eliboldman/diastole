@@ -4,7 +4,7 @@ import { Bike, Footprints, Plus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
 import { saveCloset } from "@/lib/closet-actions";
-import { BIKE_KINDS, EXTRAS, SHOE_KINDS, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
+import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
 
 const input = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none";
 const select = `${input} pr-8`;
@@ -28,7 +28,21 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
 }
 
 /** Edit an athlete's closet. Saves on its own a moment after each change. */
-export default function ClosetEditor({ athleteId, initial }: { athleteId: string; initial: Closet }) {
+export default function ClosetEditor({
+  athleteId,
+  initial,
+  mileage,
+  units = "mi",
+  today,
+}: {
+  athleteId: string;
+  initial: Closet;
+  mileage?: Record<string, number>; // meters per shoe id
+  units?: "mi" | "km";
+  today: string; // YYYY-MM-DD in the athlete's timezone: new shoes count runs from today
+}) {
+  const perUnit = units === "mi" ? 1609.344 : 1000;
+  const dist = (m: number) => `${Math.round(m / perUnit)} ${units}`;
   const [c, setC] = useState<Closet>(initial);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [, startTransition] = useTransition();
@@ -55,21 +69,71 @@ export default function ClosetEditor({ athleteId, initial }: { athleteId: string
           <Footprints size={14} aria-hidden /> Shoes
         </p>
         <ul className="mt-2 space-y-2">
-          {c.shoes.map((s, i) => (
-            <li key={s.id} className="flex items-center gap-2">
-              <input className={input} value={s.model} maxLength={60} placeholder="Model, e.g. Pegasus 41" aria-label="Shoe model" onChange={(e) => setShoe(i, { model: e.target.value })} />
-              <select className={`${select} max-w-[9.5rem]`} value={s.kind} aria-label="Shoe type" onChange={(e) => setShoe(i, { kind: e.target.value as ShoeKind })}>
-                {SHOE_KINDS.map(([k, l]) => (
-                  <option key={k} value={k}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-              <RemoveButton onClick={() => update({ ...c, shoes: c.shoes.filter((_, j) => j !== i) })} what={s.model || "shoe"} />
-            </li>
-          ))}
+          {c.shoes.map((s, i) => {
+            const m = mileage?.[s.id];
+            const wear = m === undefined ? null : shoeWear(m);
+            const isDefault = defaultShoe(c)?.id === s.id;
+            return (
+              <li key={s.id} className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 ${s.retired ? "opacity-60" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <input className={input} value={s.model} maxLength={60} placeholder="Model, e.g. Pegasus 41" aria-label="Shoe model" onChange={(e) => setShoe(i, { model: e.target.value })} />
+                  <select className={`${select} max-w-[9.5rem]`} value={s.kind} aria-label="Shoe type" onChange={(e) => setShoe(i, { kind: e.target.value as ShoeKind })}>
+                    {SHOE_KINDS.map(([k, l]) => (
+                      <option key={k} value={k}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  <RemoveButton onClick={() => update({ ...c, shoes: c.shoes.filter((_, j) => j !== i) })} what={s.model || "shoe"} />
+                </div>
+                <details className="group px-1">
+                  <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-xs text-white/55">
+                    <span className="min-w-0 truncate">
+                      {m !== undefined && <span className={wear === "replace" ? "text-amber-200" : wear === "worn" ? "text-amber-100/80" : "text-white/70"}>{dist(m)}</span>}
+                      {m !== undefined && " · "}
+                      {s.retired ? "Retired" : isDefault ? "Default for runs" : "Tap for details"}
+                      {wear === "replace" && !s.retired ? " · time to think about a new pair" : wear === "worn" && !s.retired ? " · getting worn" : ""}
+                    </span>
+                    <span className="shrink-0 text-emerald-200 group-open:hidden">Details</span>
+                  </summary>
+                  <div className="grid gap-2 pb-2 pt-1 sm:grid-cols-3 sm:items-center">
+                    <label className="flex items-center gap-2 text-xs text-white/60">
+                      <span className="shrink-0">Already on them</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={3000}
+                        className={`${input} min-h-10 w-24`}
+                        value={s.start_m ? Math.round((s.start_m / perUnit) * 10) / 10 : ""}
+                        placeholder="0"
+                        aria-label={`${units} already on ${s.model || "these shoes"}`}
+                        onChange={(e) => setShoe(i, { start_m: Math.max(0, Number(e.target.value) || 0) * perUnit })}
+                      />
+                      <span>{units}</span>
+                    </label>
+                    <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 accent-emerald-300"
+                        checked={s.default}
+                        disabled={s.retired}
+                        onChange={(e) => update({ ...c, shoes: c.shoes.map((x, j) => ({ ...x, default: j === i ? e.target.checked : e.target.checked ? false : x.default })) })}
+                      />
+                      Default for runs
+                    </label>
+                    <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
+                      <input type="checkbox" className="h-5 w-5 accent-emerald-300" checked={s.retired} onChange={(e) => setShoe(i, { retired: e.target.checked, default: e.target.checked ? false : s.default })} />
+                      Retired
+                    </label>
+                  </div>
+                </details>
+              </li>
+            );
+          })}
         </ul>
-        {c.shoes.length < 12 && <AddButton onClick={() => update({ ...c, shoes: [...c.shoes, { id: newId(), model: "", kind: "daily" }] })} label="Add shoes" />}
+        <p className="mt-2 text-xs text-white/45">Runs count toward your default pair unless you pick different shoes on the run.</p>
+        {c.shoes.length < 12 && <AddButton onClick={() => update({ ...c, shoes: [...c.shoes, { id: newId(), model: "", kind: "daily", start_m: 0, since: today, default: false, retired: false }] })} label="Add shoes" />}
       </div>
 
       <div>

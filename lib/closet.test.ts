@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { cleanCloset, closetForPrompt, EMPTY_CLOSET, isEmptyCloset, packFor } from "./closet.ts";
+import { cleanCloset, closetForPrompt, defaultShoe, EMPTY_CLOSET, isEmptyCloset, packFor, SHOE_REPLACE_M, shoeMileage, shoeWear } from "./closet.ts";
 
 const c = cleanCloset({
   shoes: [
@@ -54,4 +54,31 @@ assert.ok(items({ sport: "open_water_swimming", title: "Lake swim" }, EMPTY_CLOS
 assert.deepEqual(items({ sport: "running", title: "Easy" }, EMPTY_CLOSET), ["Running shoes"]);
 assert.equal(items({ sport: "bike", title: "Endurance" })[0], "Specialized Tarmac", "planned-workout sport names");
 assert.equal(items({ sport: "run", title: "Tempo" })[0], "Vaporfly 3");
+
+// Shoe mileage
+const sh = cleanCloset({
+  shoes: [
+    { id: "p", model: "Pegasus", kind: "daily", start_m: 100_000, since: "2026-10-01" },
+    { id: "v", model: "Vaporfly", kind: "race", default: true, retired: true },
+    { id: "n", model: "Novablast", kind: "daily", default: true, since: "2026-11-01" },
+    { id: "x", model: "Other", kind: "daily", default: true },
+  ],
+});
+assert.equal(sh.shoes.filter((s) => s.default).length, 1, "one default, never retired");
+assert.equal(defaultShoe(sh)?.id, "n");
+const runs = [
+  { id: "r1", date: "2026-10-20", distance_m: 10_000 }, // before Novablast's since: not counted unassigned
+  { id: "r2", date: "2026-11-03", distance_m: 8_000 }, // unassigned -> Novablast
+  { id: "r3", date: "2026-11-04", distance_m: 5_000 }, // assigned to Pegasus
+  { id: "r4", date: "2026-11-05", distance_m: 3_000 }, // assigned to an unknown shoe: ignored
+];
+const miles = shoeMileage(sh, runs, { r3: "p", r4: "gone" });
+assert.equal(miles.p, 105_000);
+assert.equal(miles.n, 8_000);
+assert.equal(miles.v, 0);
+assert.equal(shoeWear(SHOE_REPLACE_M + 1), "replace");
+assert.equal(shoeWear(0), "fresh");
+assert.ok(!packFor({ sport: "run", title: "Race day tempo" }, sh).some((p) => p.item === "Vaporfly"), "retired shoes aren't packed");
+const worn = packFor({ sport: "run", title: "Easy" }, sh, { n: SHOE_REPLACE_M + 10 });
+assert.ok(worn[0].why?.includes("400 miles"));
 console.log("closet: all passed");

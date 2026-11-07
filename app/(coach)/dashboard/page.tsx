@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { CalendarDays, CalendarRange, Plus } from "lucide-react";
+import { CalendarDays, CalendarRange, ClipboardList, Plus } from "lucide-react";
 
 import QuickLinks from "@/components/layout/QuickLinks";
 import SyncedAgo from "@/components/SyncedAgo";
@@ -94,7 +94,12 @@ export default async function TodayPage() {
   return (
     <DashboardShell tone={tone}>
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
-      <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
+        <Link href="/digest" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1]">
+          <ClipboardList size={16} aria-hidden /> Weekly digest
+        </Link>
+      </div>
       {/* The coach trains too: their own post-workout check */}
       <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
       <CheckinPrompt athleteId={coach.id} />

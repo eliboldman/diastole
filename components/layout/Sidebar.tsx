@@ -17,7 +17,7 @@ type Item = { label: string; href: string; icon: LucideIcon; short?: string; mat
 // The five tabs (bottom bar on phones, sidebar on desktop).
 const NAV: Record<NavRole, Item[]> = {
   coach: [
-    { label: "Today", href: "/dashboard", icon: Sun },
+    { label: "Today", href: "/dashboard", icon: Sun, match: /^\/digest(\/|$)/ },
     { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods)(\/|$)|^\/activity\// },
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
