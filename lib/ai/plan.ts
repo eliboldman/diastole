@@ -5,7 +5,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { AI_MODELS, costOf, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
-import { AiLeaf, AiRepeat } from "@/lib/ai/step-schema";
+import { FixOut, PlanOut, type PlanWorkout } from "@/lib/ai/step-schema";
 import { createAdminClient, createClient, type Profile } from "@/lib/supabase/server";
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
@@ -22,25 +22,7 @@ const MAX_DAYS = 28;
 
 // ---------------------------------------------------------------- what Claude returns
 
-const Workout = z.object({
-  date: z.string().describe("YYYY-MM-DD, within the requested window"),
-  sport: z.enum(["run", "bike", "swim"]),
-  title: z.string().describe("workout name in the coach's tone, under 60 characters"),
-  description: z.string().nullable().describe("top-level message for the athlete, in the coach's tone; one or two sentences"),
-  why: z.string().describe("one or two plain sentences for the athlete: what this session is for"),
-  pool_length: z.number().nullable().describe("swims only: pool length"),
-  pool_unit: z.enum(["yd", "m"]).nullable().describe("swims only"),
-  steps: z.array(z.discriminatedUnion("kind", [AiLeaf, AiRepeat])),
-});
-const PlanOut = z.object({
-  summary: z.string().describe("for the coach, 3-5 sentences: period and focus of this block, how the request's guidance and the athlete's data shaped it"),
-  weeks: z.array(z.object({ week_start: z.string().describe("YYYY-MM-DD"), focus: z.string(), planned_hours: z.number().nullable() })),
-  workouts: z.array(Workout),
-  other_days: z.array(z.object({ date: z.string(), kind: z.enum(["rest", "strength", "travel", "race", "note"]), note: z.string() })).describe("strength, rest, travel and race days (not watch workouts)"),
-  assumptions: z.string().nullable().describe("anything assumed or missing (e.g. no current FTP), for the coach; null if none"),
-});
-const FixOut = z.object({ workouts: z.array(Workout) });
-type AiWorkout = z.infer<typeof Workout>;
+type AiWorkout = z.infer<typeof PlanWorkout>;
 
 const SYSTEM = `You are the planning assistant for an endurance coach. You draft a block of training for ONE athlete. The coach reviews and approves every workout before the athlete sees it.
 
@@ -267,7 +249,7 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
         start_date: input.start,
         days,
         guidance: guidance || null,
-        summary: { summary: plan.summary, weeks: plan.weeks, other_days: plan.other_days, assumptions: plan.assumptions, dropped, cost_usd: Math.round(total * 1000) / 1000 },
+        summary: { summary: plan.summary, weeks: plan.weeks, other_days: plan.other_days, assumptions: plan.assumptions.trim() || null, dropped, cost_usd: Math.round(total * 1000) / 1000 },
       })
       .select("id")
       .single();

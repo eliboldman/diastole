@@ -23,3 +23,35 @@ export const AiLeaf = z.object({
   note: z.string().nullable().describe("short cue shown on the watch, optional"),
 });
 export const AiRepeat = z.object({ kind: z.literal("repeat"), times: z.number().int(), steps: z.array(AiLeaf) });
+
+// Both whole outputs live here (not in the server files) so a test can check them against the API's
+// schema limits: at most 16 nullable/union parameters (see schema-limits.ts). BuildOut is at 16.
+
+/** "Describe it": one workout. */
+export const BuildOut = z.object({
+  title: z.string().describe("short, e.g. 6 × 800 m at 5K pace"),
+  sport: z.enum(["run", "bike", "swim"]),
+  description: z.string().nullable().describe("one or two sentences for the athlete, only if the coach gave context"),
+  steps: z.array(z.discriminatedUnion("kind", [AiLeaf, AiRepeat])),
+  assumptions: z.string().nullable().describe("anything you had to assume or couldn't represent, for the coach; null if none"),
+});
+
+/** "Suggest workouts": plan-level fields are required (empty or 0 = none) to stay under the limit. */
+export const PlanWorkout = z.object({
+  date: z.string().describe("YYYY-MM-DD, within the requested window"),
+  sport: z.enum(["run", "bike", "swim"]),
+  title: z.string().describe("workout name in the coach's tone, under 60 characters"),
+  description: z.string().describe("top-level message for the athlete, in the coach's tone; one or two sentences; empty if none"),
+  why: z.string().describe("one or two plain sentences for the athlete: what this session is for"),
+  pool_length: z.number().describe("swims: pool length; 0 for runs and rides"),
+  pool_unit: z.enum(["yd", "m"]).describe("swims: the pool's unit; ignored otherwise"),
+  steps: z.array(z.discriminatedUnion("kind", [AiLeaf, AiRepeat])),
+});
+export const PlanOut = z.object({
+  summary: z.string().describe("for the coach, 3-5 sentences: period and focus of this block, how the request's guidance and the athlete's data shaped it"),
+  weeks: z.array(z.object({ week_start: z.string().describe("YYYY-MM-DD"), focus: z.string(), planned_hours: z.number().describe("0 if not estimated") })),
+  workouts: z.array(PlanWorkout),
+  other_days: z.array(z.object({ date: z.string(), kind: z.enum(["rest", "strength", "travel", "race", "note"]), note: z.string() })).describe("strength, rest, travel and race days (not watch workouts)"),
+  assumptions: z.string().describe("anything assumed or missing (e.g. no current FTP), for the coach; empty if none"),
+});
+export const FixOut = z.object({ workouts: z.array(PlanWorkout) });

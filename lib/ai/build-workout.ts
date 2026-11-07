@@ -2,11 +2,10 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { z } from "zod";
 
 import { AI_MODELS, costOf, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { createAdminClient, createClient, requireCoach } from "@/lib/supabase/server";
-import { AiLeaf as Leaf, AiRepeat as Repeat } from "@/lib/ai/step-schema";
+import { BuildOut as Output } from "@/lib/ai/step-schema";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
@@ -20,13 +19,6 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // ---------------------------------------------------------------- what Claude returns
 // Plain units (m:ss paces in the coach's unit, % of FTP, yards/meters/miles); the server converts.
 
-const Output = z.object({
-  title: z.string().describe("short, e.g. 6 × 800 m at 5K pace"),
-  sport: z.enum(["run", "bike", "swim"]),
-  description: z.string().nullable().describe("one or two sentences for the athlete, only if the coach gave context"),
-  steps: z.array(z.discriminatedUnion("kind", [Leaf, Repeat])),
-  assumptions: z.string().nullable().describe("anything you had to assume or couldn't represent, for the coach; null if none"),
-});
 
 // ---------------------------------------------------------------- prompt
 
