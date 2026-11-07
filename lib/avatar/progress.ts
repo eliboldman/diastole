@@ -56,7 +56,7 @@ export async function refreshProgress(admin: SupabaseClient, athleteId: string, 
   await scanBests(admin, athleteId);
   const since = new Date(Date.now() - 2 * 365 * 86_400_000).toISOString();
   const [{ data: details }, { data: acts }, { data: zones }, { data: goal }] = await Promise.all([
-    admin.from("activity_details").select("activity_id, bests, activities!inner(start_time)").eq("athlete_id", athleteId).not("bests", "is", null),
+    admin.from("activity_details").select("activity_id, bests, activities!inner(start_time, sport)").eq("athlete_id", athleteId).not("bests", "is", null),
     admin.from("activities").select("id, sport, start_time, distance_m").eq("athlete_id", athleteId).gte("start_time", since).order("start_time"),
     admin.from("zone_history").select("field, value, changed_at").eq("athlete_id", athleteId).order("changed_at"),
     admin.from("athlete_goals").select("race_name").eq("athlete_id", athleteId).maybeSingle(),
@@ -75,9 +75,17 @@ export async function refreshProgress(admin: SupabaseClient, athleteId: string, 
   // PRs from best efforts, in date order.
   const best = new Map<string, number>();
   const rows = (details ?? [])
-    .map((d) => ({ id: d.activity_id as string, bests: (d.bests ?? {}) as Bests, at: (d.activities as unknown as { start_time: string }).start_time }))
+    .map((d) => {
+      const a = d.activities as unknown as { start_time: string; sport: string | null };
+      return { id: d.activity_id as string, bests: (d.bests ?? {}) as Bests, at: a.start_time, bike: sportGroup(a.sport) === "bike" };
+    })
     .sort((a, b) => a.at.localeCompare(b.at));
-  for (const r of rows) for (const [k, v] of Object.entries(r.bests) as [keyof Bests, number][]) if (BEST_KEY[k]) improve(BEST_KEY[k], v, r.id, r.at, best);
+  for (const r of rows)
+    for (const [k, v] of Object.entries(r.bests) as [keyof Bests, number][]) {
+      // Power PRs come from rides only; older runs may still have a stored power best.
+      if (k === "power_20m" && !r.bike) continue;
+      if (BEST_KEY[k]) improve(BEST_KEY[k], v, r.id, r.at, best);
+    }
 
   // Longest run / ride.
   for (const a of acts ?? []) {

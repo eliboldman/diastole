@@ -29,6 +29,10 @@ assert.equal(b.run_10k, undefined);
 assert.deepEqual(bestsOf({ interval_s: 5, t, dist }, "cycling"), {}, "no run bests on a ride");
 const ride = bestsOf({ interval_s: 5, t, power: t.map((s) => (s < 1300 ? 250 : 150)) }, "cycling");
 assert.equal(ride.power_20m, 250);
+assert.equal(bestsOf({ interval_s: 5, t, power: t.map(() => 300) }, "virtual_ride").power_20m, 300, "indoor rides count");
+const runPower = bestsOf({ interval_s: 5, t, dist, power: t.map(() => 300) }, "running");
+assert.equal(runPower.power_20m, undefined, "running power is never a PR");
+assert.equal(runPower.run_1mi, 322, "runs still get distance bests");
 
 // GPS catch-up: a 30 s gap then the distance jumps 600 m in one step. No fake fast mile.
 {

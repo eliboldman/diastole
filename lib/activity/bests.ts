@@ -1,5 +1,5 @@
 // Best efforts inside one workout, from its resampled streams: fastest time over standard run
-// distances and best 20-minute power. Pure, for tests and the server.
+// distances (runs) and best 20-minute power (rides only; running power isn't a PR). Pure, for tests and the server.
 import type { Streams } from "./fit.ts";
 
 export const RUN_DISTANCES = [
@@ -12,6 +12,8 @@ export const RUN_DISTANCES = [
 export type Bests = Partial<Record<(typeof RUN_DISTANCES)[number]["key"] | "power_20m", number>>;
 
 const RUN = /run|treadmill|track|trail/i;
+// Same as sportGroup()'s "bike" in lib/pod-stickers (kept here so this module stays dependency-free).
+export const BIKE = /cycl|bik|ride|spin/i;
 
 // No human runs a sustained 5-second step faster than this (~2:13/km); faster means GPS trouble.
 const MAX_STEP_MPS = 7.5;
@@ -102,7 +104,7 @@ export function bestsOf(streams: Streams | null | undefined, sport: string | nul
       if (v <= worldBest && (!avg || v <= avg * 1.7)) out[d.key] = s;
     }
   }
-  if (streams.power) {
+  if (BIKE.test(sport ?? "") && !RUN.test(sport ?? "") && streams.power) {
     const p = bestAverage(streams.power, streams.interval_s, 1200);
     if (p && p < 700) out.power_20m = p;
   }
