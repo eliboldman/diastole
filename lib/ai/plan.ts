@@ -10,6 +10,7 @@ import { createAdminClient, createClient, type Profile } from "@/lib/supabase/se
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 // "Suggest workouts": Claude drafts up to four weeks for ONE athlete from the coach's guide, that
 // athlete's private notes, zones, preferred week, recent training and recovery, races, and the coach's
@@ -292,7 +293,7 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude is busy right now. Try again in a minute." };
     if (e instanceof Anthropic.AuthenticationError) return { ok: false, error: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { ok: false, error: `Claude API error ${e.status}.` };
+    if (e instanceof Anthropic.APIError) return { ok: false, error: apiErrorText(e, "plan") };
     throw e;
   }
 }

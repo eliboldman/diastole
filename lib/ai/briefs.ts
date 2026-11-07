@@ -10,6 +10,7 @@ import { normalizePain, SPOTS, spotLabel, PAIN_LABEL, FEEL, type PainLevel } fro
 import { createAdminClient } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 const SYSTEM = `You draft a short morning note from an endurance coach to each of their athletes. The coach reviews, edits and sends every note themselves, as a chat message in their own voice.
 
@@ -125,7 +126,7 @@ export async function draftMorningBriefs(coachId: string): Promise<BriefRun> {
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { status: "skipped", reason: "Claude API rate limit. Try again shortly." };
     if (e instanceof Anthropic.AuthenticationError) return { status: "skipped", reason: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: `Claude API error ${e.status}.` };
+    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: apiErrorText(e, "briefs") };
     throw e;
   }
 

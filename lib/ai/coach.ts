@@ -7,6 +7,7 @@ import { z } from "zod";
 import { localDate, refreshReadiness } from "@/lib/readiness/run";
 import { createAdminClient } from "@/lib/supabase/server";
 import { validateSteps, type Step, type Target } from "@/lib/workouts/garmin-format";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 // ---------------------------------------------------------------- models & pricing (USD per million tokens)
 
@@ -208,7 +209,7 @@ export async function runCoachAssistant(coachId: string, trigger: "cron" | "manu
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { status: "skipped", reason: "Claude API rate limit — try again shortly." };
     if (e instanceof Anthropic.AuthenticationError) return { status: "skipped", reason: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: `Claude API error ${e.status}: ${e.message.slice(0, 160)}` };
+    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: apiErrorText(e, "coach") };
     throw e;
   }
 

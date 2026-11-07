@@ -9,6 +9,7 @@ import { createAdminClient, createClient, requireCoach } from "@/lib/supabase/se
 import { AiLeaf as Leaf, AiRepeat as Repeat } from "@/lib/ai/step-schema";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 // Cheapest model first (Eli's rule); if its workout doesn't pass the Garmin checks, the coach's
 // model gets one retry with the exact errors.
@@ -147,7 +148,7 @@ export async function buildWorkoutFromPrompt(input: {
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude is busy right now. Try again in a moment." };
     if (e instanceof Anthropic.AuthenticationError) return { ok: false, error: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { ok: false, error: `Claude API error ${e.status}.` };
+    if (e instanceof Anthropic.APIError) return { ok: false, error: apiErrorText(e, "build-workout") };
     throw e;
   }
 }

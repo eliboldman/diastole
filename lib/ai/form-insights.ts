@@ -8,6 +8,7 @@ import { detectPatterns, FORM, type Pattern } from "@/lib/activity/form";
 import { recentFormRuns } from "@/lib/activity/form-store";
 import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { createAdminClient } from "@/lib/supabase/server";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 // Form insights: when a running-form issue shows up across several runs, Claude writes a short note
 // for the coach and picks workouts or drills from the coach's own library. Nothing goes to an athlete:
@@ -128,7 +129,7 @@ ${JSON.stringify(lib)}`,
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { status: "skipped", reason: "Claude API rate limit — try again shortly." };
     if (e instanceof Anthropic.AuthenticationError) return { status: "skipped", reason: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: `Claude API error ${e.status}: ${e.message.slice(0, 160)}` };
+    if (e instanceof Anthropic.APIError) return { status: "skipped", reason: apiErrorText(e, "form-insights") };
     throw e;
   }
 

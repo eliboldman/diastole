@@ -10,6 +10,7 @@ import { sportLabel } from "@/lib/activity/format";
 import { createAdminClient, createClient, requireCoach } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
+import { apiErrorText } from "@/lib/ai/api-error";
 
 // A short draft: the cheapest model does it well (Eli's rule: cheapest model per job, small for drafts).
 const WHY_MODEL: AiModel = "claude-haiku-5-5";
@@ -139,7 +140,7 @@ async function generateWhy(coachId: string, w: WorkoutForWhy): Promise<WhyResult
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude is busy right now. Try again in a moment." };
     if (e instanceof Anthropic.AuthenticationError) return { ok: false, error: "The Anthropic API key was rejected." };
-    if (e instanceof Anthropic.APIError) return { ok: false, error: `Claude API error ${e.status}.` };
+    if (e instanceof Anthropic.APIError) return { ok: false, error: apiErrorText(e, "why") };
     throw e;
   }
 
