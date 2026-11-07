@@ -7,6 +7,9 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-canvas: #0d1513;
   --color-panel: #15201d;
+  /* Readiness "ready" green: fixed, whatever the theme. */
+  --color-ready-200: oklch(90.5% 0.093 164.15);
+  --color-ready-300: oklch(84.5% 0.143 164.978);
   --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -699,3 +702,79 @@ body {
   }
 }
 
+
+/* ---------------------------------------------------------------- Themes (Phase 13)
+   The accent is Tailwind's emerald palette everywhere; each theme repaints it. */
+:root[data-theme="ocean"] {
+  --color-emerald-50: oklch(97.7% 0.013 236.62);
+  --color-emerald-100: oklch(95.1% 0.026 236.824);
+  --color-emerald-200: oklch(90.1% 0.058 230.902);
+  --color-emerald-300: oklch(82.8% 0.111 230.318);
+  --color-emerald-400: oklch(74.6% 0.16 232.661);
+  --color-emerald-950: oklch(29.3% 0.066 243.157);
+  --color-canvas: #0c1418;
+}
+:root[data-theme="violet"] {
+  --color-emerald-50: oklch(96.9% 0.016 293.756);
+  --color-emerald-100: oklch(94.3% 0.029 294.588);
+  --color-emerald-200: oklch(89.4% 0.057 293.283);
+  --color-emerald-300: oklch(81.1% 0.111 293.571);
+  --color-emerald-400: oklch(70.2% 0.183 293.541);
+  --color-emerald-950: oklch(28.3% 0.141 291.089);
+  --color-canvas: #110f18;
+}
+:root[data-theme="mono"] {
+  --color-emerald-50: #fafafa;
+  --color-emerald-100: #f4f4f5;
+  --color-emerald-200: #e4e4e7;
+  --color-emerald-300: #d4d4d8;
+  --color-emerald-400: #a1a1aa;
+  --color-emerald-950: #18181b;
+  --color-canvas: #0e0f10;
+}
+:root[data-theme="ocean"] .app-canvas {
+  background-image: radial-gradient(1100px 520px at 50% -8%, rgba(125, 211, 252, 0.12), transparent 70%), radial-gradient(900px 600px at 100% 110%, rgba(110, 231, 183, 0.05), transparent 70%);
+}
+:root[data-theme="violet"] .app-canvas {
+  background-image: radial-gradient(1100px 520px at 50% -8%, rgba(196, 181, 253, 0.12), transparent 70%), radial-gradient(900px 600px at 100% 110%, rgba(244, 114, 182, 0.05), transparent 70%);
+}
+:root[data-theme="mono"] .app-canvas {
+  background-image: radial-gradient(1100px 520px at 50% -8%, rgba(255, 255, 255, 0.07), transparent 70%);
+}
+
+/* Blocks: the hidden pixel theme. Original styling: square corners, chunky edges, a pixel font
+   and a faint 16px grid. */
+:root[data-theme="blocks"] {
+  --color-emerald-50: #effbe6;
+  --color-emerald-100: #dcf5c8;
+  --color-emerald-200: #b9eb92;
+  --color-emerald-300: #8fd95a;
+  --color-emerald-400: #6cbf35;
+  --color-emerald-950: #1b3a0c;
+  --color-canvas: #14120e;
+  --font-sans: var(--font-pixel), ui-monospace, monospace;
+}
+:root[data-theme="blocks"] body {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  letter-spacing: 0.01em;
+}
+:root[data-theme="blocks"] *,
+:root[data-theme="blocks"] *::before,
+:root[data-theme="blocks"] *::after {
+  border-radius: 0 !important;
+}
+:root[data-theme="blocks"] .app-canvas {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(900px 500px at 50% -10%, rgba(143, 217, 90, 0.12), transparent 70%);
+  background-size: 16px 16px, 16px 16px, auto;
+}
+:root[data-theme="blocks"] button:not(:disabled),
+:root[data-theme="blocks"] a.lift {
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="blocks"] button:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}

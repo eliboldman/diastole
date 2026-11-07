@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -760,6 +760,12 @@ r = await as(A1, `insert into public.gut_sessions (on_date, carbs_g_per_h, comfo
 check("athlete logs gut training", !r.error);
 r = await as(A2, `select count(*)::int as n from public.gut_sessions where athlete_id = '${A1}'`);
 check("other athletes can't see gut training", r.rows?.[0]?.n === 0);
+
+// Themes
+r = await as(A1, `update public.profiles set theme = 'blocks' where id = '${A1}' returning theme`);
+check("athlete picks a theme", r.rows?.[0]?.theme === "blocks");
+r = await as(A1, `update public.profiles set theme = 'neon' where id = '${A1}'`);
+check("unknown themes are refused", !!r.error);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

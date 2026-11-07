@@ -1,9 +1,11 @@
 "use server";
 
 import { createClient as createPlainClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { siteUrl } from "@/lib/site-url";
+import { asTheme, THEME_COOKIE } from "@/lib/themes";
 import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = { error?: string; email?: string };
@@ -26,6 +28,12 @@ export async function signInWithPassword(_prev: LoginState, form: FormData): Pro
       error: "Email or password is incorrect. First time here, or never set a password? Use “Forgot password” below.",
       email,
     };
+  }
+  // Paint this account's theme on this device from the first page.
+  const { data: auth } = await supabase.auth.getUser();
+  if (auth.user) {
+    const { data: p } = await supabase.from("profiles").select("theme").eq("id", auth.user.id).maybeSingle();
+    (await cookies()).set(THEME_COOKIE, asTheme(p?.theme), { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax" });
   }
   redirect("/login");
 }

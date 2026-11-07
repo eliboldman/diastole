@@ -10,6 +10,8 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
+import ThemePicker from "@/components/ThemePicker";
+import { asTheme } from "@/lib/themes";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -39,7 +41,7 @@ export default async function AccountPage() {
   const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
@@ -159,6 +161,12 @@ export default async function AccountPage() {
                 <Row href="/pods">Manage your pods</Row>
               </div>
             )}
+          </section>
+
+          <section className={card}>
+            <h2 className="mb-1 text-lg font-medium">Appearance</h2>
+            <p className="mb-3 text-sm text-white/55">Pick a color theme. Readiness colors stay the same in every theme.</p>
+            <ThemePicker initial={asTheme(profile?.theme)} />
           </section>
 
           <section className={card}>

@@ -2,7 +2,7 @@ import type { Flag } from "@/lib/readiness/engine";
 
 // Status colors are reserved for readiness state and always ship with a text label.
 export const FLAG_STYLE: Record<Flag, { dot: string; glow: string; label: string; text: string }> = {
-  green: { dot: "bg-emerald-300", glow: "glow-green", label: "Ready", text: "text-emerald-200" },
+  green: { dot: "bg-ready-300", glow: "glow-green", label: "Ready", text: "text-ready-200" },
   yellow: { dot: "bg-amber-300", glow: "glow-yellow", label: "Caution", text: "text-amber-200" },
   red: { dot: "bg-red-400", glow: "glow-red", label: "Recover", text: "text-red-200" },
   unknown: { dot: "bg-white/25", glow: "", label: "Building baseline", text: "text-white/60" },
