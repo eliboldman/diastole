@@ -767,5 +767,9 @@ check("athlete picks a theme", r.rows?.[0]?.theme === "blocks");
 r = await as(A1, `update public.profiles set theme = 'neon' where id = '${A1}'`);
 check("unknown themes are refused", !!r.error);
 
+// Barcode meals
+r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, eaten_at, items, carbs_g, protein_g, fat_g, source) values ('${A1}', '2026-11-06', now(), '[]', 26, 4, 6, 'barcode') returning id`);
+check("a barcode meal can be logged", !r.error);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

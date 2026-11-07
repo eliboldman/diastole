@@ -26,7 +26,7 @@ function confirmed(input: { name: string; portion: string; carbs: [number, numbe
 export async function saveMeal(input: {
   label: string;
   items: { name: string; portion: string; carbs: [number, number]; protein: [number, number]; fat: [number, number]; scale: number }[];
-  source: "photo" | "text";
+  source: "photo" | "text" | "barcode";
   note?: string;
 }): Promise<Result> {
   const me = await requireUser();
@@ -44,7 +44,7 @@ export async function saveMeal(input: {
       carbs_g: t.carbs_g,
       protein_g: t.protein_g,
       fat_g: t.fat_g,
-      source: input.source === "text" ? "text" : "photo",
+      source: input.source === "text" || input.source === "barcode" ? input.source : "photo",
       note: input.note?.replace(/\s+/g, " ").trim().slice(0, 280) || null,
     })
     .select("id")

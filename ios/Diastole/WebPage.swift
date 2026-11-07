@@ -153,6 +153,10 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
         // Only Diastole's own top-level pages may ask.
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == AppConfig.baseURL.host(),
               let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        if type == "scanBarcode" {
+            BarcodeScanner.shared.start(from: message.webView)
+            return
+        }
         if type == "shareImage", let b64 = body["data"] as? String {
             ShareSheet.present(base64PNG: b64)
             return

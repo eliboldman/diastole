@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Loader2, Minus, Plus, X } from "lucide-react";
+import { Camera, Loader2, Minus, Plus, ScanBarcode, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -10,7 +10,9 @@ import { confirmItem, rangeText, scaleLabel, stepScale, totals, type EstimateIte
 import { FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 
 type Item = EstimateItem & { scale: number };
-type Stage = { kind: "capture" } | { kind: "estimating" } | { kind: "confirm"; items: Item[]; label: string; note: string; source: "photo" | "text" };
+type Stage = { kind: "capture" } | { kind: "estimating" } | { kind: "confirm"; items: Item[]; label: string; note: string; source: "photo" | "text" | "barcode" };
+type Bridge = { webkit?: { messageHandlers?: { diastole?: { postMessage: (m: unknown) => void } } } };
+const bridge = () => (typeof window === "undefined" ? undefined : (window as unknown as Bridge).webkit?.messageHandlers?.diastole);
 
 /** Shrinks a photo to at most 1024 px on its long side, as JPEG (base64, no prefix). Works with iPhone HEIC in Safari. */
 async function shrink(file: File): Promise<string> {
@@ -43,6 +45,9 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [inApp, setInApp] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [code, setCode] = useState("");
 
   // Drop the photo from memory when the sheet closes (after confirming, or cancelling).
   const reset = () => {
@@ -68,6 +73,48 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // The iPhone app scans with the camera; a browser can type the number.
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => setInApp(document.documentElement.dataset.app === "ios" && Boolean(bridge())), 0);
+    const onCode = (e: Event) => {
+      const d = (e as CustomEvent<{ code?: string; error?: string }>).detail;
+      if (d?.code) void lookup(d.code);
+      else if (d?.error === "unavailable") setError("This iPhone can't scan barcodes. Type the number instead.");
+    };
+    window.addEventListener("diastole:barcode", onCode);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("diastole:barcode", onCode);
+    };
+  });
+
+  async function lookup(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length < 8) return setError("That doesn't look like a barcode.");
+    setError(null);
+    setStage({ kind: "estimating" });
+    try {
+      const r = await (await fetch(`/api/fuel/barcode?code=${digits}`)).json().catch(() => ({ ok: false, error: "Sign in again, then retry." }));
+      if (!r.ok) {
+        setError(r.error ?? "Couldn't find that product.");
+        return setStage({ kind: "capture" });
+      }
+      setTyping(false);
+      setCode("");
+      setStage({ kind: "confirm", items: [{ ...(r.item as EstimateItem), scale: 1 }], label: r.label ?? "", note: "", source: "barcode" });
+    } catch {
+      setError("No connection. Try again.");
+      setStage({ kind: "capture" });
+    }
+  }
+
+  function scan() {
+    setError(null);
+    if (inApp) bridge()?.postMessage({ type: "scanBarcode" });
+    else setTyping(true);
+  }
 
   async function pick(file: File | undefined) {
     if (!file) return;
@@ -145,6 +192,33 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
                 <span className="text-sm">Take or choose a photo</span>
               </button>
             )}
+            {!photo &&
+              (typing ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void lookup(code);
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    inputMode="numeric"
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 14))}
+                    placeholder="Barcode number"
+                    aria-label="Barcode number"
+                    className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-[16px] tabular-nums focus:border-emerald-300/40 focus:outline-none"
+                  />
+                  <button disabled={code.length < 8 || stage.kind === "estimating"} className="min-h-12 rounded-2xl border border-white/15 px-4 text-sm disabled:opacity-50">
+                    Look up
+                  </button>
+                </form>
+              ) : (
+                <button onClick={scan} disabled={stage.kind === "estimating"} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] text-sm text-white/80">
+                  <ScanBarcode size={18} className="text-emerald-200" aria-hidden /> {inApp ? "Scan a barcode" : "Enter a barcode"}
+                </button>
+              ))}
             <label className="block">
               <span className="text-sm text-white/60">Anything to add? (optional)</span>
               <textarea
