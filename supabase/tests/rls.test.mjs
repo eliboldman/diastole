@@ -771,5 +771,26 @@ check("unknown themes are refused", !!r.error);
 r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, eaten_at, items, carbs_g, protein_g, fat_g, source) values ('${A1}', '2026-11-06', now(), '[]', 26, 4, 6, 'barcode') returning id`);
 check("a barcode meal can be logged", !r.error);
 
+// Suggested training blocks, coaching notes, preferred week
+r = await as(COACH, `insert into public.athlete_coaching (athlete_id, coach_id, notes) values ('${A1}', '${COACH}', 'Goal: sub-5:15 70.3') returning athlete_id`);
+check("coach writes private notes on their athlete", !r.error && r.rows?.length === 1);
+r = await as(A1, `select count(*)::int as n from public.athlete_coaching`);
+check("athletes never see their coach's notes", r.rows?.[0]?.n === 0);
+r = await as(STRANGER, `insert into public.athlete_coaching (athlete_id, coach_id, notes) values ('${A2}', '${STRANGER}', 'x')`);
+check("strangers can't write coaching notes", !!r.error);
+r = await as(A1, `insert into public.athlete_week (athlete_id, days) values ('${A1}', '{"mon": {"sports": ["swim"]}}') returning athlete_id`);
+check("athlete saves their preferred week", !r.error && r.rows?.length === 1);
+r = await as(COACH, `update public.athlete_week set days = '{"mon": {"sports": ["run"]}}' where athlete_id = '${A1}' returning athlete_id`);
+check("coach can adjust the athlete's week", r.rows?.length === 1);
+r = await as(A2, `select count(*)::int as n from public.athlete_week where athlete_id = '${A1}'`);
+check("other athletes can't see someone's week", r.rows?.[0]?.n === 0);
+r = await as(COACH, `insert into public.plan_batches (athlete_id, start_date, days, guidance) values ('${A1}', '2026-11-09', 28, 'century ride in 2 weeks') returning id`);
+check("coach records a plan batch", !r.error && r.rows?.length === 1);
+const PB = r.rows?.[0]?.id;
+r = await as(COACH, `insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, plan_batch) values ('${A1}', '${COACH}', '2026-11-10', 'run', 'Suggested', '${PB}') returning id`);
+check("suggested drafts carry their batch", !r.error);
+r = await as(A1, `select count(*)::int as n from public.plan_batches`);
+check("athletes can't see plan batches", r.rows?.[0]?.n === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

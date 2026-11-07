@@ -11,6 +11,9 @@ import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
 import ThemePicker from "@/components/ThemePicker";
+import WeekPrefsEditor from "@/components/WeekPrefsEditor";
+import CoachingGuide from "@/components/coach/CoachingGuide";
+import { cleanWeek } from "@/lib/week-prefs";
 import { asTheme } from "@/lib/themes";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -38,7 +41,7 @@ export default async function AccountPage() {
   const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }] = await Promise.all([
+  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: avatar }, { data: myWeek }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme")
@@ -46,9 +49,10 @@ export default async function AccountPage() {
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
-    isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
+    isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd, philosophy").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
     supabase.from("avatars").select("look").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("athlete_week").select("days").eq("athlete_id", me.id).maybeSingle(),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(aiRow ?? {}) };
   const pods = (memberships ?? []).map((m) => ({ id: m.pod_id, status: m.status, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
@@ -106,6 +110,12 @@ export default async function AccountPage() {
           </div>
         </section>
       )}
+
+      <section className={`${card} mt-6`}>
+        <h2 className="mb-1 text-lg font-medium">My week</h2>
+        <p className="mb-4 text-sm text-white/55">{isCoach ? "Which disciplines you like on which days." : "Which disciplines you like on which days, and how much time you have. Your coach plans around it."}</p>
+        <WeekPrefsEditor initial={cleanWeek(myWeek?.days)} />
+      </section>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className={card}>
@@ -193,6 +203,11 @@ export default async function AccountPage() {
               this.
             </p>
             <AiSettingsForm enabled={ai.ai_enabled} model={ai.ai_model} cap={Number(ai.ai_monthly_cap_usd)} spent={spent} />
+            <div className="mt-6 border-t border-white/10 pt-6">
+              <h3 className="font-medium">Coaching guide</h3>
+              <p className="mb-3 mt-1 text-sm text-white/55">Your philosophy and rules. Every suggested workout follows it. Notes about one athlete belong on that athlete&apos;s page.</p>
+              <CoachingGuide initial={(aiRow as { philosophy?: string | null } | null)?.philosophy ?? ""} />
+            </div>
           </section>
         )}
 

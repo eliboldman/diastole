@@ -11,6 +11,7 @@ import FuelModePicker from "@/components/coach/FuelModePicker";
 import SafetyNotes from "@/components/coach/SafetyNotes";
 import FuelLog from "@/components/fuel/FuelLog";
 import FuelWeek from "@/components/fuel/FuelWeek";
+import PlanningPanel from "@/components/coach/PlanningPanel";
 import RaceForm from "@/components/race/RaceForm";
 import RaceList from "@/components/race/RaceList";
 import { getRaces } from "@/lib/fuel/race-data";
@@ -236,6 +237,10 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
         </section>
+
+        <div id="planning" className="scroll-mt-6 lg:col-span-2">
+          <PlanningPanel athleteId={profile.id} coachId={me.id} firstName={(profile.full_name || "This athlete").split(" ")[0]} full />
+        </div>
 
         <section id="races" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
           <h2 className="text-lg font-medium">Races</h2>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import VersionHistory, { type Version } from "@/components/coach/VersionHistory";
+import PlanningPanel from "@/components/coach/PlanningPanel";
 import WorkoutBuilder from "@/components/coach/WorkoutBuilder";
 import WhyEditor from "@/components/coach/WhyEditor";
 import WorkoutTools from "@/components/coach/WorkoutTools";
@@ -98,6 +99,12 @@ export default async function WorkoutPage({
         {w ? w.title : "New workout"}
       </h1>
       <p className="mt-2 text-sm text-white/55">For {name}. Drafts stay private until you approve and send.</p>
+      {!w && (
+        <div className="mt-6">
+          <PlanningPanel athleteId={id} coachId={me.id} firstName={firstName} />
+          <p className="mt-6 text-sm text-white/50">Or build one workout yourself:</p>
+        </div>
+      )}
       {/* Not for drafts: the athlete can't see those yet. */}
       {w && !w.deleted_at && w.status !== "draft" && id !== me.id && (
         <div className="mt-4">
