@@ -15,7 +15,9 @@ export default function ZonesForm({
   thresholdHr = null,
   estimatedMaxHr,
   units = "mi",
+  saveLabel = "Save zones",
 }: {
+  saveLabel?: string;
   units?: "mi" | "km";
   athleteId: string;
   maxHr: number | null;
@@ -49,13 +51,13 @@ export default function ZonesForm({
       </div>
       <p className="text-xs text-white/45">Leave a field blank to use an estimate (max HR) or skip that zone chart.</p>
       {state?.error && <p className="text-sm text-red-300">{state.error}</p>}
-      {state?.ok && <p className="text-sm text-emerald-200">Zones saved.</p>}
+      {state?.ok && <p className="text-sm text-emerald-200">Saved.</p>}
       <button
         type="submit"
         disabled={pending}
         className="flex min-h-11 items-center rounded-xl border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm text-emerald-100 transition active:scale-95 hover:bg-emerald-300/20 disabled:opacity-50"
       >
-        {pending ? "Saving…" : "Save zones"}
+        {pending ? "Saving…" : saveLabel}
       </button>
     </form>
   );

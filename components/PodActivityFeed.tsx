@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, ArrowUp, Bike, Dumbbell, Footprints, MessageCircle, Trash2, Waves } from "lucide-react";
+import { Activity, ArrowUp, Bike, Dumbbell, Footprints, Lock, MessageCircle, Trash2, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type PointerEvent, type RefObject } from "react";
 
@@ -244,7 +244,24 @@ function together(a: FeedItem, all: FeedItem[]) {
 
 const prValue = (key: string, v: number | null) => (v === null ? "" : key === "pr_power_20m" ? `${Math.round(v)} W` : clock(v));
 
-function FeedCard({ a, podId, timeZone, units, look, with: mates }: { a: FeedItem; podId: string; timeZone: string; units: Units; look?: unknown; with: string[] }) {
+function FeedCard({
+  a,
+  podId,
+  timeZone,
+  units,
+  look,
+  with: mates,
+  iShare,
+}: {
+  a: FeedItem;
+  podId: string;
+  timeZone: string;
+  units: Units;
+  look?: unknown;
+  with: string[];
+  iShare?: boolean;
+}) {
+  const [why, setWhy] = useState(false);
   const g = sportGroup(a.sport);
   const Icon = ICONS[g];
   const accent = ACCENT[g];
@@ -324,6 +341,29 @@ function FeedCard({ a, podId, timeZone, units, look, with: mates }: { a: FeedIte
         as="h3"
         className="mt-4 text-lg font-semibold tracking-tight"
       />
+      {/* Details open only when both people share them: say so instead of a title that does nothing. */}
+      {!a.details && !a.is_me && (
+        <div className="mt-1">
+          <button type="button" onClick={() => setWhy((w) => !w)} aria-expanded={why} className="flex min-h-9 items-center gap-1.5 text-xs text-white/50 hover:text-white/80">
+            <Lock size={12} aria-hidden /> Charts, laps and zones
+          </button>
+          {why && (
+            <p className="row-in text-sm text-white/60">
+              {iShare === false ? (
+                <>
+                  Workout details open when you and {first} both share them.{" "}
+                  <Link href="/me/pods#sharing" className="text-emerald-200 underline-offset-2 hover:underline">
+                    Turn yours on
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>{first} hasn&apos;t shared workout details yet.</>
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* The double-tap area: numbers and route */}
       <div onPointerUp={onTap} className="relative select-none touch-manipulation">
@@ -390,7 +430,9 @@ export default function PodActivityFeed({
   timeZone,
   units = "mi",
   avatars = {},
+  iShare,
 }: {
+  iShare?: boolean;
   podId: string;
   initial: FeedItem[];
   timeZone: string;
@@ -454,7 +496,7 @@ export default function PodActivityFeed({
           <h2 className="mb-3 px-1 text-[11px] uppercase tracking-[0.2em] text-white/45">{grp.label}</h2>
           <div className="stagger grid grid-cols-1 gap-4">
             {grp.items.map((a) => (
-              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} with={together(a, items)} />
+              <FeedCard key={a.id} a={a} podId={podId} timeZone={timeZone} units={units} look={avatars[a.athlete_id]} with={together(a, items)} iShare={iShare} />
             ))}
           </div>
         </section>

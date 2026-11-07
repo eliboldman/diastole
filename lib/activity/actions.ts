@@ -14,7 +14,7 @@ function paceToSpeed(text: string, units: "mi" | "km"): number | null {
   return sec > 0 ? Number(((units === "mi" ? 1609.344 : 1000) / sec).toFixed(3)) : null;
 }
 
-/** Coach sets an athlete's zones. Blank fields fall back to estimates. Row-level security enforces who may. */
+/** An athlete sets their own zones, or a coach sets an athlete's. Blank fields fall back to estimates. Row-level security enforces who may. */
 export async function saveZones(_prev: ZonesState, form: FormData): Promise<ZonesState> {
   await requireUser();
   const athleteId = String(form.get("athlete_id") ?? "");
@@ -38,7 +38,7 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   const { error } = await supabase
     .from("athlete_zones")
     .upsert({ athlete_id: athleteId, max_hr, threshold_speed_mps, ftp_w, threshold_hr, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
-  if (error) return { error: "Couldn't save zones. Only the athlete's coach can change them." };
+  if (error) return { error: "Couldn't save those numbers. Try again." };
   revalidatePath(`/athlete/${athleteId}`);
   revalidatePath(`/profile/${athleteId}`);
   revalidatePath("/activity/[id]", "page");

@@ -36,7 +36,7 @@ export function groupOf(kind: string, meta: Record<string, unknown> | null): Pus
   if (kind === "message") return "messages";
   if (kind === "pod_invite" || kind === "pod_answer") return "pods";
   if (kind.startsWith("workout_")) return "workouts";
-  if (["ai_suggestion", "form_insight", "athlete_joined", "checkin_pain", "briefs_ready", "safety_note"].includes(kind)) return "coaching";
+  if (["ai_suggestion", "form_insight", "athlete_joined", "checkin_pain", "briefs_ready", "safety_note", "zones_updated"].includes(kind)) return "coaching";
   return null;
 }
 

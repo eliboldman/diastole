@@ -25,7 +25,7 @@ assert.equal(apnsSound("default"), "default");
 assert.equal(apnsSound("none"), undefined);
 
 // Every coaching kind the database groups as 'coaching' is grouped the same way here.
-const sql = readFileSync(new URL("../../supabase/migrations/20261130000000_safety_notes.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../../supabase/migrations/20261209000000_athlete_zones_self.sql", import.meta.url), "utf8");
 const kinds = sql.match(/when p_kind in \(([^)]*)\) then 'coaching'/)![1].match(/'([a-z_]+)'/g)!.map((k) => k.slice(1, -1));
 for (const k of kinds) assert.equal(groupOf(k, null), "coaching", k);
 // And every bundled sound exists in the app and on the web.

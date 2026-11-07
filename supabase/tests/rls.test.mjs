@@ -221,10 +221,14 @@ check("after leaving the pod, details are hidden", !(await seesA2(A1)));
 
 r = await as(COACH, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A1}', 195)`);
 check("coach can set an athlete's zones", !r.error);
-r = await as(A1, `update public.athlete_zones set max_hr = 230 where athlete_id = '${A1}' returning max_hr`);
-check("athlete cannot change their zones", !!r.error || r.rows?.length === 0);
 r = await as(A1, `select max_hr from public.athlete_zones where athlete_id = '${A1}'`);
 check("athlete can read their zones", r.rows?.[0]?.max_hr === 195);
+r = await as(A1, `update public.athlete_zones set max_hr = 196 where athlete_id = '${A1}' returning max_hr`);
+check("athlete can change their own zones", !r.error && r.rows?.[0]?.max_hr === 196);
+const zn = (await db.query(`select title, body, href from public.notifications where user_id = '${COACH}' and kind = 'zones_updated'`)).rows[0];
+check("coach is told when an athlete changes their numbers", /updated their numbers/.test(zn?.title ?? "") && /Max HR 195 → 196/.test(zn?.body ?? "") && zn?.href === `/athlete/${A1}#zones`);
+r = await as(A2, `update public.athlete_zones set max_hr = 150 where athlete_id = '${A1}' returning max_hr`);
+check("another athlete cannot change them", !!r.error || r.rows?.length === 0);
 r = await as(STRANGER, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A2}', 150)`);
 check("stranger cannot set zones", !!r.error);
 

@@ -45,6 +45,7 @@ const fmt = (n: number) => (n >= 10_000 ? new Intl.NumberFormat("en-US", { notat
 const buzz = (p: number | number[]) => navigator.vibrate?.(p);
 // Only ever called from event handlers and timers, never while rendering.
 const clock = () => Date.now();
+const HOLD_MS = 400; // shorter than this is a tap (exactly one); longer starts the count-up
 
 type Burst = { id: number; emoji: string; n: number };
 const QUICK = ALL_STICKERS.clap;
@@ -173,8 +174,10 @@ export default function PodProps({
       start,
       base,
       timer: setInterval(() => {
+        const held = clock() - start;
+        if (held < HOLD_MS) return; // a tap is one; only a real hold starts counting up
         const c = comboRef.current;
-        if (c) setN(c.sticker, c.n + rampStep(clock() - start));
+        if (c) setN(c.sticker, c.n + rampStep(held - HOLD_MS));
       }, 80),
     };
   }
@@ -186,7 +189,7 @@ export default function PodProps({
     clearInterval(h.timer);
     hold.current = null;
     const c = comboRef.current;
-    if (c && clock() - h.start < 350) {
+    if (c && clock() - h.start < HOLD_MS) {
       if (h.base === 0) {
         comboRef.current = null;
         setCombo(null);
@@ -201,7 +204,7 @@ export default function PodProps({
   function release() {
     if (!hold.current) return;
     clearInterval(hold.current.timer);
-    const quick = clock() - hold.current.start < 350;
+    const quick = clock() - hold.current.start < HOLD_MS;
     hold.current = null;
     if (quick && ++taps.current === 4) setHint(true); // they're tapping a lot: whisper the secret
     if (!quick) setHint(false);

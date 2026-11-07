@@ -60,7 +60,7 @@ export default async function MyPodsPage() {
       )}
 
       {(active.length > 0 || invites.length > 0) && (
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6">
+        <section id="sharing" className="mt-6 scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6">
           <PodSharing
             initial={{
               level: (mine?.pod_share_level ?? 0) as 0 | 1 | 2,
