@@ -74,6 +74,14 @@ export default async function AccountPage() {
         <ChevronRight size={18} className="shrink-0 text-emerald-200" aria-hidden />
       </Link>
 
+      <Link href="/me/story" className="lift mt-3 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
+        <span className="min-w-0">
+          <span className="block font-medium">Season story</span>
+          <span className="block truncate text-sm text-white/55">Your training in one shareable picture</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+      </Link>
+
       {/* Coaches train too: everything an athlete has, one tap away, without a second account */}
       {isCoach && (
         <section className={`${card} mt-6`}>

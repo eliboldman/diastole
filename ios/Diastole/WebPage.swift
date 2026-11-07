@@ -153,6 +153,21 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
         // Only Diastole's own top-level pages may ask.
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == AppConfig.baseURL.host(),
               let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        if type == "shareImage", let b64 = body["data"] as? String {
+            ShareSheet.present(base64PNG: b64)
+            return
+        }
         HealthSync.shared.handle(type)
+    }
+}
+
+/// The iPhone share sheet for an image the page made (the season story).
+enum ShareSheet {
+    static func present(base64PNG: String) {
+        guard base64PNG.count < 20_000_000, let data = Data(base64Encoded: base64PNG), let image = UIImage(data: data),
+              let top = UIApplication.shared.topViewController else { return }
+        let sheet = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        sheet.popoverPresentationController?.sourceView = top.view
+        top.present(sheet, animated: true)
     }
 }

@@ -28,6 +28,7 @@
     "test:aisteps": "node lib/workouts/ai-steps.test.ts",
     "test:push": "node lib/push/sounds.test.ts",
     "test:apple": "node lib/apple/format.test.ts",
+    "test:story": "node lib/story.test.ts",
     "test:fuel": "node lib/fuel/plan.test.ts && node lib/fuel/meals.test.ts && node lib/fuel/safety.test.ts && node lib/fuel/race.test.ts"
   },
   "dependencies": {
