@@ -77,7 +77,7 @@ export default async function AccountPage() {
         <section className={`${card} mt-6`}>
           <h2 className="mb-1 text-lg font-medium">Your own training</h2>
           <p className="mb-4 text-sm text-white/55">Everything your athletes see, for you.</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <Row href="/me" sub="Readiness, next workouts, check-ins">
               My day
             </Row>
@@ -86,6 +86,9 @@ export default async function AccountPage() {
             </Row>
             <Row href="/fuel" sub="Workout fueling and fuel days">
               My fuel
+            </Row>
+            <Row href="/races" sub="Race plans and fueling tools">
+              My races
             </Row>
             <Row href="/me/pods" sub="Pods you train in">
               My pods

@@ -1,4 +1,6 @@
+import { ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import FuelLog from "@/components/fuel/FuelLog";
 import FuelView from "@/components/fuel/FuelView";
@@ -17,6 +19,13 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
       <FuelView mode={mode} days={days} log={meals && <FuelLog day={meals} mode={mode} timeZone={me.timezone} units={me.units} autoOpen={log === "1"} />} />
+      <Link href="/races" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
+        <span>
+          <span className="block font-medium">Race fueling</span>
+          <span className="block text-sm text-white/55">Race plans, sweat-rate test and gut training</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+      </Link>
     </DashboardShell>
   );
 }

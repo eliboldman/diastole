@@ -70,6 +70,11 @@ export default function PrivacyPage() {
               weight they enter to size daily targets. Only the athlete and their coach can see these;
               they are never shared with pods. Meal photos are not stored.
             </li>
+            <li>
+              <strong className="text-white/80">Races and race fueling</strong> (only if added): races and their goals,
+              sweat-rate test results (only the resulting rate; the body weights used to work it out are never stored)
+              and gut-training notes. Only the athlete and their coach can see these.
+            </li>
           </ul>
           <p>
             We collect data from the date an athlete connects onward. For completed outdoor workouts we

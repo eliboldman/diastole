@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, Flag, FlaskConical, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
     // A coach's own athlete pages (day, training, fuel) live under Me.
-    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log|training|fuel)(\/|$)/ },
+    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log|training|fuel|races)(\/|$)/ },
   ],
   athlete: [
     { label: "Today", href: "/me", icon: Sun, match: /^\/me$/ },
@@ -43,9 +43,11 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "My day", href: "/me", icon: Sun },
     { label: "My training", href: "/training", icon: Dumbbell },
     { label: "My fuel", href: "/fuel", icon: Utensils },
+    { label: "My races", href: "/races", icon: Flag },
   ],
   athlete: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
+    { label: "Races", href: "/races", icon: Flag },
     { label: "My pods", href: "/me/pods", icon: Orbit },
   ],
 };

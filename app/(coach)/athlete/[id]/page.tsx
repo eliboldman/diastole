@@ -11,6 +11,9 @@ import FuelModePicker from "@/components/coach/FuelModePicker";
 import SafetyNotes from "@/components/coach/SafetyNotes";
 import FuelLog from "@/components/fuel/FuelLog";
 import FuelWeek from "@/components/fuel/FuelWeek";
+import RaceForm from "@/components/race/RaceForm";
+import RaceList from "@/components/race/RaceList";
+import { getRaces } from "@/lib/fuel/race-data";
 import { getFuelDays, getFuelMode, getMealDay, getMealWeek } from "@/lib/fuel/data";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { paceOf, shortDistance } from "@/lib/activity/format";
@@ -85,7 +88,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const athleteTz = profile.timezone || "America/Chicago";
   const athleteToday = new Date().toLocaleDateString("en-CA", { timeZone: athleteTz });
   const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
-  const mealDay = await getMealDay(id, athleteToday, athleteTz, fuelToday.level);
+  const [mealDay, races] = await Promise.all([getMealDay(id, athleteToday, athleteTz, fuelToday.level), getRaces(id, { from: athleteToday, limit: 10 })]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
     return {
@@ -232,6 +235,18 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             thresholdHr={zones?.threshold_hr ?? null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
+        </section>
+
+        <section id="races" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Races</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">Each race gets a fueling plan, and race-week mode turns on for {(profile.full_name || "this athlete").split(" ")[0]} 10 days out.</p>
+          <RaceList races={races} today={athleteToday} units={me.units} empty="No upcoming races." />
+          <details className="mt-4">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-emerald-200">Add a race</summary>
+            <div className="mt-3">
+              <RaceForm athleteId={profile.id} units={me.units} />
+            </div>
+          </details>
         </section>
 
         <SafetyNotes athleteId={profile.id} />

@@ -735,5 +735,31 @@ check("acked workout is marked on the watch", aw.find((x) => x.id === AW)?.statu
 check("another athlete's workout is untouched", aw.find((x) => x.id === AW2)?.status === "approved");
 check("acked removal is confirmed", aw.find((x) => x.id === AWD)?.removal_status === "removed");
 
+// Races, sweat tests, gut training (Phase 9d/11)
+r = await as(A1, `insert into public.races (athlete_id, name, race_date, sport, distance_km) values ('${A1}', 'Lakefront Half', '2026-11-20', 'run', 21.1)`);
+check("athlete adds own race", !r.error);
+r = await as(COACH, `insert into public.races (athlete_id, name, race_date, sport) values ('${A1}', 'Turkey Trot', '2026-11-26', 'run')`);
+check("coach adds a race for their athlete", !r.error);
+r = await as(STRANGER, `insert into public.races (athlete_id, name, race_date, sport) values ('${A1}', 'x', '2026-11-26', 'run')`);
+check("stranger can't add a race for someone else", !!r.error);
+r = await as(A2, `select count(*)::int as n from public.races where athlete_id = '${A1}'`);
+check("other athletes can't see someone's races", r.rows?.[0]?.n === 0);
+r = await as(COACH, `select count(*)::int as n from public.races where athlete_id = '${A1}'`);
+check("coach sees athlete races", r.rows?.[0]?.n === 2);
+r = await as(A1, `update public.races set checklist = '{"kit": true}' where athlete_id = '${A1}' and name = 'Lakefront Half' returning id`);
+check("athlete ticks race-week checklist", !r.error && r.rows?.length === 1);
+r = await as(A1, `insert into public.sweat_tests (tested_on, sweat_rate_ml_h, minutes) values ('2026-11-05', 1100, 60)`);
+check("athlete saves a sweat test result", !r.error);
+r = await as(A1, `insert into public.sweat_tests (athlete_id, tested_on, sweat_rate_ml_h, minutes) values ('${A2}', '2026-11-05', 1100, 60)`);
+check("athlete can't save a sweat test for someone else", !!r.error);
+r = await as(COACH, `insert into public.sweat_tests (athlete_id, tested_on, sweat_rate_ml_h, minutes) values ('${A1}', '2026-11-05', 900, 60)`);
+check("coach can't write an athlete's sweat test", !!r.error);
+r = await as(COACH, `select count(*)::int as n from public.sweat_tests where athlete_id = '${A1}'`);
+check("coach reads athlete sweat tests", r.rows?.[0]?.n === 1);
+r = await as(A1, `insert into public.gut_sessions (on_date, carbs_g_per_h, comfort) values ('2026-11-04', 75, 4)`);
+check("athlete logs gut training", !r.error);
+r = await as(A2, `select count(*)::int as n from public.gut_sessions where athlete_id = '${A1}'`);
+check("other athletes can't see gut training", r.rows?.[0]?.n === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
