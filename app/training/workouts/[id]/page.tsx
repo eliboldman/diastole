@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { Backpack, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +8,7 @@ import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
+import { cleanCloset, isEmptyCloset, packFor } from "@/lib/closet";
 import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -32,14 +33,19 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
     supabase.from("activities").select("id, name, sport").eq("planned_workout_id", id).limit(1).maybeSingle(),
   ]);
   if (!w) notFound();
-  const [{ data: zones }, mode] = await Promise.all([
+  const [{ data: zones }, mode, { data: gearRow }] = await Promise.all([
     supabase.from("athlete_zones").select("threshold_speed_mps, ftp_w").eq("athlete_id", w.athlete_id).maybeSingle(),
     getFuelMode(w.athlete_id),
+    supabase.from("athlete_gear").select("gear").eq("athlete_id", w.athlete_id).maybeSingle(),
   ]);
 
   const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
   const lines = describe(w.steps as Step[], me.units, pool, w.sport === "swim");
   const session = estimateSession(w.steps as Step[], w.sport, zones, pool);
+  const closet = cleanCloset(gearRow?.gear);
+  const own = me.id === w.athlete_id;
+  // The step text counts too ("pull buoy", "at the track", "105% FTP").
+  const pack = packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet);
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
@@ -56,6 +62,40 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
           <p className="text-[11px] uppercase tracking-[0.15em] text-emerald-100/70">Why this workout</p>
           <p className="mt-1.5 text-[15px] leading-relaxed text-white/90">{w.why}</p>
           <p className="mt-2 text-xs text-white/45">From your coach</p>
+        </section>
+      )}
+
+      {pack.length > 0 && (
+        <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
+          <h2 className="flex items-center gap-2 font-medium">
+            <Backpack size={17} className="text-emerald-200" aria-hidden /> What to pack
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {pack.map((p) => (
+              <li key={p.item} className="flex gap-3 text-sm">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" aria-hidden />
+                <span className="min-w-0">
+                  <span className="text-white/90">{p.item}</span>
+                  {p.why && <span className="block text-xs text-white/50">{p.why}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {isEmptyCloset(closet) && (
+            <p className="mt-3 text-xs text-white/50">
+              {own ? (
+                <>
+                  Add your shoes and bikes in{" "}
+                  <Link href="/account#closet" className="text-emerald-200 underline">
+                    My closet
+                  </Link>{" "}
+                  and this list names your own gear.
+                </>
+              ) : (
+                "This athlete hasn't filled in their closet yet, so the list is general."
+              )}
+            </p>
+          )}
         </section>
       )}
 

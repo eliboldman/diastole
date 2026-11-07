@@ -19,6 +19,7 @@ export const LAYOUT_PAGES = {
     { key: "notes", label: "Form notes" },
     { key: "goals", label: "Goal race and block" },
     { key: "numbers", label: "My numbers" },
+    { key: "closet", label: "My closet" },
     { key: "metrics", label: "Metric cards" },
     { key: "prs", label: "Recent PRs" },
     { key: "story", label: "Season story" },

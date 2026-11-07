@@ -8,6 +8,7 @@ import { localDate, refreshReadiness } from "@/lib/readiness/run";
 import { createAdminClient } from "@/lib/supabase/server";
 import { validateSteps, type Step, type Target } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
+import { cleanCloset, closetForPrompt } from "@/lib/closet";
 
 // ---------------------------------------------------------------- models & pricing (USD per million tokens)
 
@@ -94,7 +95,7 @@ Guidelines:
 - Base every statement on the data provided. Say plainly when data is thin (few days of baseline, missing nights).
 - Prefer the smallest change that addresses the flag: keep the plan if the flag is mild and the next session is easy; reduce intensity or swap to an easy session for caution; recommend rest when several markers are suppressed together or load is spiking.
 - Only reference a target_workout_id that appears in that athlete's upcoming workouts. Use action "replace" or include proposed_workout only when you are proposing a concrete session; for "keep" and "rest", proposed_workout is null.
-- Proposed workouts are run or bike only, use simple structure (warm-up, main set, cool-down), and prefer heart-rate zone targets (zone 1-2 for easy days).
+- Proposed workouts are run or bike only, use simple structure (warm-up, main set, cool-down), and prefer heart-rate zone targets (zone 1-2 for easy days). If the athlete's closet is given, only propose what their gear allows (for example an indoor ride only with a trainer).
 - This is training guidance for a coach, not medical advice. Never diagnose. If the data could indicate illness, injury or overtraining, say the coach may want to check in with the athlete.
 - Write for a busy coach: short, specific, no filler. Return exactly one suggestion per athlete provided.`;
 
@@ -106,11 +107,12 @@ async function buildPayload(athleteId: string, name: string, timeZone: string): 
   const since = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10);
   const until = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
 
-  const [{ data: readiness }, { data: wellness }, { data: activities }, { data: upcoming }] = await Promise.all([
+  const [{ data: readiness }, { data: wellness }, { data: activities }, { data: upcoming }, { data: gear }] = await Promise.all([
     admin.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", athleteId).order("date", { ascending: false }).limit(1).maybeSingle(),
     admin.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, sleep_score, stress_avg, body_battery_high").eq("athlete_id", athleteId).gte("date", since).order("date"),
     admin.from("activities").select("sport, start_time, duration_s, distance_m, avg_hr, max_hr").eq("athlete_id", athleteId).gte("start_time", since).order("start_time"),
     admin.from("planned_workouts").select("id, scheduled_date, title, sport, status, steps").eq("athlete_id", athleteId).is("deleted_at", null).gte("scheduled_date", today).lte("scheduled_date", until).neq("status", "draft").order("scheduled_date"),
+    admin.from("athlete_gear").select("gear").eq("athlete_id", athleteId).maybeSingle(),
   ]);
 
   return {
@@ -128,6 +130,7 @@ async function buildPayload(athleteId: string, name: string, timeZone: string): 
       max_hr: a.max_hr,
     })),
     upcoming_workouts_next_3_days: upcoming ?? [],
+    closet: closetForPrompt(cleanCloset(gear?.gear)),
   };
 }
 

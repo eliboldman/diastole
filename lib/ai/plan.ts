@@ -7,6 +7,7 @@ import { z } from "zod";
 import { AI_MODELS, costOf, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { FixOut, PlanOut, type PlanWorkout } from "@/lib/ai/step-schema";
 import { createAdminClient, createClient, type Profile } from "@/lib/supabase/server";
+import { cleanCloset, closetForPrompt } from "@/lib/closet";
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
@@ -30,6 +31,7 @@ How to plan:
 - Follow the coach's guide first. Where it names a training framework (periodization, pace systems, key-session rules), apply it.
 - Use only this athlete's numbers: their zones and the coach's private notes about them. If a number you need is unknown, or the notes say not to use it (for example an old FTP), don't invent one: use heart-rate zones or effort cues in the step notes, and say so in assumptions.
 - Respect the athlete's preferred week (disciplines on which days, time available). If the coach's guidance for this request conflicts with it, the guidance wins.
+- Use the athlete's closet (their shoes, bikes, trainer, and pool, track or gym access). Only plan what they can do with it: indoor trainer sessions only if they have a trainer, TT-bike or trail sessions only with that bike or those shoes, pool or open-water swims only with access, power targets only with a power meter or smart trainer (otherwise heart rate or effort). When the gear matters, name it in the description (for example "TT bike", "race shoes", "trainer in ERG mode", "pull buoy") so the athlete can pack for it.
 - Apply the coach's guidance for this request (events, travel, constraints) to volume and intensity around those dates: build into key events, freshen up before them, recover after, keep travel days short or adapted to what's available.
 - Races: build toward A races and taper the last 10-14 days before one; treat B races as hard days with a short freshen-up; C races are training.
 - Recovery: if recent readiness is yellow or red, or check-ins mention pain or bad sessions, start the block conservatively and say so in the summary.
@@ -56,7 +58,7 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
   const supabase = await createClient();
   const today = new Date();
   const since84 = new Date(today.getTime() - 84 * DAY).toISOString();
-  const [profile, settings, notes, week, zones, readiness, wellness, acts, checkins, races, planned] = await Promise.all([
+  const [profile, settings, notes, week, zones, readiness, wellness, acts, checkins, races, planned, gear] = await Promise.all([
     supabase.from("profiles").select("full_name, timezone").eq("id", athleteId).maybeSingle(),
     supabase.from("coach_settings").select("philosophy").eq("coach_id", coachId).maybeSingle(),
     supabase.from("athlete_coaching").select("notes").eq("athlete_id", athleteId).maybeSingle(),
@@ -67,7 +69,7 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
     supabase.from("activities").select("sport, name, start_time, duration_s, distance_m, avg_hr, avg_power").eq("athlete_id", athleteId).gte("start_time", since84).order("start_time").limit(600),
     supabase.from("workout_checkins").select("created_at, feel, rpe, pain, note").eq("athlete_id", athleteId).order("created_at", { ascending: false }).limit(10),
     supabase.from("races").select("name, race_date, sport, distance_km, goal_seconds, priority, notes").eq("athlete_id", athleteId).gte("race_date", iso(today)).order("race_date").limit(10),
-    supabase.from("planned_workouts").select("scheduled_date, title, sport, status, plan_batch").eq("athlete_id", athleteId).is("deleted_at", null).gte("scheduled_date", addDays(start, -7)).lte("scheduled_date", end).order("scheduled_date"),
+    supabase.from("planned_workouts").select("scheduled_date, title, sport, status, plan_batch").eq("athlete_id", athleteId).is("deleted_at", null).gte("scheduled_date", addDays(start, -7)).lte("scheduled_date", end).order("scheduled_date"),    supabase.from("athlete_gear").select("gear").eq("athlete_id", athleteId).maybeSingle(),
   ]);
 
   const per = units === "mi" ? MILE : 1000;
@@ -101,6 +103,7 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
       pace_unit: units,
       coach_notes_about_this_athlete: notes.data?.notes?.trim() || null,
       preferred_week: weekForPrompt(cleanWeek(week.data?.days)),
+      closet: closetForPrompt(cleanCloset(gear.data?.gear)) ?? "Not filled in: assume a road bike, running shoes and pool access, and keep sessions simple to do anywhere.",
       zones: {
         ftp_watts: z?.ftp_w ?? null,
         threshold_pace: z?.threshold_speed_mps ? `${clock(per / Number(z.threshold_speed_mps))} per ${units}` : null,

@@ -24,6 +24,8 @@ import { getAthleteDetail } from "@/lib/coach-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
+import ClosetEditor from "@/components/ClosetEditor";
+import { cleanCloset, closetForPrompt } from "@/lib/closet";
 
 export default async function AthletePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,7 +36,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
   const me = await requireCoach();
   const supabase = await createClient();
-  const [{ data: zones }, { data: recentMax }, { data: insightRows }, fuelMode] = await Promise.all([
+  const [{ data: zones }, { data: recentMax }, { data: insightRows }, fuelMode, { data: gearRow }] = await Promise.all([
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", id).maybeSingle(),
     supabase
       .from("activities")
@@ -51,6 +53,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
       .order("created_at", { ascending: false })
       .limit(20),
     getFuelMode(id),
+    supabase.from("athlete_gear").select("gear").eq("athlete_id", id).maybeSingle(),
   ]);
   const athleteTz = profile.timezone || "America/Chicago";
   const athleteToday = new Date().toLocaleDateString("en-CA", { timeZone: athleteTz });
@@ -166,6 +169,29 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
             thresholdHr={zones?.threshold_hr ?? null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
+        </section>
+
+        <section id="closet" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium">Closet</h2>
+          {(() => {
+            const lines = closetForPrompt(cleanCloset(gearRow?.gear));
+            return lines ? (
+              <ul className="mt-3 space-y-1 text-sm text-white/70">
+                {lines.filter((l) => !l.startsWith("Does not have")).map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-white/55">{(profile.full_name || "This athlete").split(" ")[0]} hasn&apos;t filled in their closet yet (Me → My closet).</p>
+            );
+          })()}
+          <details className="mt-3">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-emerald-200">Edit closet</summary>
+            <div className="mt-3">
+              <ClosetEditor athleteId={profile.id} initial={cleanCloset(gearRow?.gear)} />
+            </div>
+          </details>
+          <p className="mt-3 text-xs text-white/45">Suggested workouts use this, and each workout shows {(profile.full_name || "the athlete").split(" ")[0]} what to pack.</p>
         </section>
 
         <div id="planning" className="scroll-mt-6 lg:col-span-2">

@@ -779,6 +779,20 @@ check("athlete picks a theme", r.rows?.[0]?.theme === "blocks");
 r = await as(A1, `update public.profiles set theme = 'neon' where id = '${A1}'`);
 check("unknown themes are refused", !!r.error);
 
+// My closet (athlete_gear)
+r = await as(A1, `insert into public.athlete_gear (athlete_id, gear) values ('${A1}', '{"shoes":[{"model":"Pegasus","kind":"daily"}]}') returning athlete_id`);
+check("athlete fills in their closet", r.rows?.length === 1);
+r = await as(COACH, `select gear from public.athlete_gear where athlete_id = '${A1}'`);
+check("coach sees their athlete's closet", r.rows?.[0]?.gear?.shoes?.[0]?.model === "Pegasus");
+r = await as(COACH, `update public.athlete_gear set gear = '{"notes":"fixed"}' where athlete_id = '${A1}' returning gear`);
+check("coach can fix it", r.rows?.[0]?.gear?.notes === "fixed");
+r = await as(A2, `select * from public.athlete_gear where athlete_id = '${A1}'`);
+check("other athletes can't see it", r.rows?.length === 0);
+r = await as(A2, `insert into public.athlete_gear (athlete_id, gear) values ('${A1}', '{}')`);
+check("other athletes can't write it", !!r.error);
+r = await as(A1, `update public.athlete_gear set gear = '[]' where athlete_id = '${A1}'`);
+check("closet must be an object", !!r.error);
+
 // Page layouts (Customize)
 r = await as(A1, `update public.profiles set layout = '{"me":{"order":["prs"],"hidden":["form"]}}' where id = '${A1}' returning layout`);
 check("athlete saves their own page layout", r.rows?.[0]?.layout?.me?.hidden?.[0] === "form");

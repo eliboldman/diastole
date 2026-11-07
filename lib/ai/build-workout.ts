@@ -9,6 +9,7 @@ import { BuildOut as Output } from "@/lib/ai/step-schema";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
+import { cleanCloset, closetForPrompt } from "@/lib/closet";
 
 // Cheapest model first (Eli's rule); if its workout doesn't pass the Garmin checks, the coach's
 // model gets one retry with the exact errors.
@@ -30,6 +31,7 @@ Rules:
 - Run targets: pace_range as m:ss in the given pace unit (fast end and slow end, about 10-15 s apart unless the coach gave exact paces), hr_zone 1-5, or hr_range bpm. Bike: power_pct_ftp (% of FTP), power_watts, or hr. Swim: swim_effort 1-10 or swim_pace_per_100 (m:ss per 100 of the pool unit), plus stroke, drill (kick/pull) and equipment when mentioned.
 - Named efforts: when the coach says "easy", "tempo", "threshold", "5K pace", "Z2" and so on without numbers, derive them from the athlete's zones given (threshold pace, FTP, max HR). Rough guide from threshold pace T: 5K ~ T minus 4%, 10K ~ T minus 1%, half marathon ~ T plus 3%, marathon ~ T plus 8%, easy ~ T plus 22-30%. If the needed zone isn't known, use an hr_zone or no target, and say so in assumptions.
 - Never use a pace or power target on a swim, or a swim target on a run or ride.
+- If the athlete's closet is given and shows no power meter or smart trainer, use heart-rate or effort targets instead of power unless the coach asked for watts, and say so in assumptions.
 - title: short and specific. description: only if the coach gave context for the athlete. assumptions: brief note to the coach about anything you assumed or couldn't represent; null if nothing.`;
 
 export type BuildResult =
@@ -62,7 +64,10 @@ export async function buildWorkoutFromPrompt(input: {
   const spent = await monthToDateSpend(me.id);
   if (spent >= Number(settings.ai_monthly_cap_usd) - 0.01) return { ok: false, error: "Monthly AI cap reached." };
 
-  const { data: zones } = await admin.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", input.athleteId).maybeSingle();
+  const [{ data: zones }, { data: gear }] = await Promise.all([
+    admin.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", input.athleteId).maybeSingle(),
+    admin.from("athlete_gear").select("gear").eq("athlete_id", input.athleteId).maybeSingle(),
+  ]);
   const per = input.paceUnit === "mi" ? MILE : 1000;
   const thrPace = zones?.threshold_speed_mps ? Math.round(per / Number(zones.threshold_speed_mps)) : null;
   const context = {
@@ -75,6 +80,7 @@ export async function buildWorkoutFromPrompt(input: {
       max_hr: zones?.max_hr ?? null,
       threshold_hr: zones?.threshold_hr ?? null,
     },
+    closet: closetForPrompt(cleanCloset(gear?.gear)),
   };
 
   const client = new Anthropic();

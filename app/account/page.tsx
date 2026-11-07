@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { FlagBadge } from "@/components/coach/Flags";
+import ClosetEditor from "@/components/ClosetEditor";
 import LayoutCustomizer from "@/components/LayoutCustomizer";
 import DashboardShell from "@/components/layout/DashboardShell";
 import ProfileView from "@/components/profile/ProfileView";
@@ -12,6 +13,7 @@ import { ReadinessAreas, ReadinessTrend } from "@/components/readiness/Readiness
 import { FORM, type FormMetric } from "@/lib/activity/form";
 import { recentFormRuns } from "@/lib/activity/form-store";
 import type { ReadinessRow, WellnessPoint } from "@/lib/coach-data";
+import { cleanCloset } from "@/lib/closet";
 import { resolveLayout, visibleSections } from "@/lib/layout-prefs";
 import { familyOf, oneFamily } from "@/lib/readiness/source";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
@@ -31,7 +33,7 @@ export default async function MePage() {
   const me = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: readiness }, { data: wellness }, { data: device }, formRuns, { data: notes }, { data: layoutRow }] = await Promise.all([
+  const [{ data: readiness }, { data: wellness }, { data: device }, formRuns, { data: notes }, { data: layoutRow }, { data: gearRow }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", me.id).order("date", { ascending: false }).limit(14),
     supabase.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, stress_avg").eq("athlete_id", me.id).gte("date", daysAgo(28)).order("date"),
     supabase.from("device_connections").select("source").eq("athlete_id", me.id).maybeSingle(),
@@ -39,6 +41,7 @@ export default async function MePage() {
     recentFormRuns(createAdminClient(), me.id, { limit: 30, timeZone: me.timezone }),
     supabase.rpc("my_form_insights"),
     supabase.from("profiles").select("layout").eq("id", me.id).maybeSingle(),
+    supabase.from("athlete_gear").select("gear").eq("athlete_id", me.id).maybeSingle(),
   ]);
   const rows = (readiness ?? []) as ReadinessRow[];
   const trend = oneFamily(wellness ?? [], familyOf(device?.source ?? "garmin")) as WellnessPoint[];
@@ -124,6 +127,15 @@ export default async function MePage() {
         </section>
       )}
       </>
+    ),
+    closet: (
+      <section id="closet" className={`${card} scroll-mt-6`}>
+        <h2 className="text-lg font-medium">My closet</h2>
+        <p className="mb-5 mt-1 text-sm text-white/55">
+          Your shoes, bikes and the gear you can use. Your coach plans around it, and each workout shows what to pack.
+        </p>
+        <ClosetEditor athleteId={me.id} initial={cleanCloset(gearRow?.gear)} />
+      </section>
     ),
     story: (
       <Link href="/me/story" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
