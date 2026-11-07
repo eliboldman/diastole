@@ -195,7 +195,7 @@ export default async function AccountPage() {
         </div>
 
         {isCoach && (
-          <section className={`${card} lg:col-span-2`}>
+          <section id="coaching" className={`${card} scroll-mt-6 lg:col-span-2`}>
             <h2 className="mb-1 text-lg font-medium">Coaching assistant</h2>
             <p className="mb-4 text-sm text-white/50">
               Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. When a running-form issue shows up across

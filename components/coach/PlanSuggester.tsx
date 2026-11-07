@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -38,6 +39,8 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
   }, [busy]);
 
   async function go() {
+    if (!ready.guide) return setMsg({ ok: false, text: "guide" });
+    if (!start) return setMsg({ ok: false, text: "Pick a start date." });
     setBusy(true);
     setElapsed(0);
     setMsg(null);
@@ -85,7 +88,7 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
         Replace earlier suggestions in these dates that I haven&apos;t approved
       </label>
       {missing.length > 0 && <p className="mt-1 text-xs text-amber-100/70">Better with: {missing.join(", ")}.</p>}
-      <button onClick={go} disabled={busy || !start || !ready.guide} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-[#0d1513] disabled:opacity-50 sm:w-auto sm:px-6">
+      <button onClick={go} disabled={busy} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-[#0d1513] disabled:opacity-50 sm:w-auto sm:px-6">
         {busy ? (
           <>
             <Loader2 size={18} className="animate-spin" aria-hidden /> Planning {days === 1 ? "the day" : `${days / 7 >= 1 ? days / 7 : days} ${days >= 7 ? (days === 7 ? "week" : "weeks") : "days"}`}… {elapsed}s
@@ -97,7 +100,16 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
         )}
       </button>
       {busy && days >= 14 && <p className="mt-2 text-xs text-white/45">A {days / 7}-week block takes a minute or two. Keep this page open.</p>}
-      {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-emerald-200" : "text-red-200"}`}>{msg.text}</p>}
+      {msg?.text === "guide" ? (
+        <p className="mt-3 text-sm text-amber-100">
+          Add your coaching guide first: every suggestion follows it.{" "}
+          <Link href="/account#coaching" className="font-medium text-emerald-200 underline">
+            Me → Coaching assistant
+          </Link>
+        </p>
+      ) : (
+        msg && <p className={`mt-3 text-sm ${msg.ok ? "text-emerald-200" : "text-red-200"}`}>{msg.text}</p>
+      )}
       <p className="mt-3 text-xs text-white/40">Everything arrives as drafts. Nothing goes to {firstName} or the watch until you approve it.</p>
     </div>
   );
