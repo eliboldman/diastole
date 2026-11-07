@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+
+import { resolveLayout, visibleSections } from "./layout-prefs.ts";
+
+const def = resolveLayout("me", null);
+assert.equal(def.order[0], "readiness");
+assert.deepEqual(def.hidden, []);
+assert.equal(visibleSections(def).length, def.order.length);
+
+const custom = resolveLayout("me", { me: { order: ["prs", "readiness", "bogus", "prs"], hidden: ["form", "nope"] } });
+assert.equal(custom.order[0], "prs", "keeps the person's order");
+assert.equal(custom.order[1], "story", "a missing section lands after its default neighbour (prs)");
+assert.equal(custom.order[2], "readiness");
+assert.ok(!custom.order.includes("bogus"), "drops unknown keys");
+assert.equal(new Set(custom.order).size, custom.order.length, "no duplicates");
+assert.equal(custom.order.length, def.order.length, "missing sections come back");
+assert.equal(custom.order[3], "trends");
+assert.deepEqual(custom.hidden, ["form"]);
+assert.ok(!visibleSections(custom).includes("form"));
+
+assert.deepEqual(resolveLayout("today", { today: "garbage" }).order, resolveLayout("today", {}).order);
+console.log("layout prefs: all passed");

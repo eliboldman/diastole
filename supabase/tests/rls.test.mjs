@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -778,6 +778,14 @@ r = await as(A1, `update public.profiles set theme = 'blocks' where id = '${A1}'
 check("athlete picks a theme", r.rows?.[0]?.theme === "blocks");
 r = await as(A1, `update public.profiles set theme = 'neon' where id = '${A1}'`);
 check("unknown themes are refused", !!r.error);
+
+// Page layouts (Customize)
+r = await as(A1, `update public.profiles set layout = '{"me":{"order":["prs"],"hidden":["form"]}}' where id = '${A1}' returning layout`);
+check("athlete saves their own page layout", r.rows?.[0]?.layout?.me?.hidden?.[0] === "form");
+r = await as(A2, `update public.profiles set layout = '{}' where id = '${A1}' returning id`);
+check("nobody else can change it", !!r.error || r.rows?.length === 0);
+r = await as(A1, `update public.profiles set layout = '[]' where id = '${A1}'`);
+check("layout must be an object", !!r.error);
 
 // Barcode meals
 r = await as(A1, `insert into public.meal_logs (athlete_id, local_date, eaten_at, items, carbs_g, protein_g, fat_g, source) values ('${A1}', '2026-11-06', now(), '[]', 26, 4, 6, 'barcode') returning id`);

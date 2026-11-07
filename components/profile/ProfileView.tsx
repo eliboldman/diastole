@@ -1,5 +1,5 @@
 import { Flag, Pencil, Trophy } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -19,14 +19,16 @@ import { createAdminClient, createClient, type Profile } from "@/lib/supabase/se
 // Time math lives outside the component (render must stay pure).
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 const withinDays = (iso: string, n: number) => Date.now() - Date.parse(iso) < n * 86_400_000;
+const DEFAULT_ORDER = ["goals", "numbers", "metrics", "prs", "workouts"];
 const daysUntil = (date: string) => Math.ceil((Date.parse(`${date}T12:00:00Z`) - Date.now()) / 86_400_000);
 
 /**
  * A person's profile: avatar, goals, numbers, PRs. The athlete and their coach see everything; pod
- * mates see only what the athlete shares. `analysis` sits under the goals (the Me tab puts the
- * readiness and form analyzers there); `header` sits above the avatar.
+ * mates see only what the athlete shares. Below the avatar, sections render in `order` (visible keys);
+ * `sections` adds or replaces keyed sections (the Me tab adds readiness, form and more). `header`
+ * sits above the avatar.
  */
-export default async function ProfileView({ id, me, analysis, header }: { id: string; me: Profile; analysis?: ReactNode; header?: ReactNode }) {
+export default async function ProfileView({ id, me, header, sections, order }: { id: string; me: Profile; header?: ReactNode; sections?: Record<string, ReactNode>; order?: string[] }) {
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -128,6 +130,133 @@ export default async function ProfileView({ id, me, analysis, header }: { id: st
         ? `${first} shares their avatar and name with the pod.`
         : `${first}'s readiness shows up after their watch syncs.`);
 
+  // Each section by key, so the Me tab can hide and reorder them alongside its own sections.
+  const blocks: Record<string, ReactNode> = {
+    goals: (
+      <>
+        {(goals?.race_name || goals?.block_name || coaching) && (
+          <section className="mt-8 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 space-y-1.5">
+                {goals?.race_name && (
+                  <p className="flex items-center gap-2">
+                    <Flag size={16} className="shrink-0 text-emerald-200" aria-hidden />
+                    <span className="min-w-0 truncate font-medium">{goals.race_name}</span>
+                    {goals.race_date && daysUntil(goals.race_date) >= 0 && <span className="shrink-0 text-sm text-white/55">{`in ${daysUntil(goals.race_date)} days`}</span>}
+                  </p>
+                )}
+                {goals?.block_name && (
+                  <p className="text-sm text-white/65">
+                    {`Current block: ${goals.block_name}`}
+                    {goals.block_ends && ` · ends ${new Date(`${goals.block_ends}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`}
+                  </p>
+                )}
+                {!goals?.race_name && !goals?.block_name && <p className="text-sm text-white/55">No goal race or training block set yet.</p>}
+              </div>
+              {coaching && <GoalForm athleteId={id} goals={goals} />}
+            </div>
+          </section>
+        )}
+
+      </>
+    ),
+    numbers: (
+      <>
+        {own && (
+          <section id="numbers" className="mt-6 scroll-mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
+            <h2 className="font-medium">My numbers</h2>
+            <p className="mb-4 mt-1 text-sm text-white/55">FTP, threshold pace and heart rates set your zones and workout targets. Update them after a test; your coach sees every change.</p>
+            <ZonesForm
+              athleteId={id}
+              maxHr={myZones?.max_hr ?? null}
+              thresholdPace={myZones?.threshold_speed_mps ? paceOf(Number(myZones.threshold_speed_mps), me.units ?? "mi") : null}
+              units={me.units ?? "mi"}
+              ftp={myZones?.ftp_w ?? null}
+              thresholdHr={myZones?.threshold_hr ?? null}
+              estimatedMaxHr={null}
+              saveLabel="Save my numbers"
+            />
+          </section>
+        )}
+
+      </>
+    ),
+    metrics: (
+      <>
+        {cards.length > 0 ? (
+          <section className="mt-6">
+            <MetricCards cards={cards} />
+          </section>
+        ) : (
+          <p className="mt-8 text-center text-sm text-white/55">Numbers show up here as workouts and sleep sync.</p>
+        )}
+
+      </>
+    ),
+    prs: (
+      <>
+        {prs.length > 0 && (
+          <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Trophy size={16} className="text-amber-200" aria-hidden /> Recent PRs
+            </h2>
+            <ul className="divide-y divide-white/[0.06]">
+              {prs.map((p) => (
+                <li key={`${p.key}-${p.achieved_at}`}>
+                  <Link href={p.activity_id ? `/activity/${p.activity_id}` : "#"} className="flex min-h-12 items-center justify-between gap-3 text-sm hover:text-emerald-100">
+                    <span className="min-w-0 truncate">{PR_LABEL[p.key] ?? p.key}</span>
+                    <span className="shrink-0 tabular-nums text-white/80">
+                      {prValue(p.key, p.value)}
+                      <span className="ml-2 text-white/40">{new Date(p.achieved_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: tz })}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {achievements.some((a) => a.key === "longest_run") && (
+              <p className="mt-2 text-xs text-white/45">
+                {`Longest run ${distance(Math.max(...achievements.filter((a) => a.key === "longest_run").map((a) => a.value ?? 0)), me.units ?? "mi")}`}
+              </p>
+            )}
+          </section>
+        )}
+      </>
+    ),
+    workouts: (
+      <>
+        {shares?.training && acts.length > 0 && (
+          <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
+            <h2 className="mb-2 text-sm font-medium">Recent workouts</h2>
+            <ul className="divide-y divide-white/[0.06]">
+              {acts.slice(0, 8).map((a) => {
+                const row = (
+                  <>
+                    <span className="min-w-0 truncate">{a.name || sportLabel(a.sport ?? null)}</span>
+                    <span className="shrink-0 tabular-nums text-white/55">
+                      {[clock(a.duration_s), shortDistance(a.distance_m, me.units ?? "mi", a.sport)].filter(Boolean).join(" · ")}
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={a.id ?? a.start_time}>
+                    {shares.details && a.id ? (
+                      <Link href={`/activity/${a.id}`} className="flex min-h-12 items-center justify-between gap-3 text-sm hover:text-emerald-100">
+                        {row}
+                      </Link>
+                    ) : (
+                      <span className="flex min-h-12 items-center justify-between gap-3 text-sm">{row}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+      </>
+    ),
+    ...sections,
+  };
+
   return (
     <>
       {header}
@@ -162,110 +291,9 @@ export default async function ProfileView({ id, me, analysis, header }: { id: st
           )}
         </section>
 
-        {(goals?.race_name || goals?.block_name || coaching) && (
-          <section className="mt-8 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 space-y-1.5">
-                {goals?.race_name && (
-                  <p className="flex items-center gap-2">
-                    <Flag size={16} className="shrink-0 text-emerald-200" aria-hidden />
-                    <span className="min-w-0 truncate font-medium">{goals.race_name}</span>
-                    {goals.race_date && daysUntil(goals.race_date) >= 0 && <span className="shrink-0 text-sm text-white/55">{`in ${daysUntil(goals.race_date)} days`}</span>}
-                  </p>
-                )}
-                {goals?.block_name && (
-                  <p className="text-sm text-white/65">
-                    {`Current block: ${goals.block_name}`}
-                    {goals.block_ends && ` · ends ${new Date(`${goals.block_ends}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`}
-                  </p>
-                )}
-                {!goals?.race_name && !goals?.block_name && <p className="text-sm text-white/55">No goal race or training block set yet.</p>}
-              </div>
-              {coaching && <GoalForm athleteId={id} goals={goals} />}
-            </div>
-          </section>
-        )}
-
-        {analysis}
-
-        {own && (
-          <section id="numbers" className="mt-6 scroll-mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
-            <h2 className="font-medium">My numbers</h2>
-            <p className="mb-4 mt-1 text-sm text-white/55">FTP, threshold pace and heart rates set your zones and workout targets. Update them after a test; your coach sees every change.</p>
-            <ZonesForm
-              athleteId={id}
-              maxHr={myZones?.max_hr ?? null}
-              thresholdPace={myZones?.threshold_speed_mps ? paceOf(Number(myZones.threshold_speed_mps), me.units ?? "mi") : null}
-              units={me.units ?? "mi"}
-              ftp={myZones?.ftp_w ?? null}
-              thresholdHr={myZones?.threshold_hr ?? null}
-              estimatedMaxHr={null}
-              saveLabel="Save my numbers"
-            />
-          </section>
-        )}
-
-        {cards.length > 0 ? (
-          <section className="mt-6">
-            <MetricCards cards={cards} />
-          </section>
-        ) : (
-          <p className="mt-8 text-center text-sm text-white/55">Numbers show up here as workouts and sleep sync.</p>
-        )}
-
-        {prs.length > 0 && (
-          <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Trophy size={16} className="text-amber-200" aria-hidden /> Recent PRs
-            </h2>
-            <ul className="divide-y divide-white/[0.06]">
-              {prs.map((p) => (
-                <li key={`${p.key}-${p.achieved_at}`}>
-                  <Link href={p.activity_id ? `/activity/${p.activity_id}` : "#"} className="flex min-h-12 items-center justify-between gap-3 text-sm hover:text-emerald-100">
-                    <span className="min-w-0 truncate">{PR_LABEL[p.key] ?? p.key}</span>
-                    <span className="shrink-0 tabular-nums text-white/80">
-                      {prValue(p.key, p.value)}
-                      <span className="ml-2 text-white/40">{new Date(p.achieved_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: tz })}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {achievements.some((a) => a.key === "longest_run") && (
-              <p className="mt-2 text-xs text-white/45">
-                {`Longest run ${distance(Math.max(...achievements.filter((a) => a.key === "longest_run").map((a) => a.value ?? 0)), me.units ?? "mi")}`}
-              </p>
-            )}
-          </section>
-        )}
-        {shares?.training && acts.length > 0 && (
-          <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl">
-            <h2 className="mb-2 text-sm font-medium">Recent workouts</h2>
-            <ul className="divide-y divide-white/[0.06]">
-              {acts.slice(0, 8).map((a) => {
-                const row = (
-                  <>
-                    <span className="min-w-0 truncate">{a.name || sportLabel(a.sport ?? null)}</span>
-                    <span className="shrink-0 tabular-nums text-white/55">
-                      {[clock(a.duration_s), shortDistance(a.distance_m, me.units ?? "mi", a.sport)].filter(Boolean).join(" · ")}
-                    </span>
-                  </>
-                );
-                return (
-                  <li key={a.id ?? a.start_time}>
-                    {shares.details && a.id ? (
-                      <Link href={`/activity/${a.id}`} className="flex min-h-12 items-center justify-between gap-3 text-sm hover:text-emerald-100">
-                        {row}
-                      </Link>
-                    ) : (
-                      <span className="flex min-h-12 items-center justify-between gap-3 text-sm">{row}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+        {(order ?? DEFAULT_ORDER).map((k) => (
+          <Fragment key={k}>{blocks[k]}</Fragment>
+        ))}
       </div>
     </>
   );
