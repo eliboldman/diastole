@@ -1,5 +1,7 @@
 import type { ShoeKind } from "@/lib/closet";
 
+import { catalogLabel, searchCatalog } from "./catalog-search.ts";
+
 // Running shoe models by brand, for the closet search. Model families without version numbers so
 // the list doesn't go stale; athletes add the version ("Pegasus 41") after picking. Anything not
 // here can still be typed in by hand.
@@ -67,39 +69,5 @@ export const SHOE_CATALOG: CatalogShoe[] = SHOE_BRANDS.flatMap((brand) =>
   Object.entries(C[brand]).flatMap(([kind, models]) => (models ?? []).map((model) => ({ brand, model, kind: kind as ShoeKind }))),
 );
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9%]+/g, " ").trim();
-
-/**
- * Best matches for what's typed: every word must start a word in "brand model", or (3+ letters)
- * appear inside it with spaces ignored, so "peg 41" finds Pegasus (the version number aside),
- * "hoka mach" finds the Mach family and "cloud boom" finds Cloudboom. Exact-prefix models first.
- */
-export function searchShoes(q: string, limit = 8): CatalogShoe[] {
-  const words = norm(q).split(" ").filter(Boolean);
-  if (!words.length) return [];
-  const scored: { s: CatalogShoe; score: number }[] = [];
-  for (const s of SHOE_CATALOG) {
-    const hay = norm(`${s.brand} ${s.model}`).split(" ");
-    const flat = hay.join("");
-    // Numbers that are a version ("41") can be left unmatched; letters must all match.
-    const unmatched = words.filter((w) => !hay.some((h) => h.startsWith(w)) && !(w.length >= 3 && flat.includes(w)));
-    if (unmatched.some((w) => !/^\d+$/.test(w)) || unmatched.length === words.length) continue;
-    const m = norm(s.model).replace(/ /g, "");
-    const typed = words.filter((w) => norm(s.brand) !== w && !/^\d+$/.test(w)).join("");
-    const score = (m.startsWith(typed) ? 0 : 1) + (m === typed ? -0.5 : 0) + m.length / 100 + unmatched.length;
-    scored.push({ s, score });
-  }
-  return scored
-    .sort((a, b) => a.score - b.score)
-    .slice(0, limit)
-    .map((x) => x.s);
-}
-
-/** "Nike Pegasus" + what they typed after the family name ("41"), kept as the version. */
-export function catalogLabel(s: CatalogShoe, typed: string) {
-  const version = norm(typed)
-    .split(" ")
-    .filter((w) => /^\d+(\.\d+)?$/.test(w))
-    .find((w) => !norm(s.model).split(" ").includes(w));
-  return `${s.brand} ${s.model}${version ? ` ${version}` : ""}`;
-}
+export const searchShoes = (q: string, limit = 8) => searchCatalog(SHOE_CATALOG, q, limit);
+export { catalogLabel };

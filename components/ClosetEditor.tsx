@@ -1,10 +1,12 @@
 "use client";
 
-import { Bike, Footprints, Plus, Trash2 } from "lucide-react";
+import { Bike, Footprints, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
-import ShoeSearch from "@/components/ShoeSearch";
+import GearAdder from "@/components/GearAdder";
+import { searchBikes } from "@/lib/bike-catalog";
 import { saveCloset } from "@/lib/closet-actions";
+import { searchShoes } from "@/lib/shoe-catalog";
 import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
 
 const input = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-base sm:text-sm placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none";
@@ -16,14 +18,6 @@ function RemoveButton({ onClick, what }: { onClick: () => void; what: string }) 
   return (
     <button type="button" onClick={onClick} aria-label={`Remove ${what}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/45 transition active:scale-90 hover:bg-white/[0.08] hover:text-white/80">
       <Trash2 size={16} />
-    </button>
-  );
-}
-
-function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <button type="button" onClick={onClick} className="mt-2 flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm text-emerald-200 hover:bg-white/[0.05]">
-      <Plus size={16} /> {label}
     </button>
   );
 }
@@ -61,102 +55,149 @@ export default function ClosetEditor({
     }, 600);
   };
 
-  const setShoe = (i: number, patch: Partial<Closet["shoes"][number]>) => update({ ...c, shoes: c.shoes.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
-  const setBike = (i: number, patch: Partial<Closet["bikes"][number]>) => update({ ...c, bikes: c.bikes.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
+  const setShoe = (id: string, patch: Partial<Closet["shoes"][number]>) => update({ ...c, shoes: c.shoes.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  const setBike = (id: string, patch: Partial<Closet["bikes"][number]>) => update({ ...c, bikes: c.bikes.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
+  // Saved gear shows under its type, in the order the types are listed.
+  const shoeGroups = SHOE_KINDS.map(([k, l]) => ({ k, l, items: c.shoes.filter((s) => s.kind === k) })).filter((g) => g.items.length);
+  const bikeGroups = BIKE_KINDS.map(([k, l]) => ({ k, l, items: c.bikes.filter((b) => b.kind === k) })).filter((g) => g.items.length);
   return (
     <div className="space-y-6">
       <div>
         <p className={`${small} flex items-center gap-2`}>
           <Footprints size={14} aria-hidden /> Shoes
         </p>
-        <ul className="mt-2 space-y-2">
-          {c.shoes.map((s, i) => {
-            const m = mileage?.[s.id];
-            const wear = m === undefined ? null : shoeWear(m);
-            const isDefault = defaultShoe(c)?.id === s.id;
-            return (
-              <li key={s.id} className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 ${s.retired ? "opacity-60" : ""}`}>
-                <div className="relative flex items-center gap-2">
-                  <ShoeSearch className={input} value={s.model} onChange={(model, kind) => setShoe(i, kind ? { model, kind } : { model })} />
-                  <select className={`${select} max-w-[9.5rem]`} value={s.kind} aria-label="Shoe type" onChange={(e) => setShoe(i, { kind: e.target.value as ShoeKind })}>
-                    {SHOE_KINDS.map(([k, l]) => (
-                      <option key={k} value={k}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                  <RemoveButton onClick={() => update({ ...c, shoes: c.shoes.filter((_, j) => j !== i) })} what={s.model || "shoe"} />
-                </div>
-                <details className="group px-1">
-                  <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-xs text-white/55">
-                    <span className="min-w-0 truncate">
-                      {m !== undefined && <span className={wear === "replace" ? "text-amber-200" : wear === "worn" ? "text-amber-100/80" : "text-white/70"}>{dist(m)}</span>}
-                      {m !== undefined && " · "}
-                      {s.retired ? "Retired" : isDefault ? "Default for runs" : "Tap for details"}
-                      {wear === "replace" && !s.retired ? " · time to think about a new pair" : wear === "worn" && !s.retired ? " · getting worn" : ""}
-                    </span>
-                    <span className="shrink-0 text-emerald-200 group-open:hidden">Details</span>
-                  </summary>
-                  <div className="grid gap-2 pb-2 pt-1 sm:grid-cols-3 sm:items-center">
-                    <label className="flex items-center gap-2 text-xs text-white/60">
-                      <span className="shrink-0">Already on them</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={3000}
-                        className={`${input} min-h-10 w-24`}
-                        value={s.start_m ? Math.round((s.start_m / perUnit) * 10) / 10 : ""}
-                        placeholder="0"
-                        aria-label={`${units} already on ${s.model || "these shoes"}`}
-                        onChange={(e) => setShoe(i, { start_m: Math.max(0, Number(e.target.value) || 0) * perUnit })}
-                      />
-                      <span>{units}</span>
-                    </label>
-                    <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 accent-emerald-300"
-                        checked={s.default}
-                        disabled={s.retired}
-                        onChange={(e) => update({ ...c, shoes: c.shoes.map((x, j) => ({ ...x, default: j === i ? e.target.checked : e.target.checked ? false : x.default })) })}
-                      />
-                      Default for runs
-                    </label>
-                    <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
-                      <input type="checkbox" className="h-5 w-5 accent-emerald-300" checked={s.retired} onChange={(e) => setShoe(i, { retired: e.target.checked, default: e.target.checked ? false : s.default })} />
-                      Retired
-                    </label>
-                  </div>
-                </details>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="mt-2 text-xs text-white/45">Runs count toward your default pair unless you pick different shoes on the run.</p>
-        {c.shoes.length < 12 && <AddButton onClick={() => update({ ...c, shoes: [...c.shoes, { id: newId(), model: "", kind: "daily", start_m: 0, since: today, default: false, retired: false }] })} label="Add shoes" />}
+        <div className="mt-2">
+          {c.shoes.length < 12 ? (
+            <GearAdder
+              search={searchShoes}
+              kinds={SHOE_KINDS}
+              fallbackKind="daily"
+              noun="shoe"
+              placeholder="Add shoes: search, e.g. Pegasus"
+              onAdd={(model, kind) => update({ ...c, shoes: [...c.shoes, { id: newId(), model, kind, start_m: 0, since: today, default: !c.shoes.some((x) => !x.retired), retired: false }] })}
+            />
+          ) : (
+            <p className="text-xs text-white/45">That&apos;s 12 pairs, the most the closet holds. Remove one to add another.</p>
+          )}
+        </div>
+        {shoeGroups.map((g) => (
+          <div key={g.k} className="mt-4">
+            <p className="mb-2 text-xs text-white/55">
+              {g.l} <span className="text-white/35">· {g.items.length}</span>
+            </p>
+            <ul className="space-y-2">
+              {g.items.map((s) => {
+                const m = mileage?.[s.id];
+                const wear = m === undefined ? null : shoeWear(m);
+                const isDefault = defaultShoe(c)?.id === s.id;
+                return (
+                  <li key={s.id} className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 pl-3 ${s.retired ? "opacity-60" : ""}`}>
+                    <div className="flex items-center gap-2">
+                      <p className="min-w-0 flex-1 break-words font-medium leading-snug">{s.model || "Unnamed shoes"}</p>
+                      <select className={`${select} max-w-[8.5rem]`} value={s.kind} aria-label={`Type for ${s.model || "these shoes"}`} onChange={(e) => setShoe(s.id, { kind: e.target.value as ShoeKind })}>
+                        {SHOE_KINDS.map(([k, l]) => (
+                          <option key={k} value={k}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                      <RemoveButton onClick={() => update({ ...c, shoes: c.shoes.filter((x) => x.id !== s.id) })} what={s.model || "shoe"} />
+                    </div>
+                    <details className="group">
+                      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-xs text-white/55">
+                        <span className="min-w-0 truncate">
+                          {m !== undefined && <span className={wear === "replace" ? "text-amber-200" : wear === "worn" ? "text-amber-100/80" : "text-white/70"}>{dist(m)}</span>}
+                          {m !== undefined && " · "}
+                          {s.retired ? "Retired" : isDefault ? "Default for runs" : "Tap for details"}
+                          {wear === "replace" && !s.retired ? " · time to think about a new pair" : wear === "worn" && !s.retired ? " · getting worn" : ""}
+                        </span>
+                        <span className="shrink-0 pr-1 text-emerald-200 group-open:hidden">Details</span>
+                      </summary>
+                      <div className="grid gap-2 pb-2 pr-1 pt-1 sm:grid-cols-3 sm:items-center">
+                        <label className="flex items-center gap-2 text-xs text-white/60 sm:col-span-3">
+                          <span className="shrink-0">Name</span>
+                          <input className={`${input} min-h-10`} value={s.model} maxLength={60} aria-label="Shoe name" onChange={(e) => setShoe(s.id, { model: e.target.value })} />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-white/60">
+                          <span className="shrink-0">Already on them</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            max={3000}
+                            className={`${input} min-h-10 w-24`}
+                            value={s.start_m ? Math.round((s.start_m / perUnit) * 10) / 10 : ""}
+                            placeholder="0"
+                            aria-label={`${units} already on ${s.model || "these shoes"}`}
+                            onChange={(e) => setShoe(s.id, { start_m: Math.max(0, Number(e.target.value) || 0) * perUnit })}
+                          />
+                          <span>{units}</span>
+                        </label>
+                        <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 accent-emerald-300"
+                            checked={s.default}
+                            disabled={s.retired}
+                            onChange={(e) => update({ ...c, shoes: c.shoes.map((x) => ({ ...x, default: x.id === s.id ? e.target.checked : e.target.checked ? false : x.default })) })}
+                          />
+                          Default for runs
+                        </label>
+                        <label className="flex min-h-10 items-center gap-2 text-xs text-white/70">
+                          <input type="checkbox" className="h-5 w-5 accent-emerald-300" checked={s.retired} onChange={(e) => setShoe(s.id, { retired: e.target.checked, default: e.target.checked ? false : s.default })} />
+                          Retired
+                        </label>
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+        {c.shoes.length > 0 && <p className="mt-2 text-xs text-white/45">Runs count toward your default pair unless you pick different shoes on the run.</p>}
       </div>
 
       <div>
         <p className={`${small} flex items-center gap-2`}>
           <Bike size={14} aria-hidden /> Bikes
         </p>
-        <ul className="mt-2 space-y-2">
-          {c.bikes.map((b, i) => (
-            <li key={b.id} className="flex items-center gap-2">
-              <input className={input} value={b.model} maxLength={60} placeholder="Model, e.g. Tarmac SL7" aria-label="Bike model" onChange={(e) => setBike(i, { model: e.target.value })} />
-              <select className={`${select} max-w-[9.5rem]`} value={b.kind} aria-label="Bike type" onChange={(e) => setBike(i, { kind: e.target.value as BikeKind })}>
-                {BIKE_KINDS.map(([k, l]) => (
-                  <option key={k} value={k}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-              <RemoveButton onClick={() => update({ ...c, bikes: c.bikes.filter((_, j) => j !== i) })} what={b.model || "bike"} />
-            </li>
-          ))}
-        </ul>
-        {c.bikes.length < 12 && <AddButton onClick={() => update({ ...c, bikes: [...c.bikes, { id: newId(), model: "", kind: "road" }] })} label="Add a bike" />}
+        <div className="mt-2">
+          {c.bikes.length < 12 ? (
+            <GearAdder
+              search={searchBikes}
+              kinds={BIKE_KINDS}
+              fallbackKind="road"
+              noun="bike"
+              placeholder="Add a bike: search, e.g. Cervélo P5"
+              onAdd={(model, kind) => update({ ...c, bikes: [...c.bikes, { id: newId(), model, kind }] })}
+            />
+          ) : (
+            <p className="text-xs text-white/45">That&apos;s 12 bikes, the most the closet holds. Remove one to add another.</p>
+          )}
+        </div>
+        {bikeGroups.map((g) => (
+          <div key={g.k} className="mt-4">
+            <p className="mb-2 text-xs text-white/55">
+              {g.l} <span className="text-white/35">· {g.items.length}</span>
+            </p>
+            <ul className="space-y-2">
+              {g.items.map((b) => (
+                <li key={b.id} className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 pl-3">
+                  <p className="min-w-0 flex-1 break-words font-medium leading-snug">{b.model || "Unnamed bike"}</p>
+                  <select className={`${select} max-w-[8.5rem]`} value={b.kind} aria-label={`Type for ${b.model || "this bike"}`} onChange={(e) => setBike(b.id, { kind: e.target.value as BikeKind })}>
+                    {BIKE_KINDS.map(([k, l]) => (
+                      <option key={k} value={k}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  <RemoveButton onClick={() => update({ ...c, bikes: c.bikes.filter((x) => x.id !== b.id) })} what={b.model || "bike"} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
 
       <div>
