@@ -8,6 +8,7 @@ export type SearchHit = { kind: "athlete" | "workout" | "library" | "activity" |
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 const PAGES: { title: string; href: string; roles: ("coach" | "athlete")[]; words: string }[] = [
+  { title: "Secrets", href: "/me/secrets", roles: ["coach", "athlete"], words: "secrets easter eggs hidden badges collection" },
   { title: "My setup: closet, gear, numbers, training days", href: "/me/setup", roles: ["coach", "athlete"], words: "closet shoes bikes gear trainer numbers ftp threshold pace heart rate zones week days schedule preferences setup" },
   { title: "Help and walkthrough videos", href: "/help", roles: ["coach", "athlete"], words: "help how to video tour walkthrough guide tutorial" },
   { title: "Today", href: "/dashboard", roles: ["coach"], words: "home flags readiness approvals suggestions" },

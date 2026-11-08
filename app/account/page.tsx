@@ -134,6 +134,15 @@ export default async function MePage() {
         <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
       </Link>
     ),
+    secrets: (
+      <Link href="/me/secrets" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-amber-200/15 bg-amber-200/[0.04] p-4 pl-5">
+        <span className="min-w-0">
+          <span className="block font-medium">🗝️ Secrets</span>
+          <span className="block truncate text-sm text-white/55">Little surprises hidden around Diastole</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+      </Link>
+    ),
     story: (
       <Link href="/me/story" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
         <span className="min-w-0">

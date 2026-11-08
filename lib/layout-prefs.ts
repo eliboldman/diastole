@@ -25,6 +25,7 @@ export const LAYOUT_PAGES = {
     { key: "metrics", label: "Metric cards" },
     { key: "prs", label: "Recent PRs" },
     { key: "story", label: "Season story" },
+    { key: "secrets", label: "Secrets" },
   ],
 } as const;
 

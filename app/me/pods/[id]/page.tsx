@@ -3,12 +3,15 @@ import { notFound } from "next/navigation";
 import AthleteShell from "@/components/AthleteShell";
 import { LeavePod } from "@/components/PodButtons";
 import PodActivityFeed from "@/components/PodActivityFeed";
+import RecentDiscoveries from "@/components/secrets/RecentDiscoveries";
 import PodFeed, { type PodFeedData, type PodPropsData } from "@/components/PodFeed";
 import PodChallenges, { type Challenge } from "@/components/PodChallenges";
 import PodTabs, { type PodView } from "@/components/PodTabs";
 import { FEED_PAGE, type FeedItem } from "@/lib/pod-feed-types";
 import { createClient, requireUser } from "@/lib/supabase/server";
-import BackLink from "@/components/layout/BackLink";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import RememberPod from "@/components/RememberPod";
 
 export default async function AthletePodPage({
   params,
@@ -40,7 +43,10 @@ export default async function AthletePodPage({
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <BackLink href="/me/pods" label="My pods" />
+      <RememberPod id={id} />
+      <Link href="/me/pods?all=1" className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
+        <ChevronLeft size={16} aria-hidden /> All pods &amp; sharing
+      </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{feed.pod.name}</h1>
         <LeavePod podId={id} name={feed.pod.name} />
@@ -52,7 +58,10 @@ export default async function AthletePodPage({
         {view === "challenges" ? (
           <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={me.id} canJoin isCoach={false} today={new Date().toLocaleDateString("en-CA", { timeZone: me.timezone })} units={me.units} />
         ) : view === "feed" ? (
-          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={me.timezone} units={me.units} avatars={(avatars ?? {}) as Record<string, unknown>} iShare={Boolean(mine?.share_workout_details)} />
+          <>
+            <RecentDiscoveries podId={id} />
+            <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={me.timezone} units={me.units} avatars={(avatars ?? {}) as Record<string, unknown>} iShare={Boolean(mine?.share_workout_details)} />
+          </>
         ) : (
           <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} streaks={(streaks ?? {}) as Record<string, number>} />
         )}

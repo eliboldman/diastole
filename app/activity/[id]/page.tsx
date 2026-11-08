@@ -25,6 +25,7 @@ import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMess
 import CheckIn from "@/components/avatar/CheckIn";
 import ShoePicker from "@/components/ShoePicker";
 import MergeNote from "@/components/MergeNote";
+import ReceiptPress from "@/components/secrets/ReceiptPress";
 import Explain from "@/components/Explain";
 import { explain, TILE_KEYS } from "@/lib/explain";
 import { SOURCE_LABEL } from "@/lib/activity/dupes";
@@ -321,6 +322,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
       )}
 
       {tiles.length > 0 && (
+        <ReceiptWrap own={isOwn} id={act.id}>
         <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {tiles.map(([label, value]) => (
             <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
@@ -332,6 +334,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
             </div>
           ))}
         </section>
+        </ReceiptWrap>
       )}
 
       {isRun && (isOwn || isCoach) && pickable.length > 0 && (
@@ -571,4 +574,9 @@ export default async function ActivityPage({ params, searchParams }: { params: P
       )}
     </DashboardShell>
   );
+}
+
+/** Your own finished workouts hide the Retro Receipt (long-press the numbers). */
+function ReceiptWrap({ own, id, children }: { own: boolean; id: string; children: React.ReactNode }) {
+  return own ? <ReceiptPress activityId={id}>{children}</ReceiptPress> : <>{children}</>;
 }

@@ -4,11 +4,13 @@ import { HeartPulse, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { applyLook, BACKGROUNDS, CORNERS, DEFAULT_LOOK, DENSITIES, LOOK_COOKIE, lookCookie, TEXT_SIZES, type Look } from "@/lib/appearance";
+import { eggState, findSecret } from "@/lib/secrets-client";
 import { addSecret, hasSecret } from "@/lib/secrets-local";
 import { saveAppearance } from "@/lib/theme-actions";
+import SecretSparkle from "@/components/secrets/SecretSparkle";
 import { THEME_COOKIE, THEMES, type ThemeId } from "@/lib/themes";
 
-const SECRET_TAPS = 7;
+const SECRET_TAPS = 5;
 const YEAR = 60 * 60 * 24 * 400;
 const small = "mb-2 text-[11px] uppercase tracking-[0.15em] text-white/50";
 
@@ -104,13 +106,19 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
   // Icarus: found by typing "icarus" into search (remembered on this device), or already in use.
   useEffect(() => {
     const t = setTimeout(() => {
+      if (hasSecret("blocks")) setFound(true);
       if (unlock === "icarus") {
         addSecret("icarus");
+        void findSecret("icarus");
         setIcarus(true);
         setHint("You found Icarus. ☀️ Fly high, just not too close to the sun.");
         setThemeState("icarus");
         save("icarus", look);
-      } else if (hasSecret("icarus")) setIcarus(true);
+      } else if (hasSecret("icarus")) {
+        setIcarus(true);
+        // Found on this device before the collection existed: put it on the account.
+        if (!eggState().found.includes("icarus")) void findSecret("icarus");
+      }
     }, 0);
     return () => clearTimeout(t);
     // Only on arrival.
@@ -124,6 +132,7 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
     if (left <= 0) {
       setFound(true);
       setHint("You found Blocks.");
+      void findSecret("blocks");
     } else if (left <= 3) setHint(`${left} more…`);
   };
 
@@ -135,8 +144,9 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
       <div className="app-canvas overflow-hidden rounded-2xl border border-white/10 p-4">
         <div className="rounded-2xl border border-white/10 bg-panel p-4">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={tap} aria-label="Diastole" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">
+            <button type="button" onClick={tap} aria-label="Diastole" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">
               <HeartPulse size={20} aria-hidden />
+              <SecretSparkle id="blocks" />
             </button>
             <div className="min-w-0">
               <p className="font-medium">Tempo 3×10 min</p>

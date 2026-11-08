@@ -39,6 +39,7 @@
     "test:recovery": "node lib/recovery/catalog.test.ts",
     "test:pace": "node lib/activity/pace-input.test.ts",
     "test:tabs": "node lib/tabs.test.ts",
+    "test:secrets": "node lib/secrets.test.ts",
     "test:life": "node lib/workouts/life.test.ts && node lib/activity/dupes.test.ts && node lib/explain.test.ts && node lib/conditions.test.ts",
     "test:closet": "node lib/closet.test.ts && node lib/shoe-catalog.test.ts && node lib/bike-catalog.test.ts",
     "test:plan": "node lib/ai/coaching-doc.test.ts && node lib/week-prefs.test.ts && node lib/ai/schema-limits.test.ts",

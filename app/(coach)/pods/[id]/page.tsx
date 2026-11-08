@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PodActivityFeed from "@/components/PodActivityFeed";
+import RecentDiscoveries from "@/components/secrets/RecentDiscoveries";
 import PodFeed, { type PodFeedData, type PodPropsData } from "@/components/PodFeed";
 import PodChallenges, { type Challenge } from "@/components/PodChallenges";
 import PodTabs, { type PodView } from "@/components/PodTabs";
@@ -45,7 +46,10 @@ export default async function CoachPodFeedPage({
         {view === "challenges" ? (
           <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin={false} isCoach today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} units={coach.units} />
         ) : view === "feed" ? (
-          <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
+          <>
+            <RecentDiscoveries podId={id} />
+            <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
+          </>
         ) : (
           <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} streaks={(streaks ?? {}) as Record<string, number>} />
         )}

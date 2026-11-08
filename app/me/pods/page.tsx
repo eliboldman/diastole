@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -8,7 +10,7 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "My pods · Diastole" };
 
-export default async function MyPodsPage() {
+export default async function MyPodsPage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const me = await requireUser();
   const supabase = await createClient();
   const { data: mine } = await supabase
@@ -24,6 +26,13 @@ export default async function MyPodsPage() {
   const rows = (data ?? []).map((m) => ({ ...m, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
   const active = rows.filter((r) => r.status === "active");
   const invites = rows.filter((r) => r.status === "invited");
+
+  // Athletes go straight into their pod (the one they opened last, if they're in several). The list
+  // stays for invites waiting on an answer and for sharing settings (?all=1).
+  if (me.role !== "coach" && !invites.length && active.length && (await searchParams).all !== "1") {
+    const last = (await cookies()).get("d_last_pod")?.value;
+    redirect(`/me/pods/${active.find((a) => a.pod_id === last)?.pod_id ?? active[0].pod_id}`);
+  }
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>

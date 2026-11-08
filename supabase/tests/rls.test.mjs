@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme, layout, appearance, weather_location, adjust_conditions, seen_tips, tab_bar) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout, appearance, weather_location, adjust_conditions, seen_tips, tab_bar, eggs) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -921,6 +921,24 @@ await db.exec(`
     ('${A1}', 'garmin', 'ch2', 'cycling', now(), 7200, 60000),
     ('${A2}', 'garmin', 'ch3', 'running', now(), 1800, 5000);
 `);
+// ---------------------------------------------------------------- secrets (Phase E)
+r = await as(A1, `insert into public.user_secrets (athlete_id, secret_id) values (auth.uid(), 'heartbeat') returning secret_id`);
+check("athlete records a found secret", r.rows?.[0]?.secret_id === "heartbeat");
+r = await as(A1, `insert into public.user_secrets (athlete_id, secret_id) values ('${A2}', 'blocks')`);
+check("can't record one for someone else", !!r.error);
+r = await as(A2, `select * from public.user_secrets where athlete_id = '${A1}'`);
+check("others can't see your secrets", r.rows?.length === 0);
+r = await as(A1, `update public.profiles set eggs = '{"on":true,"podPosts":true}' where id = auth.uid() returning eggs`);
+check("athlete saves easter-egg settings", r.rows?.[0]?.eggs?.podPosts === true);
+r = await as(A1, `insert into public.secret_posts (athlete_id, secret_id) values (auth.uid(), 'heartbeat')`);
+check("pod posts are written by the server only", !!r.error);
+await db.exec("reset role");
+await db.query(`insert into public.secret_posts (athlete_id, secret_id) values ('${A1}', 'heartbeat')`);
+r = await as(A2, `select first_name, secret_id from public.get_pod_secret_posts('${CPOD}')`);
+check("pod mates see the discovery", r.rows?.some((x) => x.secret_id === "heartbeat"));
+r = await as(STRANGER, `select * from public.get_pod_secret_posts('${CPOD}')`);
+check("people outside the pod don't", (r.rows?.length ?? 0) === 0);
+
 r = await as(A1, `insert into public.pod_challenges (pod_id, created_by, title, metric, sport, mode, goal, starts_on, ends_on)
   values ('${CPOD}', '${A1}', 'Team hours', 'hours', 'any', 'team', 10, current_date - 1, current_date + 5) returning id`);
 const CH = r.rows?.[0]?.id;

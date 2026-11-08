@@ -926,3 +926,38 @@ body {
 .spotlight-in { animation: spotlight-in 0.45s ease-out both; }
 :root[data-motion="off"] .spotlight-in { animation: none; }
 @media (prefers-reduced-motion: reduce) { .spotlight-in { animation: none; } }
+
+/* Secrets: a faint twinkle near an unfound secret. */
+@keyframes secret-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 0.85; transform: scale(1); box-shadow: 0 0 8px rgba(253, 230, 138, 0.8); }
+}
+.secret-sparkle { animation: secret-twinkle 3.2s ease-in-out infinite; }
+:root[data-motion="off"] .secret-sparkle { animation: none; opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) { .secret-sparkle { animation: none; opacity: 0.5; } }
+
+/* Heartbeat: the logo beats at today's resting heart rate (--beat, set from the cookie). */
+@keyframes beat-soft { 0%, 100% { filter: drop-shadow(0 0 0 transparent); transform: scale(1); } 14% { transform: scale(1.06); filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-emerald-300) 60%, transparent)); } 28% { transform: scale(1); } }
+@keyframes beat-sharp { 0%, 100% { transform: scale(1); } 10% { transform: scale(1.14); } 20% { transform: scale(0.98); } 30% { transform: scale(1.08); } 42% { transform: scale(1); } }
+:root[data-heartbeat="soft"] .logo-beat { animation: beat-soft var(--beat, 1s) ease-out infinite; }
+:root[data-heartbeat="sharp"] .logo-beat { animation: beat-sharp var(--beat, 1s) ease-out infinite; }
+:root[data-heartbeat="pixel"] .logo-beat { animation: beat-sharp var(--beat, 1s) steps(3, jump-none) infinite; image-rendering: pixelated; }
+:root[data-motion="off"] .logo-beat { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .logo-beat { animation: none !important; } }
+
+/* Night Shift: a starry sky over the page background, for the day (or for good, if chosen). */
+:root[data-night="on"] .app-canvas {
+  background-image:
+    radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,.85), transparent 60%),
+    radial-gradient(1px 1px at 28% 8%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 47% 22%, rgba(255,255,255,.75), transparent 60%),
+    radial-gradient(1px 1px at 63% 12%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1.3px 1.3px at 78% 26%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(1px 1px at 90% 6%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1px 1px at 8% 42%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(1.2px 1.2px at 35% 38%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1px 1px at 70% 44%, rgba(255,255,255,.4), transparent 60%),
+    radial-gradient(160px 160px at 84% 9%, rgba(255, 244, 214, 0.16), transparent 70%),
+    linear-gradient(180deg, #070b1a 0%, transparent 55%);
+  background-size: 360px 360px, 420px 420px, 380px 380px, 460px 460px, 400px 400px, 340px 340px, 300px 300px, 500px 500px, 440px 440px, auto, auto;
+}

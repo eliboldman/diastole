@@ -8,6 +8,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
 import GearCheck from "@/components/GearCheck";
+import TodaySecrets from "@/components/secrets/TodaySecrets";
 import Spotlight from "@/components/Spotlight";
 import WhatsNew from "@/components/WhatsNew";
 import { latestRelease, seen, TIPS } from "@/lib/discovery";
@@ -52,9 +53,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   ]);
   // "Life happened": yesterday's session if it wasn't done, and sick/injured mode.
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-  const [{ data: missedRow }, { data: symptomsToday }] = await Promise.all([
+  const [{ data: missedRow }, { data: symptomsToday }, { data: rhrRow }] = await Promise.all([
     supabase.from("planned_workouts").select("id, title").eq("athlete_id", me.id).eq("scheduled_date", yesterday).in("status", ["approved", "sent"]).is("deleted_at", null).limit(1).maybeSingle(),
     supabase.from("symptom_logs").select("symptoms, energy").eq("athlete_id", me.id).eq("date", today).maybeSingle(),
+    // Today's resting heart rate sets the logo's beat (Heartbeat secret).
+    supabase.from("daily_wellness").select("resting_hr").eq("athlete_id", me.id).not("resting_hr", "is", null).order("date", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const pause = (layoutRow?.health_pause ?? null) as { kind: "sick" | "injured"; since: string } | null;
   const todayWorkout = (workouts ?? []).find((w) => w.scheduled_date === today && (w.status === "approved" || w.status === "sent")) ?? null;
@@ -219,6 +222,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">Today</h1>
         <LayoutCustomizer page="today" initial={layout} />
       </div>
+      <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
       {/* One obvious way to closet, gear, numbers and training days. */}
       <Link href="/me/setup" className="lift mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">

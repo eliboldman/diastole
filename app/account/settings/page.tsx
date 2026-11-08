@@ -15,6 +15,8 @@ import { cleanTabs } from "@/lib/tabs";
 import ConditionsToggle from "@/components/ConditionsToggle";
 import WeatherLocation from "@/components/WeatherLocation";
 import TabBarSettings from "@/components/TabBarSettings";
+import EggsSettings from "@/components/secrets/EggsSettings";
+import { cleanEggs } from "@/lib/secrets";
 import CoachingGuide from "@/components/coach/CoachingGuide";
 import { asLook } from "@/lib/appearance";
 import { asTheme } from "@/lib/themes";
@@ -46,16 +48,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent] = await Promise.all([
+  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: secretRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar, eggs")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd, philosophy").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
+    supabase.from("user_secrets").select("secret_id, enabled").eq("athlete_id", me.id),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(aiRow ?? {}) };
   const pods = (memberships ?? []).map((m) => ({ id: m.pod_id, status: m.status, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
@@ -175,6 +178,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <h2 className="mb-1 text-lg font-medium">Bottom tabs</h2>
             <p className="mb-4 text-sm text-white/55">The places at the bottom of your screen on your phone. Pick the ones you use most.</p>
             <TabBarSettings role={isCoach ? "coach" : "athlete"} initial={cleanTabs((profile?.tab_bar as Record<string, unknown> | null)?.[isCoach ? "coach" : "athlete"], isCoach ? "coach" : "athlete")} />
+          </section>
+
+          <section id="eggs" className={card}>
+            <h2 className="mb-1 text-lg font-medium">Easter eggs</h2>
+            <p className="mb-3 text-sm text-white/55">Little surprises hidden around Diastole.</p>
+            <EggsSettings initial={cleanEggs(profile?.eggs)} found={(secretRows ?? []).filter((r) => r.enabled).map((r) => r.secret_id)} />
           </section>
 
           <section id="appearance" className={card}>

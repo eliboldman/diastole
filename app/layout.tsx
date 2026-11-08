@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import NavHistory from "@/components/layout/NavHistory";
 import NavProgress from "@/components/layout/NavProgress";
 import { asLook, LOOK_COOKIE, lookAttrs } from "@/lib/appearance";
+import { eggsFromCookie, EGGS_COOKIE } from "@/lib/secrets";
 import { asTheme, THEME_COOKIE } from "@/lib/themes";
 
 import "./globals.css";
@@ -50,6 +51,13 @@ export default async function RootLayout({
   const jar = await cookies();
   const theme = asTheme(jar.get(THEME_COOKIE)?.value);
   const look = asLook(jar.get(LOOK_COOKIE)?.value);
+  // Secrets: the logo's heartbeat (style and today's resting HR) and the Night Shift sky.
+  const eggs = eggsFromCookie(jar.get(EGGS_COOKIE)?.value);
+  const rhr = Number(jar.get("d_rhr")?.value);
+  const beat = Number.isFinite(rhr) && rhr >= 30 && rhr <= 120 ? `${(60 / rhr).toFixed(2)}s` : "1s";
+  const heartbeat = eggs.on && eggs.found.includes("heartbeat") && eggs.heartbeat !== "off" ? eggs.heartbeat : undefined;
+  const nightFound = eggs.found.includes("night_shift");
+  const night = eggs.on && nightFound && (eggs.night === "keep" || Boolean(jar.get("d_night")?.value)) ? "on" : undefined;
   return (
     <html
       lang="en"
@@ -57,7 +65,9 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-theme={theme}
       {...lookAttrs(look)}
-      style={{ "--custom-h": look.hue } as React.CSSProperties}
+      data-heartbeat={heartbeat}
+      data-night={night}
+      style={{ "--custom-h": look.hue, "--beat": beat } as React.CSSProperties}
       className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
