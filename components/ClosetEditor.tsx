@@ -3,6 +3,7 @@
 import { Bike, Footprints, Plus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
+import ShoeSearch from "@/components/ShoeSearch";
 import { saveCloset } from "@/lib/closet-actions";
 import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
 
@@ -76,7 +77,7 @@ export default function ClosetEditor({
             return (
               <li key={s.id} className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 ${s.retired ? "opacity-60" : ""}`}>
                 <div className="flex items-center gap-2">
-                  <input className={input} value={s.model} maxLength={60} placeholder="Model, e.g. Pegasus 41" aria-label="Shoe model" onChange={(e) => setShoe(i, { model: e.target.value })} />
+                  <ShoeSearch className={input} value={s.model} onChange={(model, kind) => setShoe(i, kind ? { model, kind } : { model })} />
                   <select className={`${select} max-w-[9.5rem]`} value={s.kind} aria-label="Shoe type" onChange={(e) => setShoe(i, { kind: e.target.value as ShoeKind })}>
                     {SHOE_KINDS.map(([k, l]) => (
                       <option key={k} value={k}>

@@ -3,9 +3,11 @@
 
 export const SHOE_KINDS = [
   ["daily", "Daily trainer"],
+  ["speed", "Speed / tempo"],
   ["race", "Race / carbon"],
-  ["trail", "Trail"],
+  ["track", "Track (no spikes)"],
   ["spikes", "Track spikes"],
+  ["trail", "Trail"],
   ["other", "Other"],
 ] as const;
 export const BIKE_KINDS = [
@@ -177,9 +179,20 @@ export function packFor(w: PackWorkout, closet: Closet, mileage: Record<string, 
   if (/run/.test(sport)) {
     const trail = has(words, /trail|hills? repeats?|off.?road/);
     const track = has(words, /track|spikes|400s?|800s?|200s?|\boval\b/);
-    const fast = has(words, /race|tempo|threshold|interval|vo2|repeats?|strides|fartlek|time trial|\btt\b|goal pace/);
+    const raceDay = has(words, /\brace\b|time trial|\btt\b|goal pace|race pace|race day/);
+    const fast = raceDay || has(words, /tempo|threshold|interval|vo2|repeats?|strides|fartlek/);
     const treadmill = has(words, /treadmill/);
-    const pick = trail ? shoe("trail") : track ? shoe("spikes") ?? shoe("race") : fast ? shoe("race") : null;
+    // Track: spikes, else track flats, else the fastest road pair. Race efforts: carbon first. Other
+    // fast work: speed shoes first, saving the race pair.
+    const pick = trail
+      ? shoe("trail")
+      : track
+        ? shoe("spikes") ?? shoe("track") ?? shoe("race") ?? shoe("speed")
+        : raceDay
+          ? shoe("race") ?? shoe("speed")
+          : fast
+            ? shoe("speed") ?? shoe("race")
+            : null;
     const daily = defaultShoe(c);
     if (pick) out.push({ item: pick.model, why: trail ? "Trail shoes for this route" : track ? "Fast shoes for the track" : "Workout shoes for the fast parts" });
     if (daily && daily !== pick) out.push({ item: daily.model, why: pick ? "To warm up and cool down in" : undefined });

@@ -39,6 +39,20 @@ assert.ok(tempo.includes("HRM-Pro"));
 assert.equal(items({ sport: "trail_running", title: "Long trail run" })[0], "Speedgoat 6");
 assert.ok(items({ sport: "running", title: "8x400 at the track" }).includes("Find a track"));
 
+// Speed shoes for workouts, the carbon pair saved for race efforts, track flats when there are no spikes.
+const quiver = cleanCloset({
+  shoes: [
+    { id: "d", model: "Ghost 17", kind: "daily" },
+    { id: "s", model: "Endorphin Speed 5", kind: "speed" },
+    { id: "r", model: "Alphafly 3", kind: "race" },
+    { id: "t", model: "Streakfly 2", kind: "track" },
+  ],
+});
+assert.equal(items({ sport: "running", title: "Tempo 3x10 min" }, quiver)[0], "Endorphin Speed 5");
+assert.equal(items({ sport: "running", title: "10K race" }, quiver)[0], "Alphafly 3");
+assert.equal(items({ sport: "running", title: "8x400 at the track" }, quiver)[0], "Streakfly 2");
+assert.equal(cleanCloset({ shoes: [{ id: "x", model: "Sinister", kind: "track" }] }).shoes[0].kind, "track");
+
 assert.equal(items({ sport: "cycling", title: "Race-pace TT intervals" })[0], "Cervelo P3");
 assert.equal(items({ sport: "cycling", title: "Endurance ride" })[0], "Specialized Tarmac");
 const indoor = items({ sport: "cycling", title: "Indoor sweet spot", description: "ERG mode" });

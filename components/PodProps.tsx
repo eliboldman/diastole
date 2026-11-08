@@ -46,6 +46,8 @@ const buzz = (p: number | number[]) => navigator.vibrate?.(p);
 // Only ever called from event handlers and timers, never while rendering.
 const clock = () => Date.now();
 const HOLD_MS = 400; // shorter than this is a tap (exactly one); longer starts the count-up
+const MOVE_PX = 12; // a finger that slides further than this is scrolling, not tapping
+const SEND_DELAY_MS = 2000; // time to keep tapping, or undo, before props go out
 
 type Burst = { id: number; emoji: string; n: number };
 const QUICK = ALL_STICKERS.clap;
@@ -119,7 +121,7 @@ export default function PodProps({
   // ---- tap / hold combo
   const [combo, setCombo] = useState<{ sticker: Sticker; n: number } | null>(null);
   const comboRef = useRef<{ sticker: Sticker; n: number } | null>(null);
-  const hold = useRef<{ timer: ReturnType<typeof setInterval>; start: number; base: number } | null>(null);
+  const hold = useRef<{ timer: ReturnType<typeof setInterval>; start: number; base: number; sticker: Sticker; at: { x: number; y: number } | null; moved: boolean } | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const taps = useRef(0);
   const [hint, setHint] = useState(false);
@@ -160,29 +162,40 @@ export default function PodProps({
 
   const scheduleFlush = () => {
     if (flushTimer.current) clearTimeout(flushTimer.current);
-    flushTimer.current = setTimeout(flush, 900);
+    flushTimer.current = setTimeout(flush, SEND_DELAY_MS);
   };
 
-  function press(sticker: Sticker) {
+  // A press counts only once it's a real tap (lifted without sliding) or a hold. Brushing past a
+  // sticker or starting a scroll on one sends nothing.
+  function press(sticker: Sticker, at?: { x: number; y: number }) {
     if (comboRef.current && comboRef.current.sticker.key !== sticker.key) void flush();
     const base = comboRef.current?.n ?? 0;
-    setN(sticker, base + 1);
-    buzz(6);
     if (flushTimer.current) clearTimeout(flushTimer.current);
     const start = clock();
     hold.current = {
       start,
       base,
+      sticker,
+      at: at ?? null,
+      moved: false,
       timer: setInterval(() => {
         const held = clock() - start;
-        if (held < HOLD_MS) return; // a tap is one; only a real hold starts counting up
+        if (held < HOLD_MS || hold.current?.moved) return; // only a real hold starts counting up
         const c = comboRef.current;
-        if (c) setN(c.sticker, c.n + rampStep(held - HOLD_MS));
+        if (!c || c.n === base) setN(sticker, base + 1);
+        else setN(c.sticker, c.n + rampStep(held - HOLD_MS));
       }, 80),
     };
   }
 
-  // The browser took the gesture (a scroll that began on a sticker): undo a quick press instead of sending it.
+  // A finger that slides off the sticker is a scroll, not a tap.
+  function move(e: { clientX: number; clientY: number }) {
+    const h = hold.current;
+    if (!h?.at || h.moved) return;
+    if (Math.hypot(e.clientX - h.at.x, e.clientY - h.at.y) > MOVE_PX) cancel();
+  }
+
+  // The browser took the gesture, or the finger slid away: drop the press (a hold keeps what it counted).
   function cancel() {
     const h = hold.current;
     if (!h) return;
@@ -198,17 +211,31 @@ export default function PodProps({
       comboRef.current = { ...c, n: h.base };
       setCombo(comboRef.current);
     }
-    scheduleFlush();
+    if (comboRef.current) scheduleFlush();
   }
 
   function release() {
-    if (!hold.current) return;
-    clearInterval(hold.current.timer);
-    const quick = clock() - hold.current.start < HOLD_MS;
+    const h = hold.current;
+    if (!h) return;
+    clearInterval(h.timer);
     hold.current = null;
-    if (quick && ++taps.current === 4) setHint(true); // they're tapping a lot: whisper the secret
-    if (!quick) setHint(false);
+    const quick = clock() - h.start < HOLD_MS;
+    if (quick) {
+      setN(h.sticker, h.base + 1);
+      buzz(6);
+      if (++taps.current === 4) setHint(true); // they're tapping a lot: whisper the secret
+    } else setHint(false);
     scheduleFlush();
+  }
+
+  // Changed your mind: nothing still counting gets sent.
+  function undo() {
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    if (hold.current) clearInterval(hold.current.timer);
+    hold.current = null;
+    comboRef.current = null;
+    setCombo(null);
+    buzz([6, 30, 6]);
   }
 
   useEffect(
@@ -270,9 +297,11 @@ export default function PodProps({
       key={s.key}
       type="button"
       onPointerDown={(e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        press(s);
+        press(s, { x: e.clientX, y: e.clientY });
       }}
+      onPointerMove={move}
       onPointerUp={release}
       onPointerCancel={cancel}
       onContextMenu={(e) => e.preventDefault()}
@@ -355,9 +384,11 @@ export default function PodProps({
               type="button"
               aria-label="Give a clap. Hold for more."
               onPointerDown={(e) => {
+                if (e.pointerType === "mouse" && e.button !== 0) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
-                press(QUICK);
+                press(QUICK, { x: e.clientX, y: e.clientY });
               }}
+              onPointerMove={move}
               onPointerUp={release}
               onPointerCancel={cancel}
               onContextMenu={(e) => e.preventDefault()}
@@ -390,6 +421,11 @@ export default function PodProps({
               </span>
               {milestone(combo.n) && <span className="text-[11px] uppercase tracking-[0.2em] text-amber-200/80">{milestone(combo.n)}</span>}
             </span>
+          )}
+          {combo && !open && (
+            <button type="button" onClick={undo} className="flex min-h-11 items-center gap-1 rounded-full px-3 text-sm text-white/60 hover:text-white">
+              <X size={14} aria-hidden /> Undo
+            </button>
           )}
         </div>
       ) : (
@@ -468,7 +504,12 @@ export default function PodProps({
                   <span key={milestone(combo.n) ?? "x"} className="success-pop text-3xl font-semibold tabular-nums">
                     {combo.sticker.emoji} ×{combo.n.toLocaleString()}
                   </span>
-                  <span className="text-xs uppercase tracking-[0.2em] text-amber-200/80">{milestone(combo.n) ?? " "}</span>
+                  <span className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-amber-200/80">
+                    {milestone(combo.n) ?? "\u00a0"}
+                    <button type="button" onClick={undo} className="min-h-9 normal-case tracking-normal text-white/60 underline-offset-2 hover:text-white hover:underline">
+                      Undo
+                    </button>
+                  </span>
                 </>
               ) : hint ? (
                 <span className="row-in text-sm text-white/50">psst… try holding one down</span>

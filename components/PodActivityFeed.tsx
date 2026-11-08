@@ -288,13 +288,15 @@ function FeedCard({
 
   // Double-tap the workout for a quick 👏, with a pop where you tapped.
   const quick = useRef<(() => void) | null>(null);
-  const lastTap = useRef(0);
+  const lastTap = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
   const [pop, setPop] = useState<{ id: number; x: number; y: number } | null>(null);
   const onTap = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const now = e.timeStamp;
-    if (now - lastTap.current < 300) {
-      lastTap.current = 0;
+    // Two taps close together in time and place; two separate touches while scrolling don't count.
+    const prev = lastTap.current;
+    if (now - prev.t < 300 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 30) {
+      lastTap.current = { t: 0, x: 0, y: 0 };
       quick.current?.();
       if (!a.is_me) {
         const box = e.currentTarget.getBoundingClientRect();
@@ -302,7 +304,7 @@ function FeedCard({
         setPop({ id, x: e.clientX - box.left, y: e.clientY - box.top });
         setTimeout(() => setPop((p) => (p?.id === id ? null : p)), 700);
       }
-    } else lastTap.current = now;
+    } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
   };
 
   const [commenting, setCommenting] = useState(false);
