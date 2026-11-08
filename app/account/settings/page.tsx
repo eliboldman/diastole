@@ -10,10 +10,11 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
-import ThemePicker from "@/components/ThemePicker";
+import AppearanceSettings from "@/components/AppearanceSettings";
 import WeekPrefsEditor from "@/components/WeekPrefsEditor";
 import CoachingGuide from "@/components/coach/CoachingGuide";
 import { cleanWeek } from "@/lib/week-prefs";
+import { asLook } from "@/lib/appearance";
 import { asTheme } from "@/lib/themes";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -44,7 +45,7 @@ export default async function SettingsPage() {
   const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: myWeek }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
@@ -157,10 +158,10 @@ export default async function SettingsPage() {
             )}
           </section>
 
-          <section className={card}>
+          <section id="appearance" className={card}>
             <h2 className="mb-1 text-lg font-medium">Appearance</h2>
-            <p className="mb-3 text-sm text-white/55">Pick a color theme. Readiness colors stay the same in every theme.</p>
-            <ThemePicker initial={asTheme(profile?.theme)} />
+            <p className="mb-4 text-sm text-white/55">Make Diastole yours: color, background, text size and more. Saved to your account, so it follows you to every device.</p>
+            <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} />
           </section>
 
           <section className={card}>

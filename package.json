@@ -30,6 +30,7 @@
     "test:apple": "node lib/apple/format.test.ts",
     "test:story": "node lib/story.test.ts",
     "test:layout": "node lib/layout-prefs.test.ts",
+    "test:appearance": "node lib/appearance.test.ts",
     "test:closet": "node lib/closet.test.ts && node lib/shoe-catalog.test.ts",
     "test:plan": "node lib/ai/coaching-doc.test.ts && node lib/week-prefs.test.ts && node lib/ai/schema-limits.test.ts",
     "test:fuel": "node lib/fuel/plan.test.ts && node lib/fuel/meals.test.ts && node lib/fuel/safety.test.ts && node lib/fuel/race.test.ts && node lib/fuel/barcode.test.ts"

@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme, layout) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout, appearance) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -778,6 +778,16 @@ r = await as(A1, `update public.profiles set theme = 'blocks' where id = '${A1}'
 check("athlete picks a theme", r.rows?.[0]?.theme === "blocks");
 r = await as(A1, `update public.profiles set theme = 'neon' where id = '${A1}'`);
 check("unknown themes are refused", !!r.error);
+r = await as(A1, `update public.profiles set theme = 'custom', appearance = '{"hue":20,"bg":"black","text":"xl"}' where id = '${A1}' returning theme, appearance`);
+check("athlete saves a custom color and appearance", r.rows?.[0]?.theme === "custom" && r.rows?.[0]?.appearance?.bg === "black");
+for (const t of ["sunset", "rose", "gold"]) {
+  r = await as(A1, `update public.profiles set theme = '${t}' where id = '${A1}' returning theme`);
+  check(`${t} theme allowed`, r.rows?.[0]?.theme === t);
+}
+r = await as(A1, `update public.profiles set appearance = '[1,2]' where id = '${A1}'`);
+check("appearance must be an object", !!r.error);
+r = await as(A1, `update public.profiles set appearance = '{"bg":"black"}' where id = '${A2}' returning id`);
+check("can't change someone else's appearance", !r.rows?.length);
 
 // My closet (athlete_gear)
 r = await as(A1, `insert into public.athlete_gear (athlete_id, gear) values ('${A1}', '{"shoes":[{"model":"Pegasus","kind":"daily"}]}') returning athlete_id`);

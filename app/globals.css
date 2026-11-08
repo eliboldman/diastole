@@ -5,16 +5,20 @@
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --color-canvas: #0d1513;
-  --color-panel: #15201d;
   /* Readiness "ready" green: fixed, whatever the theme. */
   --color-ready-200: oklch(90.5% 0.093 164.15);
   --color-ready-300: oklch(84.5% 0.143 164.978);
   --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Not inline, so bg-canvas / bg-panel follow the appearance settings at runtime. */
+@theme {
+  --color-canvas: #0d1513;
+  --color-panel: #15201d;
+}
+
 :root {
-  --background: #0d1513;
+  --background: var(--color-canvas);
   --foreground: #f4f7f5;
 }
 
@@ -34,7 +38,7 @@ body {
 .app-canvas {
   background-color: var(--color-canvas);
   background-image:
-    radial-gradient(1100px 520px at 50% -8%, rgba(110, 231, 183, 0.11), transparent 70%),
+    radial-gradient(1100px 520px at 50% -8%, color-mix(in oklab, var(--color-emerald-300) 11%, transparent), transparent 70%),
     radial-gradient(900px 600px at 100% 110%, rgba(125, 211, 252, 0.06), transparent 70%);
 }
 
@@ -64,7 +68,7 @@ body {
     text-align: left;
   }
   :focus-visible {
-    outline: 2px solid rgba(110, 231, 183, 0.55);
+    outline: 2px solid color-mix(in oklab, var(--color-emerald-300) 55%, transparent);
     outline-offset: 2px;
   }
 }
@@ -81,7 +85,7 @@ body {
   .lift:hover {
     transform: translateY(-2px);
     border-color: rgba(255, 255, 255, 0.18);
-    box-shadow: 0 18px 50px -24px rgba(110, 231, 183, 0.25);
+    box-shadow: 0 18px 50px -24px color-mix(in oklab, var(--color-emerald-300) 25%, transparent);
   }
 }
 .lift:active {
@@ -140,15 +144,15 @@ body {
 
 @keyframes glowPulseGreen {
   0% {
-    filter: drop-shadow(0 0 6px rgba(110, 231, 183, 0.18));
+    filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-emerald-300) 18%, transparent));
   }
 
   50% {
-    filter: drop-shadow(0 0 18px rgba(110, 231, 183, 0.32));
+    filter: drop-shadow(0 0 18px color-mix(in oklab, var(--color-emerald-300) 32%, transparent));
   }
 
   100% {
-    filter: drop-shadow(0 0 6px rgba(110, 231, 183, 0.18));
+    filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-emerald-300) 18%, transparent));
   }
 }
 
@@ -255,10 +259,10 @@ body {
 }
 .neural-grid {
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(110, 231, 183, 0.45) 0 1px, transparent 2px),
+    radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--color-emerald-300) 45%, transparent) 0 1px, transparent 2px),
     radial-gradient(circle at 70% 25%, rgba(251, 191, 36, 0.35) 0 1px, transparent 2px),
     radial-gradient(circle at 85% 70%, rgba(248, 113, 113, 0.35) 0 1px, transparent 2px),
-    linear-gradient(115deg, transparent 0%, rgba(110, 231, 183, 0.12) 38%, transparent 39%),
+    linear-gradient(115deg, transparent 0%, color-mix(in oklab, var(--color-emerald-300) 12%, transparent) 38%, transparent 39%),
     linear-gradient(45deg, transparent 0%, rgba(248, 113, 113, 0.1) 62%, transparent 63%);
   background-size:
     220px 220px,
@@ -458,7 +462,7 @@ body {
 
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 40px rgba(110, 231, 183, 0.03);
+      0 0 40px color-mix(in oklab, var(--color-emerald-300) 3%, transparent);
   }
 
   50% {
@@ -467,7 +471,7 @@ body {
 
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 100px rgba(110, 231, 183, 0.07);
+      0 0 100px color-mix(in oklab, var(--color-emerald-300) 7%, transparent);
   }
 
   100% {
@@ -476,7 +480,7 @@ body {
 
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 40px rgba(110, 231, 183, 0.03);
+      0 0 40px color-mix(in oklab, var(--color-emerald-300) 3%, transparent);
   }
 }
 
@@ -616,7 +620,7 @@ body {
   to { transform: translateX(100%); opacity: 0; }
 }
 .approve-sweep {
-  background: linear-gradient(100deg, transparent 20%, rgba(110, 231, 183, 0.18) 50%, transparent 80%);
+  background: linear-gradient(100deg, transparent 20%, color-mix(in oklab, var(--color-emerald-300) 18%, transparent) 50%, transparent 80%);
   animation: approveSweep 900ms var(--ease-soft) both;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -733,7 +737,7 @@ body {
   --color-canvas: #0e0f10;
 }
 :root[data-theme="ocean"] .app-canvas {
-  background-image: radial-gradient(1100px 520px at 50% -8%, rgba(125, 211, 252, 0.12), transparent 70%), radial-gradient(900px 600px at 100% 110%, rgba(110, 231, 183, 0.05), transparent 70%);
+  background-image: radial-gradient(1100px 520px at 50% -8%, rgba(125, 211, 252, 0.12), transparent 70%), radial-gradient(900px 600px at 100% 110%, color-mix(in oklab, var(--color-emerald-300) 5%, transparent), transparent 70%);
 }
 :root[data-theme="violet"] .app-canvas {
   background-image: radial-gradient(1100px 520px at 50% -8%, rgba(196, 181, 253, 0.12), transparent 70%), radial-gradient(900px 600px at 100% 110%, rgba(244, 114, 182, 0.05), transparent 70%);
@@ -787,4 +791,98 @@ body {
   textarea {
     font-size: max(16px, 1em);
   }
+}
+
+
+/* ---------------------------------------------------------------- Appearance
+   Any accent from one hue: Sunset, Rose and Gold are fixed hues, Custom is the person's own. */
+:root[data-theme="sunset"] { --accent-h: 55; --accent-c: 0.145; }
+:root[data-theme="rose"] { --accent-h: 350; }
+:root[data-theme="gold"] { --accent-h: 88; --accent-c: 0.155; }
+:root[data-theme="custom"] { --accent-h: var(--custom-h, 165); }
+:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"]) {
+  --color-emerald-50: oklch(97.5% 0.02 var(--accent-h, 165));
+  --color-emerald-100: oklch(95% 0.045 var(--accent-h, 165));
+  --color-emerald-200: oklch(90% calc(var(--accent-c, 0.13) * 0.65) var(--accent-h, 165));
+  --color-emerald-300: oklch(83.5% var(--accent-c, 0.13) var(--accent-h, 165));
+  --color-emerald-400: oklch(74% calc(var(--accent-c, 0.13) * 1.23) var(--accent-h, 165));
+  --color-emerald-950: oklch(28% 0.07 var(--accent-h, 165));
+  --color-canvas: oklch(17.5% 0.014 var(--accent-h, 165));
+}
+:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"]) .app-canvas {
+  background-image: radial-gradient(1100px 520px at 50% -8%, color-mix(in oklab, var(--color-emerald-300) 12%, transparent), transparent 70%);
+}
+
+/* Cards follow the background: a little lighter than the canvas. Diastole's own pair stays as designed. */
+:root:not([data-theme="diastole"]),
+:root[data-bg] {
+  --color-panel: color-mix(in oklab, var(--color-canvas) 93%, white);
+}
+
+/* Background. After the themes, so it wins over each theme's tinted canvas. */
+:root[data-bg="midnight"] { --color-canvas: #0b0d10; }
+:root[data-bg="black"] { --color-canvas: #000000; --color-panel: #0f0f11; }
+:root[data-bg="slate"] { --color-canvas: #0f1522; }
+:root[data-bg="warm"] { --color-canvas: #15110c; }
+
+/* Glow off: a flat background. */
+:root[data-glow="off"] .app-canvas {
+  background-image: none;
+}
+
+/* Text size scales everything sized in rem (nearly the whole app). */
+:root[data-text="s"] { font-size: 93.75%; }
+:root[data-text="l"] { font-size: 112.5%; }
+:root[data-text="xl"] { font-size: 125%; }
+
+/* Corners. */
+:root[data-corners="soft"] {
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.3125rem;
+  --radius-xl: 0.4375rem;
+  --radius-2xl: 0.5625rem;
+  --radius-3xl: 0.75rem;
+}
+:root[data-corners="square"] {
+  --radius-sm: 0.0625rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.125rem;
+  --radius-xl: 0.1875rem;
+  --radius-2xl: 0.1875rem;
+  --radius-3xl: 0.25rem;
+}
+
+/* Compact: every Tailwind spacing step a little tighter. */
+:root[data-density="compact"] {
+  --spacing: 0.22rem;
+}
+
+/* Reduced motion, chosen in the app (the system setting is respected separately). */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* The custom color slider's thumb. */
+.hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  width: 28px;
+  border-radius: 9999px;
+  background: var(--color-emerald-300);
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.hue-slider::-moz-range-thumb {
+  height: 22px;
+  width: 22px;
+  border-radius: 9999px;
+  background: var(--color-emerald-300);
+  border: 3px solid white;
 }

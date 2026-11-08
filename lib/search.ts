@@ -19,6 +19,7 @@ const PAGES: { title: string; href: string; roles: ("coach" | "athlete")[]; word
   { title: "Weekly digest", href: "/digest", roles: ["coach"], words: "summary week report compliance missed" },
   { title: "My pods", href: "/me/pods", roles: ["athlete"], words: "groups teams sharing" },
   { title: "Me", href: "/account", roles: ["coach", "athlete"], words: "profile avatar readiness form recovery hrv sleep metrics prs" },
+  { title: "Appearance", href: "/account/settings#appearance", roles: ["coach", "athlete"], words: "theme color colour dark black oled background text size font bigger corners compact spacing animations motion custom" },
   { title: "Settings", href: "/account/settings", roles: ["coach", "athlete"], words: "account settings units timezone name device notifications theme pods sharing sign out" },
   { title: "Watch connection", href: "/connect", roles: ["coach", "athlete"], words: "garmin apple device watch connect" },
   { title: "Import Garmin history", href: "/me/import", roles: ["coach", "athlete"], words: "export zip history backfill" },

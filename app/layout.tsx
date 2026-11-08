@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 
 import NavProgress from "@/components/layout/NavProgress";
+import { asLook, LOOK_COOKIE, lookAttrs } from "@/lib/appearance";
 import { asTheme, THEME_COOKIE } from "@/lib/themes";
 
 import "./globals.css";
@@ -37,13 +38,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const theme = asTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const jar = await cookies();
+  const theme = asTheme(jar.get(THEME_COOKIE)?.value);
+  const look = asLook(jar.get(LOOK_COOKIE)?.value);
   return (
     <html
       lang="en"
       // The iOS app adds data-app="ios" before hydration.
       suppressHydrationWarning
       data-theme={theme}
+      {...lookAttrs(look)}
+      style={{ "--custom-h": look.hue } as React.CSSProperties}
       className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
