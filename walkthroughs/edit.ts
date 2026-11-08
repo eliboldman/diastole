@@ -2,9 +2,9 @@
 // 90 seconds (intro and outro cards are already in the recording), plus a short clip (15 s max)
 // per feature segment.
 //
-//   node walkthroughs/edit.ts athlete      (reads walkthroughs/out/athlete.webm + athlete.json)
+//   node walkthroughs/edit.ts athlete      (reads walkthroughs/out/athlete.mp4 + athlete.json)
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const role = process.argv[2];
@@ -14,21 +14,23 @@ if (role !== "athlete" && role !== "coach") {
 }
 const OUT = join("walkthroughs", "out");
 const meta = JSON.parse(readFileSync(join(OUT, `${role}.json`), "utf8")) as {
-  size: { width: number; height: number };
+  css: { width: number; height: number };
   introEnd: number;
   outroStart: number;
   end: number;
   taps: { t: number; x: number; y: number }[];
   segments: Record<string, [number, number]>;
 };
-const { width: W, height: H } = meta.size;
+// The raw video's real size; taps were recorded in CSS pixels.
+const [W, H] = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", join(OUT, `${role}.mp4`)]).toString().trim().split(",").map(Number);
+const k = W / meta.css.width;
 const FPS = 30;
 const ZOOM = 0.3; // up to 1.3x
 const MAX = 89;
 
 // The zoom: a smooth rise and fall around each tap, centred on where the tap landed.
 const T = `(in/${FPS})`;
-const windows = meta.taps.filter((p) => p.t > meta.introEnd && p.t < meta.outroStart).map((p) => ({ a: Math.max(0, p.t - 0.35), b: p.t + 1.4, x: p.x, y: p.y }));
+const windows = meta.taps.filter((p) => p.t > meta.introEnd && p.t < meta.outroStart).map((p) => ({ a: Math.max(0, p.t - 0.35), b: p.t + 1.4, x: p.x * k, y: p.y * k }));
 const bump = windows.map((w) => `between(${T},${w.a.toFixed(2)},${w.b.toFixed(2)})*${ZOOM}*sin(PI*(${T}-${w.a.toFixed(2)})/${(w.b - w.a).toFixed(2)})`).join("+") || "0";
 const z = `min(1+${ZOOM},1+${bump})`;
 const pick = (axis: "x" | "y") => windows.reduceRight((acc, w) => `if(between(${T},${w.a.toFixed(2)},${w.b.toFixed(2)}),${Math.round(w[axis])},${acc})`, axis === "x" ? "iw/2" : "ih/2");
@@ -46,7 +48,8 @@ const filters = [
 ].filter(Boolean).join(",");
 
 const tour = join(OUT, `${role}-tour.mp4`);
-execFileSync("ffmpeg", ["-y", "-v", "error", "-i", join(OUT, `${role}.webm`), "-vf", filters, "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "22", "-movflags", "+faststart", tour], { stdio: "inherit" });
+if (!existsSync(join(OUT, `${role}.mp4`))) throw new Error(`Record first: node walkthroughs/record.ts ${role}`);
+execFileSync("ffmpeg", ["-y", "-v", "error", "-i", join(OUT, `${role}.mp4`), "-vf", filters, "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "22", "-movflags", "+faststart", tour], { stdio: "inherit" });
 console.log(`✓ ${tour}${speed > 1 ? ` (sped up ${speed.toFixed(2)}x to stay under 90 s)` : ""}`);
 
 // One short clip per feature.

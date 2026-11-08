@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
+import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import ProfileView from "@/components/profile/ProfileView";
 import { requireUser } from "@/lib/supabase/server";
@@ -17,7 +18,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   if (!UUID.test(id)) notFound();
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <ProfileView id={id} me={me} />
+      <BackLink href={me.role === "coach" ? "/athletes" : "/me/pods"} label={me.role === "coach" ? "Athletes" : "Pods"} />
+      <div className="mt-2">
+        <ProfileView id={id} me={me} />
+      </div>
     </DashboardShell>
   );
 }

@@ -3,15 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient, requireUser } from "@/lib/supabase/server";
+import { parsePace, wholeNumber } from "@/lib/activity/pace-input";
 
 export type ZonesState = { ok?: boolean; error?: string } | null;
 
-/** "6:35" per mile or "4:05" per km -> metres per second. */
+/** A typed pace ("6:35", "635", "6.35"…) per mile or km -> metres per second. */
 function paceToSpeed(text: string, units: "mi" | "km"): number | null {
-  const m = /^(\d{1,2}):([0-5]\d)$/.exec(text.trim());
-  if (!m) return null;
-  const sec = Number(m[1]) * 60 + Number(m[2]);
-  return sec > 0 ? Number(((units === "mi" ? 1609.344 : 1000) / sec).toFixed(3)) : null;
+  const sec = parsePace(text);
+  return sec ? Number(((units === "mi" ? 1609.344 : 1000) / sec).toFixed(3)) : null;
 }
 
 /** An athlete sets their own zones, or a coach sets an athlete's. Blank fields fall back to estimates. Row-level security enforces who may. */
@@ -23,22 +22,25 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   const ftpText = String(form.get("ftp") ?? "").trim();
   const thrText = String(form.get("threshold_hr") ?? "").trim();
 
-  const max_hr = maxHrText ? Number(maxHrText) : null;
-  if (max_hr !== null && !(Number.isInteger(max_hr) && max_hr >= 120 && max_hr <= 230)) return { error: "Max heart rate should be between 120 and 230." };
+  const max_hr = maxHrText ? wholeNumber(maxHrText) : null;
+  if (maxHrText && (max_hr === null || max_hr < 120 || max_hr > 230)) return { error: "Max heart rate should be a number between 120 and 230." };
   const units = form.get("units") === "km" ? "km" : "mi";
   const threshold_speed_mps = paceText ? paceToSpeed(paceText, units) : null;
   if (paceText && (threshold_speed_mps === null || threshold_speed_mps < 1 || threshold_speed_mps > 10))
-    return { error: `Threshold pace should look like ${units === "mi" ? "6:35 (minutes per mile)" : "4:05 (minutes per km)"}.` };
-  const ftp_w = ftpText ? Number(ftpText) : null;
-  if (ftp_w !== null && !(Number.isInteger(ftp_w) && ftp_w >= 50 && ftp_w <= 600)) return { error: "FTP should be between 50 and 600 watts." };
-  const threshold_hr = thrText ? Number(thrText) : null;
-  if (threshold_hr !== null && !(Number.isInteger(threshold_hr) && threshold_hr >= 100 && threshold_hr <= 220)) return { error: "Threshold heart rate should be between 100 and 220." };
+    return { error: `Threshold pace should be minutes and seconds per ${units === "mi" ? "mile, like 6:35 (or type 635)" : "km, like 4:05 (or type 405)"}.` };
+  const ftp_w = ftpText ? wholeNumber(ftpText) : null;
+  if (ftpText && (ftp_w === null || ftp_w < 50 || ftp_w > 600)) return { error: "FTP should be a number of watts between 50 and 600." };
+  const threshold_hr = thrText ? wholeNumber(thrText) : null;
+  if (thrText && (threshold_hr === null || threshold_hr < 100 || threshold_hr > 220)) return { error: "Threshold heart rate should be a number between 100 and 220." };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("athlete_zones")
     .upsert({ athlete_id: athleteId, max_hr, threshold_speed_mps, ftp_w, threshold_hr, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
-  if (error) return { error: "Couldn't save those numbers. Try again." };
+  if (error) {
+    console.error("saveZones failed", error.code, error.message);
+    return { error: "Couldn't save those numbers. Try again." };
+  }
   revalidatePath(`/athlete/${athleteId}`);
   revalidatePath(`/profile/${athleteId}`);
   revalidatePath("/account");

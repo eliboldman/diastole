@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 
+import NavHistory from "@/components/layout/NavHistory";
 import NavProgress from "@/components/layout/NavProgress";
 import { asLook, LOOK_COOKIE, lookAttrs } from "@/lib/appearance";
 import { asTheme, THEME_COOKIE } from "@/lib/themes";
@@ -61,7 +62,8 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Suspense fallback={null}>
-          <NavProgress />
+          <NavHistory />
+        <NavProgress />
         </Suspense>
         {children}
       </body>

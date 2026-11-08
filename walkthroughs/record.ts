@@ -7,7 +7,8 @@
 // Captions, tap ripples and the intro/outro cards are drawn in the page itself, so the video needs
 // no text rendering later. Writes walkthroughs/out/<role>.webm and <role>.json (tap times and
 // positions for zooms, and where each feature segment starts and ends for the short clips).
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { chromium, devices, type Locator, type Page } from "playwright";
@@ -22,34 +23,28 @@ if (role !== "athlete" && role !== "coach") {
 const env = (k: string) => process.env[k] ?? "";
 const siteFromEnv = existsSync(".env.local") ? /^NEXT_PUBLIC_SITE_URL=(.*)$/m.exec(readFileSync(".env.local", "utf8"))?.[1]?.replace(/^"|"$/g, "") : undefined;
 const BASE = (env("BASE_URL") || siteFromEnv || "http://localhost:3000").replace(/\/$/, "");
+// A session saved by walkthroughs/seed-demo.ts, or else an email and password to sign in with.
+const savedState = join("walkthroughs", "out", `${role}.state.json`);
 const email = env(role === "coach" ? "DEMO_COACH_EMAIL" : "DEMO_ATHLETE_EMAIL");
 const password = env(role === "coach" ? "DEMO_COACH_PASSWORD" : "DEMO_ATHLETE_PASSWORD");
-if (!email || !password) {
-  console.error(`Set ${role === "coach" ? "DEMO_COACH_EMAIL and DEMO_COACH_PASSWORD" : "DEMO_ATHLETE_EMAIL and DEMO_ATHLETE_PASSWORD"} first.`);
+if (!existsSync(savedState) && (!email || !password)) {
+  console.error("Run node walkthroughs/seed-demo.ts first (or set the DEMO_* email and password variables).");
   process.exit(1);
 }
 
 const OUT = join("walkthroughs", "out");
 mkdirSync(OUT, { recursive: true });
 const phone = devices["iPhone 15 Pro"];
-const VIDEO = { width: phone.viewport.width * 2, height: phone.viewport.height * 2 };
+// Frames are captured at the phone's pixel density (sharp), up to 1080 px wide.
+const FRAMES = join(OUT, `${role}-frames`);
 
-// Drawn in the page: a caption bar and tap ripples, in the app's own look.
-const OVERLAY = `
-(() => {
-  if (window.__wt) return;
-  window.__wt = true;
-  const style = document.createElement("style");
-  style.textContent = \`
-    #wt-cap{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 88px);z-index:2147483647;padding:14px 16px;border-radius:18px;
-      background:rgba(6,10,9,.86);border:1px solid rgba(255,255,255,.14);color:#fff;font:600 17px/1.35 -apple-system,system-ui,sans-serif;text-align:center;
-      box-shadow:0 10px 40px rgba(0,0,0,.5);opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;pointer-events:none}
-    #wt-cap.on{opacity:1;transform:none}
-    .wt-tap{position:fixed;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid rgba(255,255,255,.9);z-index:2147483647;pointer-events:none;
-      animation:wt-tap .6s ease-out forwards}
-    @keyframes wt-tap{from{transform:scale(.4);opacity:1}to{transform:scale(1.4);opacity:0}}\`;
-  document.documentElement.appendChild(style);
-})();`;
+// Drawn in the page with inline styles (the app's own CSS never touches them): a caption bar and
+// tap ripples, in the app's look.
+const CAPTION_STYLE =
+  "position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 150px);z-index:2147483647;padding:14px 16px;border-radius:18px;" +
+  "background:rgba(6,10,9,.88);border:1px solid rgba(255,255,255,.16);color:#fff;font:600 17px/1.35 -apple-system,system-ui,sans-serif;text-align:center;" +
+  "box-shadow:0 10px 40px rgba(0,0,0,.5);pointer-events:none;transition:opacity .25s,transform .25s;opacity:0;transform:translateY(8px)";
+const TAP_STYLE = "position:fixed;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid rgba(255,255,255,.92);z-index:2147483647;pointer-events:none";
 
 export type Tour = {
   page: Page;
@@ -68,26 +63,44 @@ img{width:120px;height:120px;border-radius:28px;box-shadow:0 0 60px rgba(110,231
 @keyframes in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}</style></head>
 <body><div class="c"><img src="${BASE}/logo.png" alt=""><h1>${title}</h1><p>${sub}</p></div></body></html>`;
 
-const browser = await chromium.launch();
-// Sign in without recording, then record with the saved session.
-const login = await browser.newContext({ ...phone });
-const lp = await login.newPage();
-await lp.goto(`${BASE}/login`);
-await lp.locator('input[name="email"]').fill(email);
-await lp.locator('input[name="password"]').fill(password);
-await lp.getByRole("button", { name: "Sign in", exact: true }).click();
-await lp.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 20000 });
-const state = await login.storageState();
-await login.close();
+// Full Chromium in its new headless mode: the screencast then comes at the phone's pixel density.
+const browser = await chromium.launch({ channel: "chromium", args: ["--force-device-scale-factor=3"] });
+// Sign in without recording (or reuse the saved session), then record with it.
+let state: Awaited<ReturnType<Awaited<ReturnType<typeof browser.newContext>>["storageState"]>>;
+if (existsSync(savedState)) {
+  state = JSON.parse(readFileSync(savedState, "utf8"));
+} else {
+  const login = await browser.newContext({ ...phone });
+  const lp = await login.newPage();
+  await lp.goto(`${BASE}/login`);
+  await lp.locator('input[name="email"]').fill(email);
+  await lp.locator('input[name="password"]').fill(password);
+  await lp.getByRole("button", { name: "Sign in", exact: true }).click();
+  await lp.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 20000 });
+  state = await login.storageState();
+  await login.close();
+}
 
-const ctx = await browser.newContext({ ...phone, storageState: state, recordVideo: { dir: OUT, size: VIDEO } });
-await ctx.addInitScript(OVERLAY);
+const ctx = await browser.newContext({ ...phone, storageState: state });
 const page = await ctx.newPage();
+
+// Chrome's screencast: a JPEG each time the screen changes, with its timestamp.
+rmSync(FRAMES, { recursive: true, force: true });
+mkdirSync(FRAMES, { recursive: true });
+const cdp = await ctx.newCDPSession(page);
+const frames: { file: string; t: number }[] = [];
+cdp.on("Page.screencastFrame", (f) => {
+  const file = join(FRAMES, `f${String(frames.length).padStart(5, "0")}.jpg`);
+  writeFileSync(file, Buffer.from(f.data, "base64"));
+  frames.push({ file, t: f.metadata.timestamp ?? Date.now() / 1000 });
+  void cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
+});
+await cdp.send("Page.startScreencast", { format: "jpeg", quality: 88, maxWidth: 1080, maxHeight: 2400, everyNthFrame: 1 });
 const t0 = Date.now();
 const now = () => (Date.now() - t0) / 1000;
 const taps: { t: number; x: number; y: number }[] = [];
 const segments: Record<string, [number, number]> = {};
-const scale = VIDEO.width / phone.viewport.width;
+const scale = 1; // taps are stored in CSS pixels; edit.ts scales them to the video
 const pause = (ms: number) => page.waitForTimeout(ms);
 
 const tour: Tour = {
@@ -97,18 +110,26 @@ const tour: Tour = {
     await pause(700);
   },
   caption: async (text, ms) => {
-    await page.evaluate((txt) => {
-      let el = document.getElementById("wt-cap");
-      if (!el) {
-        el = document.createElement("div");
+    await page.evaluate(
+      ([txt, css]) => {
+        document.getElementById("wt-cap")?.remove();
+        const el = document.createElement("div");
         el.id = "wt-cap";
+        el.style.cssText = css;
+        el.textContent = txt;
         document.body.appendChild(el);
-      }
-      el.textContent = txt;
-      requestAnimationFrame(() => el!.classList.add("on"));
-    }, text);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          el.style.opacity = "1";
+          el.style.transform = "none";
+        }));
+      },
+      [text, CAPTION_STYLE],
+    );
     await pause(ms);
-    await page.evaluate(() => document.getElementById("wt-cap")?.classList.remove("on"));
+    await page.evaluate(() => {
+      const el = document.getElementById("wt-cap");
+      if (el) el.style.opacity = "0";
+    });
     await pause(250);
   },
   tap: async (target) => {
@@ -119,14 +140,16 @@ const tour: Tour = {
         const x = box.x + box.width / 2;
         const y = box.y + box.height / 2;
         taps.push({ t: now(), x: x * scale, y: y * scale });
-        await page.evaluate(([px, py]) => {
-          const d = document.createElement("div");
-          d.className = "wt-tap";
-          d.style.left = `${px}px`;
-          d.style.top = `${py}px`;
-          document.body.appendChild(d);
-          setTimeout(() => d.remove(), 700);
-        }, [x, y]);
+        await page.evaluate(
+          ([px, py, css]) => {
+            const d = document.createElement("div");
+            d.style.cssText = `${css};left:${px}px;top:${py}px`;
+            document.body.appendChild(d);
+            d.animate([{ transform: "scale(.4)", opacity: 1 }, { transform: "scale(1.4)", opacity: 0 }], { duration: 600, easing: "ease-out", fill: "forwards" });
+            setTimeout(() => d.remove(), 700);
+          },
+          [x, y, TAP_STYLE] as const,
+        );
       }
       await pause(350);
       await target.click();
@@ -158,10 +181,36 @@ const outroStart = now();
 await page.setContent(card("Built between the beats.", "diastole.app"));
 await pause(2500);
 
-const video = page.video();
+await cdp.send("Page.stopScreencast").catch(() => {});
+const endT = now();
 await ctx.close();
 await browser.close();
-const file = await video!.path();
-renameSync(file, join(OUT, `${role}.webm`));
-writeFileSync(join(OUT, `${role}.json`), JSON.stringify({ size: VIDEO, introEnd, outroStart, end: now(), taps, segments }, null, 2));
-console.log(`Recorded ${join(OUT, `${role}.webm`)} (${now().toFixed(0)} s). Next: node walkthroughs/edit.ts ${role}`);
+
+// Frames → a steady 30 fps video: each frame holds until the next one arrived.
+const first = frames[0]?.t ?? 0;
+// Keep at most one frame per 1/30 s, each holding until the next kept one.
+const kept = frames.reduce<typeof frames>((acc, f) => (acc.length && f.t - acc[acc.length - 1].t < 1 / 30 ? acc : [...acc, f]), []);
+const lines: string[] = [];
+kept.forEach((f, i) => {
+  const next = kept[i + 1]?.t ?? Math.max(f.t + 1 / 30, first + (endT - Math.max(0, first - t0 / 1000)));
+  lines.push(`file '${f.file.split("/").pop()}'`, `duration ${(next - f.t).toFixed(4)}`);
+});
+lines.push(`file '${kept.at(-1)!.file.split("/").pop()}'`);
+writeFileSync(join(FRAMES, "list.txt"), lines.join("\n"));
+const raw = join(OUT, `${role}.mp4`);
+// The size Chrome actually captured (middle of the tour), and an output at the phone's proportions.
+const mid = kept[Math.floor(kept.length / 2)].file;
+const [fw] = execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", mid]).toString().trim().split(",").map(Number);
+const W = Math.min(1080, Math.max(fw, 720)) & ~1;
+const H = Math.round((W * phone.viewport.height) / phone.viewport.width / 2) * 2;
+console.log(`  captured at ${fw} px wide; video ${W}×${H}`);
+execFileSync("ffmpeg", ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", join(FRAMES, "list.txt"), "-vf", `fps=30,scale=${W}:${H}:flags=lanczos,setsar=1,format=yuv420p`, "-c:v", "libx264", "-crf", "18", "-preset", "fast", raw]);
+rmSync(FRAMES, { recursive: true, force: true });
+// Timeline zero = first frame; shift everything recorded against t0 to match.
+const lag = frames.length ? Math.max(0, first - t0 / 1000) : 0;
+const shift = (v: number) => Math.max(0, v - lag);
+writeFileSync(
+  join(OUT, `${role}.json`),
+  JSON.stringify({ css: phone.viewport, introEnd: shift(introEnd), outroStart: shift(outroStart), end: shift(endT), taps: taps.map((p) => ({ ...p, t: shift(p.t) })), segments: Object.fromEntries(Object.entries(segments).map(([k, [a, b]]) => [k, [shift(a), shift(b)]])) }, null, 2),
+);
+console.log(`Recorded ${raw} (${endT.toFixed(0)} s, ${frames.length} frames). Next: node walkthroughs/edit.ts ${role}`);

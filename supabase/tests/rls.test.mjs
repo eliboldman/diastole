@@ -227,6 +227,11 @@ r = await as(A1, `update public.athlete_zones set max_hr = 196 where athlete_id 
 check("athlete can change their own zones", !r.error && r.rows?.[0]?.max_hr === 196);
 const zn = (await db.query(`select title, body, href from public.notifications where user_id = '${COACH}' and kind = 'zones_updated'`)).rows[0];
 check("coach is told when an athlete changes their numbers", /updated their numbers/.test(zn?.title ?? "") && /Max HR 195 → 196/.test(zn?.body ?? "") && zn?.href === `/athlete/${A1}#zones`);
+r = await as(A2, `insert into public.athlete_zones (athlete_id, max_hr, threshold_speed_mps, ftp_w, threshold_hr, updated_at) values ('${A2}', 190, 4.074, 240, 170, now())
+  on conflict (athlete_id) do update set max_hr = excluded.max_hr, threshold_speed_mps = excluded.threshold_speed_mps, ftp_w = excluded.ftp_w, threshold_hr = excluded.threshold_hr, updated_at = excluded.updated_at returning ftp_w`);
+check("an athlete saves their numbers the first time (insert or update)", !r.error && r.rows?.[0]?.ftp_w === 240);
+r = await as(A2, `insert into public.athlete_zones (athlete_id, ftp_w, updated_at) values ('${A2}', 250, now()) on conflict (athlete_id) do update set ftp_w = excluded.ftp_w returning ftp_w`);
+check("and saves them again", !r.error && r.rows?.[0]?.ftp_w === 250);
 r = await as(A2, `update public.athlete_zones set max_hr = 150 where athlete_id = '${A1}' returning max_hr`);
 check("another athlete cannot change them", !!r.error || r.rows?.length === 0);
 r = await as(STRANGER, `insert into public.athlete_zones (athlete_id, max_hr) values ('${A2}', 150)`);

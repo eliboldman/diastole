@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+
+import { formatPaceTyping } from "@/lib/activity/pace-input";
 
 import { saveZones, type ZonesState } from "@/lib/activity/actions";
 
@@ -27,6 +29,8 @@ export default function ZonesForm({
   estimatedMaxHr: number | null;
 }) {
   const [state, action, pending] = useActionState<ZonesState, FormData>(saveZones, null);
+  // The phone's number pad has no colon: type 635 and it shows 6:35.
+  const [pace, setPace] = useState(thresholdPace ?? "");
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="athlete_id" value={athleteId} />
@@ -38,7 +42,19 @@ export default function ZonesForm({
         </label>
         <label className="block min-w-0 text-sm text-white/65">
           Threshold pace (min/{units})
-          <input name="threshold_pace" inputMode="numeric" defaultValue={thresholdPace ?? ""} placeholder={units === "mi" ? "e.g. 6:35" : "e.g. 4:05"} className={`mt-1.5 ${input}`} />
+          <input
+            name="threshold_pace"
+            inputMode="numeric"
+            autoComplete="off"
+            value={pace}
+            onChange={(e) => setPace(formatPaceTyping(e.target.value))}
+            placeholder={units === "mi" ? "e.g. 6:35" : "e.g. 4:05"}
+            aria-describedby="pace-hint"
+            className={`mt-1.5 ${input}`}
+          />
+          <span id="pace-hint" className="mt-1 block text-xs text-white/40">
+            Just type the numbers: {units === "mi" ? "635" : "405"} becomes {units === "mi" ? "6:35" : "4:05"}
+          </span>
         </label>
         <label className="block min-w-0 text-sm text-white/65">
           FTP (watts)

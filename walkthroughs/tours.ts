@@ -25,7 +25,7 @@ export const TOURS: Record<"athlete" | "coach", { title: string; run: (t: Tour) 
       await t.segment("athlete-recovery", async () => {
         await t.go("/recovery");
         await t.caption("Recovery routines with your coach's demo videos.", 2600);
-        await t.tap(t.page.getByRole("link", { name: /Calf and soleus/ }));
+        await t.tap(t.page.getByRole("link", { name: /Calf and soleus/ }).first());
         await t.tap(t.page.getByRole("button", { name: "Start" }));
         await t.caption("Follow along: timer, side switches and spoken cues.", 4200);
         await t.tap(t.page.getByRole("button", { name: "Close" }));
