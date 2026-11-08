@@ -162,7 +162,7 @@ export default function PodChallenges({
     );
   };
 
-  const field = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm";
+  const field = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-base sm:text-sm";
   const goalUnit = form.metric === "hours" ? "hours" : form.metric === "sessions" ? "sessions" : units;
 
   return (

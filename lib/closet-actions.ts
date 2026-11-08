@@ -15,8 +15,8 @@ export async function saveCloset(athleteId: string, raw: unknown) {
   const gear = cleanCloset(raw);
   const { error } = await supabase.from("athlete_gear").upsert({ athlete_id: athleteId, gear, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
   if (error) return { ok: false as const, error: "Couldn't save your closet." };
-  revalidatePath("/account");
-  revalidatePath(`/athlete/${athleteId}`);
+  // No revalidatePath: the editor autosaves while typing and keeps its own state, and refreshing
+  // the page under it reset the scroll on every keystroke. Other pages read the closet fresh.
   return { ok: true as const, gear };
 }
 

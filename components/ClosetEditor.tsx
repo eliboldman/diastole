@@ -7,7 +7,7 @@ import ShoeSearch from "@/components/ShoeSearch";
 import { saveCloset } from "@/lib/closet-actions";
 import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
 
-const input = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none";
+const input = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-base sm:text-sm placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none";
 const select = `${input} pr-8`;
 const small = "text-[11px] uppercase tracking-[0.15em] text-white/50";
 const newId = () => Math.random().toString(36).slice(2, 10);

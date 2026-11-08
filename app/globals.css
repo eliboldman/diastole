@@ -778,3 +778,13 @@ body {
   transform: translateY(2px);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
 }
+
+/* iOS zooms into any form field under 16px when it's focused (and scrolls the page to it). On
+   touch screens, keep every field at least 16px so typing never zooms. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}

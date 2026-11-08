@@ -28,7 +28,7 @@ export default function ShoePicker({
         <Footprints size={16} aria-hidden /> Shoes
       </span>
       <select
-        className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm sm:max-w-xs"
+        className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-base sm:max-w-xs sm:text-sm"
         value={value}
         disabled={pending}
         onChange={(e) => {
