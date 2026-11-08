@@ -577,6 +577,16 @@ check("pod mates never see check-ins", r.rows?.length === 0);
 r = await as(COACH, `update public.workout_checkins set note = 'coach edit' where activity_id = '${ACT1}' returning activity_id`);
 check("coach can't edit it", !!r.error || r.rows?.length === 0);
 
+// The same spot three times in two weeks: one private heads-up to the coach.
+await db.exec("reset role");
+const painActs = [];
+for (let i = 0; i < 2; i++) {
+  painActs.push((await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'pain-${i}', 'yoga', now() - interval '${i + 40} days', 1800) returning id`)).rows[0].id);
+}
+for (const id of painActs) await as(A1, `insert into public.workout_checkins (activity_id, athlete_id, pain) values ('${id}', '${A1}', '{"knee_l": 1}')`);
+const repeat = (await db.query(`select title from public.notifications where user_id = '${COACH}' and dedupe_key like 'pain_repeat:${A1}:knee_l:%'`)).rows;
+check("same spot 3 times in 2 weeks: coach gets one heads-up", repeat.length === 1 && /keeps flagging/.test(repeat[0].title));
+
 // ---------------------------------------------------------------- the "why" (Phase 6)
 const WK = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, why)
   values ('${A1}', '${COACH}', current_date + 1, 'run', 'Tempo', 'approved', 'Builds your threshold for the half.') returning id`)).rows[0].id;
@@ -836,6 +846,38 @@ r = await as(COACH, `update public.athlete_library set title = 'x' where id = '$
 check("coach can't edit it", !r.rows?.length);
 r = await as(A1, `insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, requested_by) values ('${A1}', '${COACH}', current_date, 'run', 'Self', '${A1}')`);
 check("athletes can't write requests straight into the schedule", !!r.error);
+// ---------------------------------------------------------------- recovery
+r = await as(COACH, `insert into public.recovery_routines (coach_id, title, items) values (auth.uid(), 'Calf reset', '[{"slug":"foam-roll-calves","seconds":45}]') returning id`);
+const ROUT = r.rows?.[0]?.id;
+check("coach saves a recovery routine", !!ROUT);
+r = await as(A1, `select id from public.recovery_routines where id = '${ROUT}'`);
+check("their athlete can open it", r.rows?.length === 1);
+r = await as(STRANGER, `select id from public.recovery_routines where id = '${ROUT}'`);
+check("other people can't", r.rows?.length === 0);
+r = await as(A1, `insert into public.recovery_routines (coach_id, title, items) values (auth.uid(), 'Mine', '[{"slug":"x"}]')`);
+check("athletes can't create routines", !!r.error);
+r = await as(COACH, `insert into public.recovery_assignments (athlete_id, coach_id, routine_id, title, items, scheduled_date) values ('${A1}', auth.uid(), '${ROUT}', 'Calf reset', '[{"slug":"foam-roll-calves","seconds":45}]', current_date) returning id`);
+const RASS = r.rows?.[0]?.id;
+check("coach assigns a routine", !!RASS);
+r = await as(COACH, `insert into public.recovery_assignments (athlete_id, coach_id, title, items, scheduled_date) values ('${STRANGER}', auth.uid(), 'x', '[{"slug":"a"}]', current_date)`);
+check("only to their own athletes", !!r.error);
+r = await as(A2, `select id from public.recovery_assignments where id = '${RASS}'`);
+check("other athletes can't see it", r.rows?.length === 0);
+r = await as(A1, `update public.recovery_assignments set completed_at = now() where id = '${RASS}' returning id`);
+check("athlete can't edit the assignment directly", !r.rows?.length);
+r = await as(A1, `insert into public.recovery_sessions (athlete_id, assignment_id, title, seconds, source) values (auth.uid(), '${RASS}', 'Calf reset', 300, 'assigned') returning id`);
+check("athlete logs a finished routine", !!r.rows?.[0]?.id);
+r = await as(A1, `select completed_at from public.recovery_assignments where id = '${RASS}'`);
+check("finishing marks the assignment done", !!r.rows?.[0]?.completed_at);
+r = await as(A1, `insert into public.recovery_sessions (athlete_id, title, seconds, source) values ('${A2}', 'x', 60, 'self')`);
+check("can't log for someone else", !!r.error);
+r = await as(COACH, `select id from public.recovery_sessions where athlete_id = '${A1}'`);
+check("coach sees their athlete's recovery", r.rows?.length === 1);
+r = await as(A1, `insert into public.recovery_videos (slug, path) values ('foam-roll-calves', 'x')`);
+check("only the upload script writes videos", !!r.error);
+r = await as(A1, `select slug from public.recovery_videos`);
+check("signed-in users can read the video list", !r.error);
+
 r = await as(A1, `select public.server_notify('${A2}', 'workout_pack', 't', 'b', '/', 'k')`);
 check("signed-in users can't call server_notify", !!r.error);
 

@@ -1,11 +1,13 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Leaf } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import Avatar from "@/components/avatar/Avatar";
 import { saveCheckin } from "@/lib/avatar/actions";
+import { minutesLabel, routineSeconds, suggestRoutine } from "@/lib/recovery/catalog";
 import { cyclePain, FEEL, PAIN_COLOR, PAIN_LABEL, RPE_LABEL, sessionLoad, SPOTS, spotLabel, type Pain, type PainLevel, type Spot } from "@/lib/avatar/pain";
 
 export type CheckinData = { feel: number | null; rpe: number | null; pain: Pain; note: string | null; updated_at?: string };
@@ -46,6 +48,7 @@ export default function CheckIn({
     setSaved(false);
   };
   const sore = SPOTS.filter((s) => pain[s]).sort((a, b) => (pain[b] ?? 0) - (pain[a] ?? 0));
+  const tip = hurts && sore.length ? suggestRoutine({ spots: sore, readiness: null }) : null;
 
   // Tapped a face on Today: that tap is the check-in; save it now, the rest is optional.
   const autoSaved = useRef(false);
@@ -285,6 +288,16 @@ export default function CheckIn({
           </span>
         )}
       </div>
+      {/* Sore spots saved: offer the matching recovery routine. */}
+      {saved && !dirty && tip && (
+        <Link href={`/recovery/${tip.routine.id}?from=/activity/${activityId}&s=suggested`} className="flex min-h-12 items-center gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.06] px-4 text-sm">
+          <Leaf size={16} className="shrink-0 text-emerald-200" aria-hidden />
+          <span className="min-w-0 flex-1">
+            Try <span className="font-medium">{tip.routine.title}</span> · {minutesLabel(routineSeconds(tip.routine.items))}
+          </span>
+          <span className="shrink-0 text-emerald-200">Start →</span>
+        </Link>
+      )}
     </div>
   );
 }

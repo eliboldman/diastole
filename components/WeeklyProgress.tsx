@@ -22,7 +22,7 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
   const mondayIso = monday.toISOString();
   const sunday = new Date(monday.getTime() + 6 * DAY).toISOString().slice(0, 10);
   const fourWeeksAgo = new Date(monday.getTime() - 28 * DAY).toISOString();
-  const [{ data: acts }, { data: planned }, { data: recentWins }] = await Promise.all([
+  const [{ data: acts }, { data: planned }, { data: recentWins }, { count: recovery }] = await Promise.all([
     supabase.from("activities").select("start_time, duration_s, planned_workout_id").eq("athlete_id", athleteId).gte("start_time", fourWeeksAgo),
     supabase
       .from("planned_workouts")
@@ -33,6 +33,8 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
       .not("status", "in", "(draft,skipped)")
       .is("deleted_at", null),
     supabase.from("achievements").select("id, key, value, achieved_at, activity_id").eq("athlete_id", athleteId).gte("achieved_at", ago(7 * DAY)),
+    // Finished recovery routines count toward the week too.
+    supabase.from("recovery_sessions").select("id", { count: "exact", head: true }).eq("athlete_id", athleteId).gte("completed_at", mondayIso),
   ]);
   const real = (acts ?? []).filter((a) => (a.duration_s ?? 0) >= 300);
   const thisWeek = real.filter((a) => a.start_time >= mondayIso);
@@ -93,6 +95,7 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
               hasPlan ? (pct >= 1 ? "Plan done" : null) : `usual week is about ${target}`,
               extra ? `+ ${extra} other activit${extra === 1 ? "y" : "ies"}` : null,
               `${hours.toFixed(1)} h${pct >= 1 || !hasPlan ? "" : " so far"}`,
+              recovery ? `${recovery} recovery` : null,
             ]
               .filter(Boolean)
               .join(" · ")}

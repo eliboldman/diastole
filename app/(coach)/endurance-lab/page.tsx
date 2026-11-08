@@ -95,6 +95,9 @@ export default async function EnduranceLabPage() {
               Open the library <ChevronRight size={16} className="text-white/45" aria-hidden />
             </Link>
             <ConnectImport />
+            <Link href="/lab/recovery" className={`${linkRow} mt-3`}>
+              Recovery routines and demos <ChevronRight size={16} className="text-white/45" aria-hidden />
+            </Link>
           </Card>
 
           <Card title="Readiness suggestions" icon={<Gauge size={18} className="text-emerald-200" aria-hidden />}>

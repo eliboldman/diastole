@@ -1,4 +1,4 @@
-import { CalendarRange, ChevronRight, Upload, Hammer } from "lucide-react";
+import { CalendarRange, ChevronRight, Upload, Hammer, Leaf } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -49,6 +49,9 @@ export default async function TrainingPage() {
         <div className="flex flex-wrap gap-2">
           <Link href="/training/mine" className="flex min-h-11 items-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-4 text-sm font-medium text-emerald-50 hover:bg-emerald-300/20">
             <Hammer size={16} aria-hidden /> My workouts
+          </Link>
+          <Link href="/recovery" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]">
+            <Leaf size={16} aria-hidden /> Recovery
           </Link>
           <Link href="/me/upload" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 hover:bg-white/[0.1]">
             <Upload size={16} aria-hidden /> Upload workout

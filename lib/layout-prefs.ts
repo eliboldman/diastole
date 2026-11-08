@@ -8,6 +8,7 @@ export const LAYOUT_PAGES = {
     { key: "streaks", label: "Streaks" },
     { key: "checkin", label: "Check-in prompt" },
     { key: "gear", label: "Which shoes?" },
+    { key: "recovery", label: "Recovery" },
     { key: "readiness", label: "Readiness" },
     { key: "fuel", label: "Today's fuel" },
     { key: "upcoming", label: "Coming up" },
