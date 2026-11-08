@@ -1,4 +1,4 @@
-import { Backpack, ChevronRight } from "lucide-react";
+import { Backpack, ChevronRight, CloudSun } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,6 +9,8 @@ import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMess
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
 import { cleanCloset, isEmptyCloset, packFor } from "@/lib/closet";
+import { weatherLine, weatherPack } from "@/lib/weather";
+import { athleteWeather } from "@/lib/weather-data";
 import { getShoeMileage } from "@/lib/shoes";
 import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
@@ -34,10 +36,11 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
     supabase.from("activities").select("id, name, sport").eq("planned_workout_id", id).limit(1).maybeSingle(),
   ]);
   if (!w) notFound();
-  const [{ data: zones }, mode, { data: gearRow }] = await Promise.all([
+  const [{ data: zones }, mode, { data: gearRow }, weather] = await Promise.all([
     supabase.from("athlete_zones").select("threshold_speed_mps, ftp_w").eq("athlete_id", w.athlete_id).maybeSingle(),
     getFuelMode(w.athlete_id),
     supabase.from("athlete_gear").select("gear").eq("athlete_id", w.athlete_id).maybeSingle(),
+    athleteWeather(supabase, w.athlete_id, w.scheduled_date),
   ]);
 
   const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
@@ -47,7 +50,11 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const own = me.id === w.athlete_id;
   // The step text counts too ("pull buoy", "at the track", "105% FTP").
   const mileage = w.sport === "run" ? await getShoeMileage(supabase, w.athlete_id, closet, me.timezone) : {};
-  const pack = packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet, mileage);
+  const units = me.units === "km" ? "km" : "mi";
+  const pack = [
+    ...packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet, mileage),
+    ...(weather.day ? weatherPack(weather.day, w.sport, units) : []),
+  ];
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
@@ -64,6 +71,16 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
           <p className="text-[11px] uppercase tracking-[0.15em] text-emerald-100/70">Why this workout</p>
           <p className="mt-1.5 text-[15px] leading-relaxed text-white/90">{w.why}</p>
           <p className="mt-2 text-xs text-white/45">From your coach</p>
+        </section>
+      )}
+
+      {weather.day && weather.place && (
+        <section className="row-in mt-6 flex items-start gap-3 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
+          <CloudSun size={20} className="mt-0.5 shrink-0 text-emerald-200" aria-hidden />
+          <div className="min-w-0">
+            <h2 className="font-medium">Weather in {weather.place.name.split(",")[0]}</h2>
+            <p className="mt-1 text-sm text-white/70">{weatherLine(weather.day, units)}</p>
+          </div>
         </section>
       )}
 
@@ -96,6 +113,15 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
               ) : (
                 "This athlete hasn't filled in their closet yet, so the list is general."
               )}
+            </p>
+          )}
+          {own && !weather.place && (
+            <p className="mt-2 text-xs text-white/50">
+              Add your town in{" "}
+              <Link href="/account/settings#weather" className="text-emerald-200 underline">
+                Settings
+              </Link>{" "}
+              for weather tips here too.
             </p>
           )}
         </section>

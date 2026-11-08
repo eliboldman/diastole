@@ -6,6 +6,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
+import Streaks from "@/components/Streaks";
 import Welcome from "@/components/Welcome";
 import FuelToday from "@/components/fuel/FuelToday";
 import RaceWeek from "@/components/race/RaceWeek";
@@ -53,12 +54,17 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const blocks: Record<string, ReactNode> = {
     race: (
       <>
-      <RaceWeek athleteId={me.id} today={today} />
+      <RaceWeek athleteId={me.id} today={today} units={me.units === "km" ? "km" : "mi"} />
       </>
     ),
     progress: (
       <>
       <WeeklyProgress athleteId={me.id} timeZone={me.timezone} />
+      </>
+    ),
+    streaks: (
+      <>
+      <Streaks athleteId={me.id} timeZone={me.timezone} today={today} />
       </>
     ),
     checkin: (

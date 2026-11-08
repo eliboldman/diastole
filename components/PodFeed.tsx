@@ -69,12 +69,14 @@ export default function PodFeed({
   props,
   units = "mi",
   avatars = {},
+  streaks = {},
 }: {
   feed: PodFeedData;
   timeZone: string;
   units?: Units;
   props: PodPropsData | null;
   avatars?: Record<string, unknown>;
+  streaks?: Record<string, number>; // weekly training streaks, only for members who share training
 }) {
   if (!feed.members.length) {
     return <p className="text-white/50">Nobody has joined this pod yet.</p>;
@@ -166,6 +168,11 @@ export default function PodFeed({
                     <AvatarCircle look={avatars[m.id]} name={m.name} size={44} />
                     <span className="min-w-0 truncate">{m.name}</span>
                     {m.is_me && <span className="text-sm font-normal text-white/50">(you)</span>}
+                    {streaks[m.id] >= 2 && (
+                      <span className="shrink-0 rounded-full border border-amber-200/20 bg-amber-200/[0.07] px-2 py-0.5 text-xs font-normal tabular-nums text-amber-100" title={`${streaks[m.id]} weeks in a row with 3+ workouts`}>
+                        🔥 {streaks[m.id]}
+                      </span>
+                    )}
                   </Link>
                 </h2>
                 <span

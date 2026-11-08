@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
       })().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     }
   }
+  // Pod challenges that ended yesterday: final standings to everyone who joined (rules only).
+  const { data: wrapped, error: wrapError } = await admin.rpc("finish_pod_challenges");
+  results.challenges = wrapError ? { status: "error", reason: wrapError.message.slice(0, 200) } : { sent: wrapped };
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;
   // Read notifications clear themselves after a week; cleared ones are deleted after 30 days.

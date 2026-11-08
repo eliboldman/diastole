@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme, layout, appearance) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout, appearance, weather_location) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -863,6 +863,55 @@ r = await as(A1, `select public.get_pod_challenges('${CPOD}') as c`);
 check("leaving removes you from the board", r.rows?.[0]?.c?.find((x) => x.id === CH)?.entries?.length === 1);
 r = await as(COACH, `delete from public.pod_challenges where id = '${CH}' returning id`);
 check("the coach can delete any challenge in their pod", r.rows?.length === 1);
+
+// Challenge wrap-ups
+await db.exec(`
+  insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values
+    ('${A1}', 'garmin', 'wr1', 'running', now() - interval '36 hours', 7200),
+    ('${A2}', 'garmin', 'wr2', 'running', now() - interval '36 hours', 3600);
+`);
+r = await db.query(`insert into public.pod_challenges (pod_id, created_by, title, metric, mode, starts_on, ends_on)
+  values ('${CPOD}', '${A1}', 'Hours sprint', 'hours', 'leaderboard', current_date - 3, current_date - 1) returning id`);
+const CH3 = r.rows[0].id;
+await db.exec(`insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH3}', '${A1}'), ('${CH3}', '${A2}')`);
+r = await as(A1, `select public.finish_pod_challenges()`);
+check("signed-in users can't run the wrap-up", !!r.error);
+// The morning job runs with nobody signed in.
+await db.exec(`select set_config('request.jwt.claim.sub', '', false)`);
+r = await db.query(`select public.finish_pod_challenges() as n`);
+const wrap = (await db.query(`select user_id, title, body from public.notifications where dedupe_key = 'challenge_end:${CH3}'`)).rows;
+const wrapFor = (u) => wrap.find((x) => x.user_id === u);
+check("the winner hears they won", wrapFor(A1)?.title?.startsWith("🏆 You won Hours sprint"));
+check("everyone else gets their place", wrapFor(A2)?.body?.includes("2nd of 2"));
+check("the coach gets a summary", wrapFor(COACH)?.title === "🏁 Hours sprint is over");
+await db.query(`select public.finish_pod_challenges()`);
+check("running it again sends nothing new", (await db.query(`select count(*)::int n from public.notifications where dedupe_key = 'challenge_end:${CH3}'`)).rows[0].n === wrap.length);
+
+// Weather location
+r = await as(A1, `update public.profiles set weather_location = '{"name":"Austin, Texas","lat":30.27,"lon":-97.74}' where id = '${A1}' returning weather_location`);
+check("athlete saves their town", r.rows?.[0]?.weather_location?.name === "Austin, Texas");
+r = await as(A1, `update public.profiles set weather_location = '{"name":"x","lat":200,"lon":0}' where id = '${A1}'`);
+check("impossible coordinates are refused", !!r.error);
+r = await as(A2, `update public.profiles set weather_location = null where id = '${A1}' returning id`);
+check("nobody else can change it", !!r.error || !r.rows?.length);
+
+// Streaks in pods (weekly: 3+ workouts in each of the last two weeks)
+await db.exec(`
+  update public.profiles set pod_share_level = 0 where id = '${A2}';
+  insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s)
+  select a, 'garmin', 'st' || a || w || d, 'running', date_trunc('week', now()) - (w * interval '7 days') + (d * interval '1 day') + interval '12 hours', 2400
+  from unnest(array['${A1}'::uuid, '${A2}'::uuid]) a, generate_series(1, 2) w, generate_series(1, 3) d;
+`);
+r = await as(A1, `select public.get_pod_streaks('${CPOD}') as s`);
+check("you see your own streak", Number(r.rows?.[0]?.s?.[A1]) >= 2);
+check("not a member who doesn't share training", r.rows?.[0]?.s?.[A2] === undefined);
+r = await as(COACH, `select public.get_pod_streaks('${CPOD}') as s`);
+check("the coach sees everyone's", Number(r.rows?.[0]?.s?.[A2]) >= 2);
+await db.exec(`update public.profiles set pod_share_level = 2 where id = '${A2}'`);
+r = await as(A1, `select public.get_pod_streaks('${CPOD}') as s`);
+check("members who share training show their streak", Number(r.rows?.[0]?.s?.[A2]) >= 2);
+r = await as(STRANGER, `select public.get_pod_streaks('${CPOD}') as s`);
+check("outsiders see none", JSON.stringify(r.rows?.[0]?.s ?? {}) === "{}");
 
 // Page layouts (Customize)
 r = await as(A1, `update public.profiles set layout = '{"me":{"order":["prs"],"hidden":["form"]}}' where id = '${A1}' returning layout`);

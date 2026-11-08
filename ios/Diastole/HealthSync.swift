@@ -1,6 +1,8 @@
 import CryptoKit
 import Foundation
 import HealthKit
+import UIKit
+import WebKit
 @preconcurrency import WorkoutKit
 
 /// Apple Watch support. After the athlete taps Connect (on the web Connect page, inside the app):
@@ -8,7 +10,9 @@ import HealthKit
 ///    Diastole through the signed-in page's own fetch, so it uses the web sign-in;
 ///  - puts the coach's upcoming workouts in the Apple Watch Workout app (WorkoutKit), and takes
 ///    off ones the coach removed or changed.
-/// It syncs when the app opens or comes back to the front (at most every 15 minutes), and on "Sync now".
+/// It syncs when the app opens or comes back to the front, when Apple Health has something new
+/// (iOS wakes the app in the background for new workouts and overnight data), at most every 15
+/// minutes, and on "Sync now".
 final class HealthSync {
     static let shared = HealthSync()
 
@@ -16,6 +20,7 @@ final class HealthSync {
     private weak var page: WebPage?
     private var running = false
     private var lastSync: Date?
+    private var observing = false
     private let connectedKey = "health.connected"
     private let scheduledKey = "health.scheduled" // planned workout id -> fingerprint of what's on the watch
     private static let lookbackDays = 14
@@ -33,6 +38,7 @@ final class HealthSync {
         guard connected else { return }
         connected = false
         lastSync = nil
+        stopBackgroundDelivery()
         Task { await clearWatch() }
     }
 
@@ -63,11 +69,48 @@ final class HealthSync {
 
     // MARK: sync
 
-    private func sync(connect: Bool, report shouldReport: Bool) async {
-        guard let page, AppConfig.isOwn(page.webView.url ?? AppConfig.baseURL) else {
-            if shouldReport { report(["ok": false, "error": "failed"]) }
-            return
+    // MARK: background
+
+    /// Ask iOS to wake the app when Apple Health gets a new workout (right away) or overnight data
+    /// (hourly), so the coach sees it without the athlete opening Diastole. Set up at every launch.
+    func startBackgroundDelivery() {
+        guard connected, !observing, HKHealthStore.isHealthDataAvailable() else { return }
+        observing = true
+        let types: [(HKSampleType, HKUpdateFrequency)] = [
+            (HKObjectType.workoutType(), .immediate), (Self.hrv, .hourly), (Self.restingHR, .hourly), (Self.sleep, .hourly),
+        ]
+        for (type, frequency) in types {
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { @Sendable _, completion, error in
+                guard error == nil else { return completion() }
+                nonisolated(unsafe) let done = completion
+                Task { @MainActor in
+                    await HealthSync.shared.backgroundSync()
+                    done()
+                }
+            }
+            store.execute(query)
+            store.enableBackgroundDelivery(for: type, frequency: frequency) { _, _ in }
         }
+    }
+
+    private func stopBackgroundDelivery() {
+        observing = false
+        store.disableAllBackgroundDelivery { _, _ in }
+    }
+
+    /// Apple Health has something new. Same 15-minute limit as opening the app.
+    func backgroundSync() async {
+        guard connected, !running else { return }
+        if let lastSync, Date().timeIntervalSince(lastSync) < Self.minInterval { return }
+        // A little extra time if iOS woke the app just for this.
+        let task = UIApplication.shared.beginBackgroundTask(withName: "health-sync")
+        await sync(connect: false, report: false)
+        if task != .invalid { UIApplication.shared.endBackgroundTask(task) }
+    }
+
+    // MARK: sync
+
+    private func sync(connect: Bool, report shouldReport: Bool) async {
         running = true
         defer { running = false }
 
@@ -76,7 +119,7 @@ final class HealthSync {
             "activities": await workouts(),
             "connect": connect,
         ]
-        guard let response = await post(page, "/api/apple/sync", payload) else {
+        guard let response = await post("/api/apple/sync", payload) else {
             if shouldReport { report(["ok": false, "error": "failed"]) }
             return
         }
@@ -96,10 +139,11 @@ final class HealthSync {
         }
         connected = true
         lastSync = Date()
+        startBackgroundDelivery()
 
         let plans = (response.json["workouts"] as? [[String: Any]]) ?? []
         let removing = Set((response.json["removing"] as? [String]) ?? [])
-        let onWatch = await updateWatch(plans, removing: removing, page: page)
+        let onWatch = await updateWatch(plans, removing: removing)
         if shouldReport { report(["ok": true, "workouts": onWatch]) }
     }
 
@@ -110,9 +154,13 @@ final class HealthSync {
 
     private struct Response { let status: Int; let json: [String: Any] }
 
-    /// POST through the page so the request carries the web sign-in (and its refreshes stay in one place).
-    private func post(_ page: WebPage, _ path: String, _ body: [String: Any]) async -> Response? {
+    /// POST with the web sign-in: through the page while the app is open, or directly with the
+    /// page's cookies when iOS woke the app in the background.
+    private func post(_ path: String, _ body: [String: Any]) async -> Response? {
         guard let data = try? JSONSerialization.data(withJSONObject: body), let text = String(data: data, encoding: .utf8) else { return nil }
+        guard UIApplication.shared.applicationState == .active, let page, AppConfig.isOwn(page.webView.url ?? AppConfig.baseURL) else {
+            return await directPost(path, data)
+        }
         let js = """
         const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
         return JSON.stringify({ status: r.status, json: await r.json().catch(() => ({})) });
@@ -120,6 +168,30 @@ final class HealthSync {
         guard let out = try? await page.webView.callAsyncJavaScript(js, arguments: ["path": path, "body": text], contentWorld: .page) as? String,
               let parsed = try? JSONSerialization.jsonObject(with: Data(out.utf8)) as? [String: Any] else { return nil }
         return Response(status: (parsed["status"] as? Int) ?? 0, json: (parsed["json"] as? [String: Any]) ?? [:])
+    }
+
+    /// The background path: the web view's sign-in cookies on a plain request. The server refreshes
+    /// an expiring session in its response; those cookies go back to the web view so the next page
+    /// load (and sync) uses them.
+    private func directPost(_ path: String, _ data: Data) async -> Response? {
+        let jar = WKWebsiteDataStore.default().httpCookieStore
+        let cookies = await jar.allCookies().filter(AppConfig.isOwnCookie)
+        guard !cookies.isEmpty else { return nil }
+        let url = AppConfig.url(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = data
+        request.httpShouldHandleCookies = false
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        for (k, v) in HTTPCookie.requestHeaderFields(with: cookies) { request.setValue(v, forHTTPHeaderField: k) }
+        guard let (body, response) = try? await URLSession.shared.data(for: request), let http = response as? HTTPURLResponse else { return nil }
+        // Signed out (the server redirected to the login page): not an answer. Without this check an
+        // empty reply would look like "no workouts planned" and clear the watch.
+        guard http.url?.path == url.path, (http.value(forHTTPHeaderField: "content-type") ?? "").contains("json") else { return nil }
+        if let fields = http.allHeaderFields as? [String: String] {
+            for c in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) where AppConfig.isOwnCookie(c) { await jar.setCookie(c) }
+        }
+        return Response(status: http.statusCode, json: ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any]) ?? [:])
     }
 
     // MARK: Apple Health -> Diastole
@@ -269,7 +341,7 @@ final class HealthSync {
     }
 
     /// Makes the watch match the coach's plan. Returns how many workouts are on the watch.
-    private func updateWatch(_ plans: [[String: Any]], removing: Set<String>, page: WebPage) async -> Int {
+    private func updateWatch(_ plans: [[String: Any]], removing: Set<String>) async -> Int {
         guard WorkoutScheduler.isSupported, await Self.schedulerAuthorized() else { return 0 }
         let current = await WorkoutScheduler.shared.scheduledWorkouts
         var memory = scheduled
@@ -297,7 +369,7 @@ final class HealthSync {
         // Removals the coach is waiting on, including ones that were never on this watch.
         for id in removing where wanted[id] == nil { removed.insert(id) }
         if !sent.isEmpty || !removed.isEmpty {
-            _ = await post(page, "/api/apple/ack", ["sent": sent, "removed": Array(removed)])
+            _ = await post("/api/apple/ack", ["sent": sent, "removed": Array(removed)])
         }
         return await WorkoutScheduler.shared.scheduledWorkouts.count
     }

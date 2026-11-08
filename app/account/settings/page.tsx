@@ -11,11 +11,13 @@ import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
 import AppearanceSettings from "@/components/AppearanceSettings";
+import WeatherLocation from "@/components/WeatherLocation";
 import WeekPrefsEditor from "@/components/WeekPrefsEditor";
 import CoachingGuide from "@/components/coach/CoachingGuide";
 import { cleanWeek } from "@/lib/week-prefs";
 import { asLook } from "@/lib/appearance";
 import { asTheme } from "@/lib/themes";
+import { asPlace } from "@/lib/weather";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -45,7 +47,7 @@ export default async function SettingsPage() {
   const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: myWeek }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
@@ -156,6 +158,12 @@ export default async function SettingsPage() {
                 <Row href="/pods">Manage your pods</Row>
               </div>
             )}
+          </section>
+
+          <section id="weather" className={card}>
+            <h2 className="mb-1 text-lg font-medium">Weather</h2>
+            <p className="mb-3 text-sm text-white/55">Where you usually train. Workouts and race day then show the forecast and what to bring for it. Just a town, never your address.</p>
+            <WeatherLocation initial={asPlace(profile?.weather_location)} />
           </section>
 
           <section id="appearance" className={card}>

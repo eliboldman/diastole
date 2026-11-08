@@ -81,6 +81,9 @@ final class PushCenter {
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Background delivery needs its observers set up at every launch, including ones iOS starts
+        // in the background for new Health data.
+        HealthSync.shared.startBackgroundDelivery()
         return true
     }
 

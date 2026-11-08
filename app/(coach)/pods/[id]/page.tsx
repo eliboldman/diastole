@@ -21,9 +21,10 @@ export default async function CoachPodFeedPage({
   const v = (await searchParams).view;
   const view: PodView = v === "feed" || v === "challenges" ? v : "members";
   const supabase = await createClient();
-  const [{ data }, { data: props }, { data: activities }, { data: challenges }] = await Promise.all([
+  const [{ data }, { data: props }, { data: streaks }, { data: activities }, { data: challenges }] = await Promise.all([
     supabase.rpc("get_pod_feed", { p_pod: id }),
     view === "members" ? supabase.rpc("get_pod_props", { p_pod: id }) : Promise.resolve({ data: null }),
+    view === "members" ? supabase.rpc("get_pod_streaks", { p_pod: id }) : Promise.resolve({ data: null }),
     view === "feed" ? supabase.rpc("get_pod_activity_feed", { p_pod: id, p_limit: FEED_PAGE }) : Promise.resolve({ data: null }),
     view === "challenges" ? supabase.rpc("get_pod_challenges", { p_pod: id }) : Promise.resolve({ data: null }),
   ]);
@@ -46,7 +47,7 @@ export default async function CoachPodFeedPage({
         ) : view === "feed" ? (
           <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={coach.timezone} units={coach.units} avatars={(avatars ?? {}) as Record<string, unknown>} />
         ) : (
-          <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} />
+          <PodFeed feed={feed} timeZone={coach.timezone} units={coach.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} streaks={(streaks ?? {}) as Record<string, number>} />
         )}
       </div>
     </DashboardShell>

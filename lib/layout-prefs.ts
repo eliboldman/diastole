@@ -5,6 +5,7 @@ export const LAYOUT_PAGES = {
   today: [
     { key: "race", label: "Race week" },
     { key: "progress", label: "Weekly progress" },
+    { key: "streaks", label: "Streaks" },
     { key: "checkin", label: "Check-in prompt" },
     { key: "readiness", label: "Readiness" },
     { key: "fuel", label: "Today's fuel" },
