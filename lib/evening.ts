@@ -75,7 +75,7 @@ export async function runEvening() {
         p_kind: "workout_shoes",
         p_title: `Your ${s.model} are at ${dist}`,
         p_body: "Most running shoes are worn out somewhere between 300 and 500 miles. Time to think about a new pair, and retire these in My closet when you do.",
-        p_href: "/account#closet",
+        p_href: "/me/setup#closet",
         p_key: key,
       });
       shoes++;

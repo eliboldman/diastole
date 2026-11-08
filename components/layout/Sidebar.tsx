@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import Logo from "@/components/Logo";
+import { TAB_ICON } from "@/components/layout/tab-icons";
+import { DEFAULT_TABS, TAB_OPTIONS } from "@/lib/tabs";
 import NotificationHost, { NotificationButton } from "@/components/layout/Notifications";
 import SearchHost, { SearchButton } from "@/components/layout/SearchDialog";
 
@@ -33,22 +35,13 @@ const NAV: Record<NavRole, Item[]> = {
   ],
 };
 
-// Phones: a fixed bar at the bottom with the four most used places. Everything else stays in the
-// slide-out menu (tap the logo), and Messages sits in the top bar.
-const TABS: Record<NavRole, Item[]> = {
-  coach: [
-    { label: "Today", href: "/dashboard", icon: Sun, match: /^\/digest(\/|$)/ },
-    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods)(\/|$)|^\/activity\// },
-    { label: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
-    { label: "Messages", href: "/messages", icon: MessageCircle },
-  ],
-  athlete: [
-    { label: "Me", href: "/me", icon: Sun, match: /^\/me$|^\/me\/story|^\/(account|connect|races)(\/|$)/ },
-    { label: "Pods", href: "/me/pods", icon: Orbit },
-    { label: "Training", href: "/training", icon: Dumbbell, match: /^\/(calendar|activity)(\/|$)/ },
-    { label: "Fuel", href: "/fuel", icon: Utensils },
-  ],
-};
+// Phones: a fixed bar at the bottom with each person's chosen places (Settings → Bottom tabs).
+// Everything else stays in the slide-out menu (tap the logo).
+const tabItems = (role: NavRole, ids: string[]): Item[] =>
+  ids.flatMap((id) => {
+    const t = TAB_OPTIONS[role].find((o) => o.id === id);
+    return t ? [{ label: t.label, href: t.href, icon: TAB_ICON[id] ?? Sun, match: t.match ? new RegExp(t.match) : undefined }] : [];
+  });
 
 // Desktop has room for one-click shortcuts below the tabs.
 const SHORTCUTS: Record<NavRole, Item[]> = {
@@ -80,7 +73,8 @@ function isActive(pathname: string, item: Item) {
   return item.match ? item.match.test(pathname) : false;
 }
 
-export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
+export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: { role?: NavRole; tabs?: string[] }) {
+  const tabBar = tabItems(role, tabs);
   const pathname = usePathname();
   const items = NAV[role];
   const shortcuts = SHORTCUTS[role];
@@ -136,7 +130,7 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
           <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
           <div className="flex items-center">
             <SearchButton />
-            {role === "athlete" && (
+            {!tabs.includes("messages") && (
               <Link href="/messages" aria-label="Messages" className={`flex h-11 w-11 items-center justify-center rounded-xl ${pathname.startsWith("/messages") ? "text-emerald-200" : "text-white/70"}`}>
                 <MessageCircle size={19} />
               </Link>
@@ -148,8 +142,8 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
 
       {/* Mobile: the tab bar */}
       <nav aria-label="Tabs" className="tabbar fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">
-        <ul className="grid grid-cols-4">
-          {TABS[role].map((item) => {
+        <ul className="grid" style={{ gridTemplateColumns: `repeat(${tabBar.length}, minmax(0, 1fr))` }}>
+          {tabBar.map((item) => {
             const active = isActive(pathname, item);
             return (
               <li key={item.href}>

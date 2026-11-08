@@ -3,18 +3,20 @@ import assert from "node:assert/strict";
 import { resolveLayout, visibleSections } from "./layout-prefs.ts";
 
 const def = resolveLayout("me", null);
-assert.equal(def.order[0], "readiness");
+assert.equal(def.order[0], "setup", "My setup comes first");
+assert.equal(def.order[1], "readiness");
 assert.deepEqual(def.hidden, []);
 assert.equal(visibleSections(def).length, def.order.length);
 
 const custom = resolveLayout("me", { me: { order: ["prs", "readiness", "bogus", "prs"], hidden: ["form", "nope"] } });
-assert.equal(custom.order[0], "prs", "keeps the person's order");
-assert.equal(custom.order[1], "story", "a missing section lands after its default neighbour (prs)");
-assert.equal(custom.order[2], "readiness");
+assert.equal(custom.order[0], "setup", "a new first section lands at the top");
+assert.equal(custom.order[1], "prs", "keeps the person's order");
+assert.equal(custom.order[2], "story", "a missing section lands after its default neighbour (prs)");
+assert.equal(custom.order[3], "readiness");
 assert.ok(!custom.order.includes("bogus"), "drops unknown keys");
 assert.equal(new Set(custom.order).size, custom.order.length, "no duplicates");
 assert.equal(custom.order.length, def.order.length, "missing sections come back");
-assert.equal(custom.order[3], "trends");
+assert.equal(custom.order[4], "trends");
 assert.deepEqual(custom.hidden, ["form"]);
 assert.ok(!visibleSections(custom).includes("form"));
 

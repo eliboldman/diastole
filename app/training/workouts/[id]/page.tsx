@@ -122,7 +122,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
               {own ? (
                 <>
                   Add your shoes and bikes in{" "}
-                  <Link href="/account#closet" className="text-emerald-200 underline">
+                  <Link href="/me/setup#closet" className="text-emerald-200 underline">
                     My closet
                   </Link>{" "}
                   and this list names your own gear.

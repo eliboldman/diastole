@@ -6,9 +6,8 @@ import { notFound } from "next/navigation";
 import Avatar from "@/components/avatar/Avatar";
 import GoalForm from "@/components/avatar/GoalForm";
 import MetricCards from "@/components/avatar/MetricCards";
-import ZonesForm from "@/components/coach/ZonesForm";
 import BackLink from "@/components/layout/BackLink";
-import { clock, distance, paceOf, shortDistance, sportLabel, whole } from "@/lib/activity/format";
+import { clock, distance, shortDistance, sportLabel, whole } from "@/lib/activity/format";
 import { buildMetricCards } from "@/lib/avatar/metrics";
 import type { Mood } from "@/components/avatar/Avatar";
 import { PR_LABEL, refreshProgress, summarize, todayState, type Achievement } from "@/lib/avatar/progress";
@@ -106,9 +105,6 @@ export default async function ProfileView({ id, me, header, sections, order }: {
     goals = p.goals;
   }
 
-  const { data: myZones } = own
-    ? await supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", id).maybeSingle()
-    : { data: null };
   const cards = buildMetricCards({ zones, days, acts: acts.map((a) => ({ ...a, training_load: a.training_load ?? null })), units: me.units ?? "mi", timeZone: tz });
   const first = (person.full_name || "Athlete").split(" ")[0];
   // Recent PRs: real improvements (not the first-ever value) in the last 90 days, newest first.
@@ -155,27 +151,6 @@ export default async function ProfileView({ id, me, header, sections, order }: {
               </div>
               {coaching && <GoalForm athleteId={id} goals={goals} />}
             </div>
-          </section>
-        )}
-
-      </>
-    ),
-    numbers: (
-      <>
-        {own && (
-          <section id="numbers" className="mt-6 scroll-mt-6 rounded-[24px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
-            <h2 className="font-medium">My numbers</h2>
-            <p className="mb-4 mt-1 text-sm text-white/55">FTP, threshold pace and heart rates set your zones and workout targets. Update them after a test; your coach sees every change.</p>
-            <ZonesForm
-              athleteId={id}
-              maxHr={myZones?.max_hr ?? null}
-              thresholdPace={myZones?.threshold_speed_mps ? paceOf(Number(myZones.threshold_speed_mps), me.units ?? "mi") : null}
-              units={me.units ?? "mi"}
-              ftp={myZones?.ftp_w ?? null}
-              thresholdHr={myZones?.threshold_hr ?? null}
-              estimatedMaxHr={null}
-              saveLabel="Save my numbers"
-            />
           </section>
         )}
 

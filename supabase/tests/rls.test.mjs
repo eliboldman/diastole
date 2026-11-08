@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme, layout, appearance, weather_location, adjust_conditions, seen_tips) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout, appearance, weather_location, adjust_conditions, seen_tips, tab_bar) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";

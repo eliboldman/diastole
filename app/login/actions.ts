@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { siteUrl } from "@/lib/site-url";
 import { asLook, LOOK_COOKIE, lookCookie } from "@/lib/appearance";
+import { tabsCookie, TABS_COOKIE } from "@/lib/tabs";
 import { asTheme, THEME_COOKIE } from "@/lib/themes";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,10 +34,11 @@ export async function signInWithPassword(_prev: LoginState, form: FormData): Pro
   // Paint this account's theme on this device from the first page.
   const { data: auth } = await supabase.auth.getUser();
   if (auth.user) {
-    const { data: p } = await supabase.from("profiles").select("theme, appearance").eq("id", auth.user.id).maybeSingle();
+    const { data: p } = await supabase.from("profiles").select("theme, appearance, tab_bar").eq("id", auth.user.id).maybeSingle();
     const jar = await cookies();
     jar.set(THEME_COOKIE, asTheme(p?.theme), { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax" });
     jar.set(LOOK_COOKIE, lookCookie(asLook(p?.appearance)), { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax" });
+    if (p?.tab_bar) jar.set(TABS_COOKIE, tabsCookie(p.tab_bar as Record<string, string[]>), { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax" });
   }
   redirect("/login");
 }

@@ -11,11 +11,11 @@ import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
 import SyncedAgo from "@/components/SyncedAgo";
 import AppearanceSettings from "@/components/AppearanceSettings";
+import { cleanTabs } from "@/lib/tabs";
 import ConditionsToggle from "@/components/ConditionsToggle";
 import WeatherLocation from "@/components/WeatherLocation";
-import WeekPrefsEditor from "@/components/WeekPrefsEditor";
+import TabBarSettings from "@/components/TabBarSettings";
 import CoachingGuide from "@/components/coach/CoachingGuide";
-import { cleanWeek } from "@/lib/week-prefs";
 import { asLook } from "@/lib/appearance";
 import { asTheme } from "@/lib/themes";
 import { asPlace } from "@/lib/weather";
@@ -46,17 +46,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: myWeek }] = await Promise.all([
+  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar")
       .eq("id", me.id)
       .single(),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd, philosophy").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
-    supabase.from("athlete_week").select("days").eq("athlete_id", me.id).maybeSingle(),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(aiRow ?? {}) };
   const pods = (memberships ?? []).map((m) => ({ id: m.pod_id, status: m.status, name: (m.pods as unknown as { name: string } | null)?.name ?? "Pod" }));
@@ -92,11 +91,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </section>
       )}
 
-      <section className={`${card} mt-8`}>
-        <h2 className="mb-1 text-lg font-medium">My week</h2>
-        <p className="mb-4 text-sm text-white/55">{isCoach ? "Which disciplines you like on which days." : "Which disciplines you like on which days, and how much time you have. Your coach plans around it."}</p>
-        <WeekPrefsEditor initial={cleanWeek(myWeek?.days)} />
-      </section>
+      {/* Closet, numbers and training days live together in My setup. */}
+      <Link href="/me/setup" className="lift mt-8 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-5">
+        <span className="min-w-0">
+          <span className="block text-lg font-medium">My setup</span>
+          <span className="block text-sm text-white/55">Closet and gear, your numbers, training days and metrics</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+      </Link>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className={card}>
@@ -167,6 +169,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <p className="mb-3 text-sm text-white/55">Where you usually train. Workouts and race day then show the forecast and what to bring for it. Just a town, never your address.</p>
             <WeatherLocation initial={asPlace(profile?.weather_location)} />
             <ConditionsToggle initial={Boolean(profile?.adjust_conditions)} />
+          </section>
+
+          <section id="tabs" className={card}>
+            <h2 className="mb-1 text-lg font-medium">Bottom tabs</h2>
+            <p className="mb-4 text-sm text-white/55">The places at the bottom of your screen on your phone. Pick the ones you use most.</p>
+            <TabBarSettings role={isCoach ? "coach" : "athlete"} initial={cleanTabs((profile?.tab_bar as Record<string, unknown> | null)?.[isCoach ? "coach" : "athlete"], isCoach ? "coach" : "athlete")} />
           </section>
 
           <section id="appearance" className={card}>

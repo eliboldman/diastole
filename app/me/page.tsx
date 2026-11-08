@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Backpack, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 
@@ -218,6 +219,17 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">Today</h1>
         <LayoutCustomizer page="today" initial={layout} />
       </div>
+      {/* One obvious way to closet, gear, numbers and training days. */}
+      <Link href="/me/setup" className="lift mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">
+          <Backpack size={19} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">My setup</span>
+          <span className="block truncate text-sm text-white/55">Closet, gear, numbers, training days, metrics</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+      </Link>
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
 
       {!showWelcome && release && !seen(seenTips, release.id) && <WhatsNew id={release.id} items={me.role === "coach" ? release.coach : release.athlete} />}
