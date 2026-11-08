@@ -94,14 +94,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         #endif
     }
 
+    // Completion-handler versions, not the async ones: iOS requires these handlers to be called on
+    // the main thread, and the async variants' generated handlers run off it, which crashed the app
+    // whenever a notification was tapped. Both hop to the main thread before doing anything.
+
     /// Show notifications even while the app is open.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound, .badge]
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        nonisolated(unsafe) let done = completionHandler
+        DispatchQueue.main.async { done([.banner, .list, .sound, .badge]) }
     }
 
     /// Tapped: open the page it's about.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard let href = response.notification.request.content.userInfo["href"] as? String else { return }
-        await MainActor.run { PushCenter.shared.open(href) }
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let href = response.notification.request.content.userInfo["href"] as? String
+        nonisolated(unsafe) let done = completionHandler
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if let href { PushCenter.shared.open(href) }
+            }
+            done()
+        }
     }
 }
