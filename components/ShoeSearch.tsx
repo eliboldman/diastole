@@ -7,7 +7,10 @@ import { catalogLabel, searchShoes } from "@/lib/shoe-catalog";
 
 const kindLabel = (k: ShoeKind) => SHOE_KINDS.find(([x]) => x === k)?.[1] ?? k;
 
-/** The shoe model field: type to search Nike, On, Saucony, Craft, Hoka, Brooks and Altra; picking one fills the model and its type. Free text still works. */
+/**
+ * The shoe model field: type to search Nike, On, Saucony, Craft, Hoka, Brooks and Altra; picking one fills the model and its type. Free text still works.
+ * The suggestions open under the nearest positioned parent, so the row it sits in should be `relative`: the list then spans the whole row instead of just the text box.
+ */
 export default function ShoeSearch({ value, onChange, className }: { value: string; onChange: (model: string, kind?: ShoeKind) => void; className: string }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -24,7 +27,7 @@ export default function ShoeSearch({ value, onChange, className }: { value: stri
   };
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className="min-w-0 flex-1">
       <input
         className={className}
         value={value}
@@ -57,7 +60,7 @@ export default function ShoeSearch({ value, onChange, className }: { value: stri
         }}
       />
       {shown.length > 0 && (
-        <ul id={list} role="listbox" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-white/10 bg-panel/95 p-1 shadow-2xl backdrop-blur-xl">
+        <ul id={list} role="listbox" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-panel p-1 shadow-2xl shadow-black/60">
           {shown.map((s, i) => (
             <li
               key={`${s.brand} ${s.model}`}
@@ -69,12 +72,12 @@ export default function ShoeSearch({ value, onChange, className }: { value: stri
                 pick(i);
               }}
               onMouseEnter={() => setActive(i)}
-              className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-sm ${i === active ? "bg-white/[0.08]" : ""}`}
+              className={`flex min-h-12 cursor-pointer flex-col justify-center rounded-xl px-3 py-1.5 ${i === active ? "bg-white/[0.08]" : ""}`}
             >
-              <span className="min-w-0 truncate">
-                <span className="text-white/50">{s.brand}</span> {s.model}
+              <span className="text-[15px] leading-snug">
+                <span className="text-white/55">{s.brand}</span> {s.model}
               </span>
-              <span className="shrink-0 text-xs text-white/45">{kindLabel(s.kind)}</span>
+              <span className="text-[11px] text-white/45">{kindLabel(s.kind)}</span>
             </li>
           ))}
           <li className="px-3 py-2 text-[11px] text-white/40">Add the version after picking, e.g. 41. Not listed? Just type it.</li>

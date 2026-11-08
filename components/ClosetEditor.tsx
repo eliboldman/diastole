@@ -76,7 +76,7 @@ export default function ClosetEditor({
             const isDefault = defaultShoe(c)?.id === s.id;
             return (
               <li key={s.id} className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 ${s.retired ? "opacity-60" : ""}`}>
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center gap-2">
                   <ShoeSearch className={input} value={s.model} onChange={(model, kind) => setShoe(i, kind ? { model, kind } : { model })} />
                   <select className={`${select} max-w-[9.5rem]`} value={s.kind} aria-label="Shoe type" onChange={(e) => setShoe(i, { kind: e.target.value as ShoeKind })}>
                     {SHOE_KINDS.map(([k, l]) => (

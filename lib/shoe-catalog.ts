@@ -19,7 +19,7 @@ const C: Record<ShoeBrand, Partial<Record<ShoeKind, string[]>>> = {
   },
   On: {
     daily: ["Cloud", "Cloud X", "Cloudmonster", "Cloudsurfer", "Cloudsurfer Max", "Cloudsurfer Next", "Cloudrunner", "Cloudeclipse", "Cloudstratus", "Cloudgo", "Cloudflyer", "Cloudspark", "Cloudnova Flux"],
-    speed: ["Cloudmonster Hyper", "Cloudflow", "Cloudboom Zone"],
+    speed: ["Cloudmonster Hyper", "Cloudflow", "Cloudboom Zone", "Cloudboom Max"],
     race: ["Cloudboom Echo", "Cloudboom Strike", "Cloudboom Strike LS"],
     spikes: ["Cloudspike 10000m", "Cloudspike 1500m"],
     trail: ["Cloudultra", "Cloudultra Pro", "Cloudvista", "Cloudsurfer Trail", "Cloudventure", "Cloudventure Peak", "Cloudhorizon"],
@@ -70,8 +70,9 @@ export const SHOE_CATALOG: CatalogShoe[] = SHOE_BRANDS.flatMap((brand) =>
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9%]+/g, " ").trim();
 
 /**
- * Best matches for what's typed: every word must start a word in "brand model" (so "peg 41" finds
- * Pegasus, the version number aside, and "hoka mach" finds the Mach family). Exact-prefix models first.
+ * Best matches for what's typed: every word must start a word in "brand model", or (3+ letters)
+ * appear inside it with spaces ignored, so "peg 41" finds Pegasus (the version number aside),
+ * "hoka mach" finds the Mach family and "cloud boom" finds Cloudboom. Exact-prefix models first.
  */
 export function searchShoes(q: string, limit = 8): CatalogShoe[] {
   const words = norm(q).split(" ").filter(Boolean);
@@ -79,11 +80,13 @@ export function searchShoes(q: string, limit = 8): CatalogShoe[] {
   const scored: { s: CatalogShoe; score: number }[] = [];
   for (const s of SHOE_CATALOG) {
     const hay = norm(`${s.brand} ${s.model}`).split(" ");
+    const flat = hay.join("");
     // Numbers that are a version ("41") can be left unmatched; letters must all match.
-    const unmatched = words.filter((w) => !hay.some((h) => h.startsWith(w)));
+    const unmatched = words.filter((w) => !hay.some((h) => h.startsWith(w)) && !(w.length >= 3 && flat.includes(w)));
     if (unmatched.some((w) => !/^\d+$/.test(w)) || unmatched.length === words.length) continue;
-    const m = norm(s.model);
-    const score = (m.startsWith(words.filter((w) => norm(s.brand) !== w).join(" ")) ? 0 : 1) + m.length / 100 + unmatched.length;
+    const m = norm(s.model).replace(/ /g, "");
+    const typed = words.filter((w) => norm(s.brand) !== w && !/^\d+$/.test(w)).join("");
+    const score = (m.startsWith(typed) ? 0 : 1) + (m === typed ? -0.5 : 0) + m.length / 100 + unmatched.length;
     scored.push({ s, score });
   }
   return scored
