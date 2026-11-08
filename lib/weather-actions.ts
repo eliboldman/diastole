@@ -18,3 +18,11 @@ export async function saveWeatherLocation(raw: unknown) {
   const { error } = await supabase.from("profiles").update({ weather_location: place }).eq("id", me.id);
   return error ? { ok: false as const } : { ok: true as const };
 }
+
+/** The heat/altitude opt-in. */
+export async function saveAdjustConditions(on: boolean) {
+  const me = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ adjust_conditions: on === true }).eq("id", me.id);
+  return error ? { ok: false as const } : { ok: true as const };
+}

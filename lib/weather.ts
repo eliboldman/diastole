@@ -14,6 +14,7 @@ export type DayWeather = {
   coldMorning: number; // °C, coldest "feels like" in the window
   wind: number; // km/h, strongest in the window
   code: number; // WMO weather code, the worst in the window
+  elevation?: number; // m, of the forecast point (for altitude adjustments)
 };
 
 export const FORECAST_DAYS = 16;
@@ -51,8 +52,8 @@ export async function getForecast(place: Place, timeZone: string): Promise<DayWe
     // Shared by everyone at the same spot; forecasts don't change minute to minute.
     const r = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(5000) });
     if (!r.ok) return null;
-    const j = (await r.json()) as { hourly?: Hourly; daily?: Daily };
-    return j.hourly && j.daily ? toDays(j.hourly, j.daily) : null;
+    const j = (await r.json()) as { hourly?: Hourly; daily?: Daily; elevation?: number };
+    return j.hourly && j.daily ? toDays(j.hourly, j.daily).map((d) => ({ ...d, elevation: typeof j.elevation === "number" ? j.elevation : undefined })) : null;
   } catch {
     return null;
   }

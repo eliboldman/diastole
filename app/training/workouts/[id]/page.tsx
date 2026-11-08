@@ -11,6 +11,7 @@ import { sportLabel } from "@/lib/activity/format";
 import { cleanCloset, isEmptyCloset, packFor } from "@/lib/closet";
 import { weatherLine, weatherPack } from "@/lib/weather";
 import { athleteWeather } from "@/lib/weather-data";
+import { adjustForConditions, conditionsFor, conditionsNote } from "@/lib/conditions";
 import { getShoeMileage } from "@/lib/shoes";
 import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
@@ -42,6 +43,8 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
     supabase.from("athlete_gear").select("gear").eq("athlete_id", w.athlete_id).maybeSingle(),
     athleteWeather(supabase, w.athlete_id, w.scheduled_date),
   ]);
+  // Heat and altitude (the athlete's opt-in): targets as they'd feel at today's conditions.
+  const { data: optIn } = await supabase.from("profiles").select("adjust_conditions").eq("id", w.athlete_id).maybeSingle();
 
   const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
   const lines = describe(w.steps as Step[], me.units, pool, w.sport === "swim");
@@ -51,6 +54,9 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   // The step text counts too ("pull buoy", "at the track", "105% FTP").
   const mileage = w.sport === "run" ? await getShoeMileage(supabase, w.athlete_id, closet, me.timezone) : {};
   const units = me.units === "km" ? "km" : "mi";
+  const cond = optIn?.adjust_conditions && weather.day && w.sport !== "swim" ? conditionsFor(weather.day.feelsMorning, weather.day.elevation) : null;
+  const adjusted = cond && cond.total >= 0.01 ? adjustForConditions(w.steps as Step[], cond.total) : null;
+  const adjustedLines = adjusted && JSON.stringify(adjusted) !== JSON.stringify(w.steps) ? describe(adjusted, me.units, pool, false) : null;
   const pack = [
     ...packFor({ sport: w.sport, title: w.title, description: [w.description, ...lines].filter(Boolean).join(" ") }, closet, mileage),
     ...(weather.day ? weatherPack(weather.day, w.sport, units) : []),
@@ -80,6 +86,17 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
           <div className="min-w-0">
             <h2 className="font-medium">Weather in {weather.place.name.split(",")[0]}</h2>
             <p className="mt-1 text-sm text-white/70">{weatherLine(weather.day, units)}</p>
+            {cond && adjustedLines && (
+              <div className="mt-3 rounded-2xl bg-amber-200/[0.06] p-3">
+                <p className="text-sm text-amber-50/90">{conditionsNote(cond, units, w.sport)}</p>
+                <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-white/75">
+                  {adjustedLines.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-xs text-white/45">Your watch shows the original targets; aim for these instead.</p>
+              </div>
+            )}
           </div>
         </section>
       )}

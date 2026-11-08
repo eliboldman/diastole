@@ -1,5 +1,15 @@
 "use client";
 
+import Explain from "@/components/Explain";
+import { explain, type ExplainKey } from "@/lib/explain";
+
+// "Explain this" for running-form charts, with this run's average.
+const CHART_KEYS: Record<string, ExplainKey> = { vo: "vertical_oscillation", gct: "ground_contact", vr: "vertical_ratio", stride: "stride_length" };
+const mean = (v: (number | null)[]) => {
+  const xs = v.filter((x): x is number => x !== null && Number.isFinite(x) && x > 0);
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+};
+
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { Streams } from "@/lib/activity/fit";
@@ -219,7 +229,10 @@ export default function ActivityCharts({
         {prepared.map((s) => (
           <div key={s.key} className="mb-4">
             <div className="mb-1 flex items-baseline justify-between gap-3">
-              <h3 className="text-sm font-medium text-white/80">{s.title}</h3>
+              <h3 className="flex items-center gap-1.5 text-sm font-medium text-white/80">
+                {s.title}
+                {CHART_KEYS[s.key] && <Explain label={s.title} text={explain(CHART_KEYS[s.key], { value: mean(s.values) })} />}
+              </h3>
               <span className="truncate text-xs tabular-nums text-white/45">
                 {s.format(s.bottom)} – {s.format(s.top)} {s.unit}
               </span>

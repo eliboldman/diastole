@@ -1,5 +1,6 @@
 import "server-only";
 
+import { mergeIfDuplicate } from "@/lib/activity/merge";
 import { linkPlannedWorkout, saveFitActivity } from "@/lib/activity/store";
 import { forgetGarmin, garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -163,16 +164,10 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
           },
           { onConflict: "source,external_id" },
         );
-        // A hand-uploaded file of this same workout is now redundant: drop it so it isn't counted twice.
-        await admin
-          .from("activities")
-          .delete()
-          .eq("athlete_id", athleteId)
-          .eq("source", "upload")
-          .gte("start_time", new Date((start - 60) * 1000).toISOString())
-          .lte("start_time", new Date((start + 60) * 1000).toISOString());
         const { data: saved } = await admin.from("activities").select("id").eq("source", "garmin").eq("external_id", externalId).maybeSingle();
-        if (saved) await linkPlannedWorkout(admin, saved.id);
+        // The same session from the Apple Watch (or elsewhere): merge into one record.
+        const keptId = saved ? await mergeIfDuplicate(admin, saved.id).catch(() => saved.id) : null;
+        if (keptId) await linkPlannedWorkout(admin, keptId);
       } else {
         const fields = wellnessFields(type, item);
         const date = typeof item.calendarDate === "string" ? item.calendarDate : null;

@@ -31,7 +31,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                revoke update on public.profiles from authenticated;
-               grant update (full_name, timezone, units, theme, layout, appearance, weather_location) on public.profiles to authenticated;`);
+               grant update (full_name, timezone, units, theme, layout, appearance, weather_location, adjust_conditions) on public.profiles to authenticated;`);
 
 const COACH = "00000000-0000-0000-0000-00000000000c";
 const A1 = "00000000-0000-0000-0000-0000000000a1";
@@ -877,6 +877,32 @@ r = await as(A1, `insert into public.recovery_videos (slug, path) values ('foam-
 check("only the upload script writes videos", !!r.error);
 r = await as(A1, `select slug from public.recovery_videos`);
 check("signed-in users can read the video list", !r.error);
+
+// ---------------------------------------------------------------- life happened (Phase P)
+await db.exec("reset role");
+await db.query(`insert into public.plan_changes (athlete_id, coach_id, reason, summary, status) values ('${A1}', '${COACH}', 'minutes', 'Shortened', 'pending')`);
+r = await as(A1, `select summary from public.plan_changes`);
+check("athlete sees their plan changes", r.rows?.length === 1);
+r = await as(COACH, `select summary from public.plan_changes where athlete_id = '${A1}'`);
+check("coach sees them", r.rows?.length === 1);
+r = await as(A2, `select summary from public.plan_changes`);
+check("other athletes don't", r.rows?.length === 0);
+r = await as(A1, `insert into public.plan_changes (athlete_id, coach_id, reason, summary, status) values ('${A1}', '${COACH}', 'minutes', 'Sneaky', 'approved')`);
+check("athletes can't write plan changes directly", !!r.error);
+r = await as(A1, `update public.profiles set health_pause = '{"kind":"sick","since":"2026-11-08"}' where id = auth.uid() returning id`);
+check("health pause is set by the server only", !!r.error || !r.rows?.length);
+r = await as(A1, `insert into public.symptom_logs (athlete_id, date, symptoms, energy) values (auth.uid(), current_date, '{Cough}', 2) returning date`);
+check("athlete logs symptoms", r.rows?.length === 1);
+r = await as(COACH, `select symptoms from public.symptom_logs where athlete_id = '${A1}'`);
+check("coach reads symptoms", r.rows?.length === 1);
+r = await as(A2, `select * from public.symptom_logs`);
+check("pod mates and others can't", r.rows?.length === 0);
+r = await as(A1, `update public.profiles set adjust_conditions = true where id = auth.uid() returning adjust_conditions`);
+check("athlete opts in to heat/altitude", r.rows?.[0]?.adjust_conditions === true);
+r = await as(A1, `insert into public.activity_merges (athlete_id, kept_id, source, external_id, row) values (auth.uid(), '${ACT1}', 'apple', 'x', '{}')`);
+check("merges are written by the server only", !!r.error);
+r = await as(A1, `select id from public.activity_merges`);
+check("athletes can read their merges", !r.error);
 
 r = await as(A1, `select public.server_notify('${A2}', 'workout_pack', 't', 'b', '/', 'k')`);
 check("signed-in users can't call server_notify", !!r.error);

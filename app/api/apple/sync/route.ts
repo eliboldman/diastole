@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { mergeIfDuplicate } from "@/lib/activity/merge";
 import { linkPlannedWorkout } from "@/lib/activity/store";
 import { toAppleWorkout, type AppleWorkout } from "@/lib/apple/format";
 import { refreshReadiness } from "@/lib/readiness/run";
@@ -127,16 +128,9 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   if (newActivities.length) {
     const { data: saved } = await admin.from("activities").select("id, start_time").eq("source", "apple").in("external_id", newActivities);
-    for (const a of saved ?? []) {
-      // A hand-uploaded file of the same workout is now redundant.
-      const t = new Date(a.start_time).getTime();
-      await admin
-        .from("activities")
-        .delete()
-        .eq("athlete_id", me.id)
-        .eq("source", "upload")
-        .gte("start_time", new Date(t - 60_000).toISOString())
-        .lte("start_time", new Date(t + 60_000).toISOString());
+    for (const s of saved ?? []) {
+      // The same session from Garmin or an uploaded file: merge into one record (undoable).
+      const a = { ...s, id: await mergeIfDuplicate(admin, s.id).catch(() => s.id) };
       await linkPlannedWorkout(admin, a.id).catch(() => {});
     }
   }

@@ -13,6 +13,7 @@ import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/F
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
 import WorkoutRequests from "@/components/coach/WorkoutRequests";
+import PlanChanges from "@/components/coach/PlanChanges";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { getRoster, type AthleteSummary } from "@/lib/coach-data";
@@ -104,6 +105,7 @@ export default async function TodayPage() {
       </div>
       {/* "Doing this instead": the coach's own schedule, or any athlete they name */}
       <ChangeOfPlans today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} />
+      <PlanChanges coachId={coach.id} />
       <WorkoutRequests coachId={coach.id} units={coach.units === "km" ? "km" : "mi"} />
       {/* The coach trains too: their own post-workout check */}
       <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />

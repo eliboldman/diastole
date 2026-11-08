@@ -7,6 +7,8 @@ import SyncedAgo from "@/components/SyncedAgo";
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
 import GearCheck from "@/components/GearCheck";
+import LifeHappened from "@/components/LifeHappened";
+import PausedCard from "@/components/PausedCard";
 import RecoveryCard from "@/components/recovery/RecoveryCard";
 import Streaks from "@/components/Streaks";
 import Welcome from "@/components/Welcome";
@@ -42,8 +44,17 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
     supabase.from("profiles").select("welcomed_at").eq("id", me.id).maybeSingle(),
     searchParams,
-    supabase.from("profiles").select("layout").eq("id", me.id).maybeSingle(),
+    supabase.from("profiles").select("layout, health_pause").eq("id", me.id).maybeSingle(),
   ]);
+  // "Life happened": yesterday's session if it wasn't done, and sick/injured mode.
+  const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const [{ data: missedRow }, { data: symptomsToday }] = await Promise.all([
+    supabase.from("planned_workouts").select("id, title").eq("athlete_id", me.id).eq("scheduled_date", yesterday).in("status", ["approved", "sent"]).is("deleted_at", null).limit(1).maybeSingle(),
+    supabase.from("symptom_logs").select("symptoms, energy").eq("athlete_id", me.id).eq("date", today).maybeSingle(),
+  ]);
+  const pause = (layoutRow?.health_pause ?? null) as { kind: "sick" | "injured"; since: string } | null;
+  const todayWorkout = (workouts ?? []).find((w) => w.scheduled_date === today && (w.status === "approved" || w.status === "sent")) ?? null;
+  const hasCoach = Boolean(me.coach_id && me.coach_id !== me.id);
 
   const invites = (memberships ?? []).filter((m) => m.status === "invited");
   const pods = (memberships ?? []).filter((m) => m.status === "active");
@@ -139,6 +150,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         {device?.source === "garmin" && workouts?.length ? (
           <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
         ) : null}
+        {!pause && <LifeHappened today={todayWorkout ? { id: todayWorkout.id, title: todayWorkout.title } : null} missed={missedRow ?? null} hasCoach={hasCoach} />}
       </section>
       </>
     ),
@@ -201,6 +213,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <LayoutCustomizer page="today" initial={layout} />
       </div>
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
+
+      {pause && <PausedCard kind={pause.kind} since={pause.since} today={today} logged={symptomsToday ?? null} hasCoach={hasCoach} />}
 
       {invites.map((inv) => (
         <section key={inv.pod_id} className="mt-6 rounded-[28px] border border-amber-200/20 bg-amber-200/[0.04] p-6">

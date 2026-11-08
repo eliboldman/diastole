@@ -24,6 +24,10 @@ import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import CheckIn from "@/components/avatar/CheckIn";
 import ShoePicker from "@/components/ShoePicker";
+import MergeNote from "@/components/MergeNote";
+import Explain from "@/components/Explain";
+import { explain, TILE_KEYS } from "@/lib/explain";
+import { SOURCE_LABEL } from "@/lib/activity/dupes";
 import { cleanCloset, defaultShoe, INDOOR_RIDE } from "@/lib/closet";
 import MusclesWorked from "@/components/avatar/MusclesWorked";
 import { normalizePain } from "@/lib/avatar/pain";
@@ -187,6 +191,8 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         ])
       : [{ data: null }, { data: null }, { data: null }];
   const runCloset = cleanCloset(gearRow?.gear);
+  const { data: typicalLoadRows } = await supabase.from("activities").select("training_load").eq("athlete_id", act.athlete_id).gte("start_time", new Date(Date.parse(act.start_time) - 28 * 86_400_000).toISOString()).not("training_load", "is", null).limit(200);
+  const { data: merges } = isOwn || isCoach ? await supabase.from("activity_merges").select("id, source").eq("kept_id", act.id).is("undone_at", null) : { data: [] };
   const pickable = runCloset.shoes.filter((s) => !s.retired || s.id === shoePick?.shoe_id);
   const onlyBike = runCloset.bikes.length === 1 ? runCloset.bikes[0] : null;
   let form: FormSummary | null = (detail?.form as FormSummary | null) ?? null;
@@ -279,6 +285,14 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const powerSecs = streams?.power && zonesRow?.ftp_w ? timeInZones(powerZones(zonesRow.ftp_w), streams.power, interval) : null;
   const hasZones = [hrSecs, paceSecs, powerSecs].some((s) => s?.some(Boolean));
 
+  // "Explain this" on the tiles, with this athlete's own numbers.
+  const typicalLoad = typicalLoadRows?.length ? typicalLoadRows.reduce((t, r) => t + Number(r.training_load), 0) / typicalLoadRows.length : null;
+  const explainCtx = (label: string) => {
+    const key = TILE_KEYS[label];
+    const value = key === "avg_hr" ? act.avg_hr : key === "max_hr" ? act.max_hr : key === "normalized_power" ? act.normalized_power : key === "training_load" ? act.training_load : key === "swolf" ? (swimSum?.swolf ?? null) : null;
+    return { value: value == null ? null : Number(value), baseline: key === "training_load" ? typicalLoad : null, maxHr: maxHr ?? null, ftp: zonesRow?.ftp_w ?? null };
+  };
+
   return (
     <DashboardShell role={isCoach ? "coach" : "athlete"}>
       <BackLink href={back.href} label={back.label} />
@@ -297,6 +311,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
           .filter(Boolean)
           .join(" · ")}
       </p>
+      {(isOwn || isCoach) && <MergeNote merges={(merges ?? []).map((m) => ({ id: m.id, label: SOURCE_LABEL[m.source] ?? m.source }))} />}
 
       {/* Owner -> their coach; coach -> the athlete. A coach who is their own athlete has no one to message. */}
       {((isOwn && me.coach_id && me.coach_id !== me.id) || (isCoach && !isOwn)) && (
@@ -309,7 +324,10 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {tiles.map(([label, value]) => (
             <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
-              <p className="truncate text-xs uppercase tracking-[0.15em] text-white/45">{label}</p>
+              <p className="flex min-w-0 items-center gap-1.5 text-xs uppercase tracking-[0.15em] text-white/45">
+                <span className="truncate">{label}</span>
+                {TILE_KEYS[label] && <Explain label={label} text={explain(TILE_KEYS[label], explainCtx(label))} />}
+              </p>
               <p className="mt-1 truncate text-xl font-semibold tabular-nums">{value}</p>
             </div>
           ))}

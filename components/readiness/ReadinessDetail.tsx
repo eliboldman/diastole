@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { FLAG_STYLE } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
+import Explain from "@/components/Explain";
+import { explain } from "@/lib/explain";
 import type { ReadinessRow, WellnessPoint } from "@/lib/coach-data";
 import type { Flag } from "@/lib/readiness/engine";
 
@@ -9,6 +11,14 @@ import type { Flag } from "@/lib/readiness/engine";
 // own Readiness page so both see the same numbers. Wording is neutral because either may read it.
 
 const AREAS = ["recovery", "sleep", "stress", "load"] as const;
+
+/** The latest value and the average of the days before it, for "Explain this". */
+function latestVsUsual(points: { value: number | null }[]) {
+  const xs = points.map((p) => p.value).filter((p): p is number => p !== null && Number.isFinite(p));
+  if (xs.length < 4) return {};
+  const before = xs.slice(0, -1);
+  return { value: xs[xs.length - 1], baseline: before.reduce((a, b) => a + b, 0) / before.length };
+}
 
 const AREA_HELP: Record<(typeof AREAS)[number], string> = {
   recovery: "HRV and resting heart rate vs. the last 28 days",
@@ -75,10 +85,24 @@ export function ReadinessTrend({ trend, readiness }: { trend: WellnessPoint[]; r
     <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
       <h2 className="text-lg font-medium">Last 14 days</h2>
       <div className="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4">
-        <Sparkline label="HRV" points={lastNDays(trend, "hrv_ms")} format={fmt.hrv} width={150} height={40} />
-        <Sparkline label="Resting HR" points={lastNDays(trend, "resting_hr")} format={fmt.rhr} width={150} height={40} />
-        <Sparkline label="Sleep" points={lastNDays(trend, "sleep_seconds")} format={fmt.sleep} width={150} height={40} />
-        <Sparkline label="Stress" points={lastNDays(trend, "stress_avg")} format={fmt.stress} width={150} height={40} />
+        {(
+          [
+            ["HRV", "hrv_ms", fmt.hrv, "hrv"],
+            ["Resting HR", "resting_hr", fmt.rhr, "resting_hr"],
+            ["Sleep", "sleep_seconds", fmt.sleep, "sleep"],
+            ["Stress", "stress_avg", fmt.stress, "stress"],
+          ] as const
+        ).map(([label, field, format, key]) => {
+          const points = lastNDays(trend, field);
+          return (
+            <div key={field} className="relative">
+              <Sparkline label={label} points={points} format={format} width={150} height={40} />
+              <span className="absolute right-0 top-0">
+                <Explain label={label} text={explain(key, latestVsUsual(points))} />
+              </span>
+            </div>
+          );
+        })}
       </div>
       {readiness.length > 1 && (
         <div className="mt-6 flex flex-wrap gap-1.5" aria-label="Daily overall flags, oldest to newest">
