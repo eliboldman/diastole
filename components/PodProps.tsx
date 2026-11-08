@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from "react-dom";
 
 import { useToast } from "@/components/coach/Toast";
+import { hasSecret } from "@/lib/secrets-local";
 import { hideOneProp, hideProps, sendProps } from "@/lib/pod-props-actions";
 import {
   ALL_STICKERS,
@@ -72,10 +73,16 @@ export default function PodProps({
   const router = useRouter();
   const { show, element: toast } = useToast(4500);
   const first = member.name.split(" ")[0];
-  const secrets = useMemo(
-    () => (activity ? unlockedForActivity(activity) : member.wellness && member.activities ? unlockedFor(member as MemberData) : []),
-    [member, activity],
-  );
+  // Found Icarus (typed it into search)? Its sticker joins the secret ones for this sender.
+  const [icarus, setIcarus] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setIcarus(hasSecret("icarus")), 0);
+    return () => clearTimeout(t);
+  }, []);
+  const secrets = useMemo(() => {
+    const earned = activity ? unlockedForActivity(activity) : member.wellness && member.activities ? unlockedFor(member as MemberData) : [];
+    return icarus ? [...earned, { ...ALL_STICKERS.icarus, line: "Wings of wax, heart of gold." }] : earned;
+  }, [member, activity, icarus]);
   const sportSet = useMemo(() => (activity ? sportStickers(activity.sport) : []), [activity]);
 
   // Local totals so sends land instantly; the server copy replaces them on refresh.

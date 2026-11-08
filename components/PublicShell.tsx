@@ -1,5 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
+
+import Logo from "@/components/Logo";
 import type { ReactNode } from "react";
 
 import PhysiologyBackground from "@/components/PhysiologyBackground";
@@ -23,14 +24,7 @@ export default function PublicShell({
       <div className="page-breathe-in relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:pt-[max(2rem,env(safe-area-inset-top))] sm:pb-8">
         <header className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt=""
-              width={32}
-              height={32}
-              className="rounded-lg"
-              priority
-            />
+            <Logo size={32} />
             <span className="text-lg font-medium tracking-tight">
               {SITE.name}
             </span>

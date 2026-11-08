@@ -79,7 +79,7 @@ export default async function WeeklyProgress({ athleteId, timeZone }: { athleteI
             cy="40"
             r={R}
             fill="none"
-            stroke={pct >= 1 ? "#fbbf24" : "#6ee7b7"}
+            stroke={pct >= 1 ? "#fbbf24" : "var(--color-emerald-300)"}
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={C}

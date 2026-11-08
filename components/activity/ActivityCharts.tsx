@@ -240,8 +240,8 @@ export default function ActivityCharts({
             <div className="relative">
               <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-24 w-full sm:h-28" aria-hidden>
                 <line x1={0} x2={W} y1={H / 2} y2={H / 2} stroke="rgba(255,255,255,0.07)" vectorEffect="non-scaling-stroke" />
-                {s.area && <path d={s.area} fill="rgba(110,231,183,0.12)" />}
-                <path d={s.path} fill="none" stroke="#6ee7b7" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                {s.area && <path d={s.area} fill="color-mix(in oklab, var(--color-emerald-300) 12%, transparent)" />}
+                <path d={s.path} fill="none" stroke="var(--color-emerald-300)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
               </svg>
               {/* HTML dot: an SVG circle would stretch into an ellipse with this aspect ratio */}
               {idx !== null && s.values[idx] !== null && (

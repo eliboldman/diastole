@@ -100,6 +100,7 @@ const SECRETS: Record<string, Sticker> = Object.fromEntries(
       ["goat_climb", "⛰️", "Mountain goat", "props"],
       ["redline", "🚨", "Redline enjoyer", "heckle"],
       ["quickie", "⏱️", "Speedrun any%", "heckle"],
+      ["icarus", "🪽", "Flew too close to the sun", "props"],
     ] as const
   ).map(([key, emoji, label, tone]) => [key, { key, emoji, label, tone, secret: true }]),
 );

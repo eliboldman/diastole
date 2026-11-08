@@ -174,7 +174,7 @@ export default function WorkoutFilesImport({ athleteId }: { athleteId: string })
         </div>
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-gradient-to-r from-emerald-300/70 to-teal-200 transition-[width] duration-500" style={{ width: `${Math.max(3, pct)}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-emerald-300/70 to-emerald-200 transition-[width] duration-500" style={{ width: `${Math.max(3, pct)}%` }} />
       </div>
       {phase.kind !== "done" && (
         <button onClick={() => abort.current?.abort()} className="mt-4 min-h-11 text-sm text-white/55 hover:text-white">

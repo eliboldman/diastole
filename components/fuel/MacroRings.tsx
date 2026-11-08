@@ -5,7 +5,7 @@ import { ring, type Macro, type Targets } from "@/lib/fuel/meals";
 // Three nested rings, carbs outside, then protein, then fat. Each fills toward the bottom of the day's
 // range and stays full past it: no red, no "over". Colors stay calm in both directions on purpose.
 export const MACRO_STYLE: Record<Macro, { label: string; stroke: string; text: string }> = {
-  carbs: { label: "Carbs", stroke: "#6ee7b7", text: "text-emerald-200" },
+  carbs: { label: "Carbs", stroke: "var(--color-emerald-300)", text: "text-emerald-200" },
   protein: { label: "Protein", stroke: "#7dd3fc", text: "text-sky-200" },
   fat: { label: "Fat", stroke: "#fcd34d", text: "text-amber-200" },
 };

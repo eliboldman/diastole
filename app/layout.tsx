@@ -27,11 +27,19 @@ export const metadata: Metadata = {
   description: "Fitness is built between the beats. A coaching platform that reads recovery from Garmin and Apple Watch.",
 };
 
-export const viewport: Viewport = {
-  themeColor: "#0d1513",
-  viewportFit: "cover",
-  colorScheme: "dark",
-};
+// The browser's top bar matches the page background for the person's theme and background choice.
+const CANVAS: Record<string, string> = { diastole: "#0d1513", ocean: "#0c1418", violet: "#110f18", mono: "#0e0f10", blocks: "#14120e", icarus: "#08182a" };
+const BG: Record<string, string> = { midnight: "#0b0d10", black: "#000000", slate: "#0f1522", warm: "#15110c" };
+const HUE: Record<string, number> = { sunset: 55, rose: 350, gold: 88 };
+
+export async function generateViewport(): Promise<Viewport> {
+  const jar = await cookies();
+  const theme = asTheme(jar.get(THEME_COOKIE)?.value);
+  const look = asLook(jar.get(LOOK_COOKIE)?.value);
+  const hue = theme === "custom" ? look.hue : HUE[theme];
+  const themeColor = BG[look.bg] ?? CANVAS[theme] ?? (hue !== undefined ? `oklch(17.5% 0.014 ${hue})` : "#0d1513");
+  return { themeColor, viewportFit: "cover", colorScheme: "dark" };
+}
 
 export default async function RootLayout({
   children,

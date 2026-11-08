@@ -32,9 +32,9 @@ function Spark({ points, invert, big = false }: { points: MetricCard["points"]; 
   const last = points.at(-1)!;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={big ? "h-20 w-full" : "h-7 w-24"} preserveAspectRatio="none" aria-hidden>
-      {big && <path d={`${d}L${x(xs.at(-1)!)} ${H}L${x(xs[0])} ${H}Z`} fill="rgba(110,231,183,0.1)" />}
-      <path d={d} fill="none" stroke="#6ee7b7" strokeWidth={big ? 2 : 1.6} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={x(Date.parse(last.t))} cy={y(last.v)} r={big ? 3.5 : 2.4} fill="#6ee7b7" />
+      {big && <path d={`${d}L${x(xs.at(-1)!)} ${H}L${x(xs[0])} ${H}Z`} fill="color-mix(in oklab, var(--color-emerald-300) 10%, transparent)" />}
+      <path d={d} fill="none" stroke="var(--color-emerald-300)" strokeWidth={big ? 2 : 1.6} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(Date.parse(last.t))} cy={y(last.v)} r={big ? 3.5 : 2.4} fill="var(--color-emerald-300)" />
     </svg>
   );
 }

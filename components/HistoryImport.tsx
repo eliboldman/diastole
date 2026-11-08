@@ -204,7 +204,7 @@ export default function HistoryImport({ athleteId, forName }: { athleteId: strin
           </div>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-300/70 to-teal-200 transition-[width] duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-300/70 to-emerald-200 transition-[width] duration-500"
               style={{ width: `${Math.max(3, pct)}%` }}
             />
           </div>

@@ -5,6 +5,7 @@
 // shaded per workout and tapped to edit. Proportions come only from the athlete's sliders.
 import * as THREE from "three";
 
+import { accentHex } from "@/lib/accent";
 import type { Look } from "./look";
 import { PAIN_COLOR, type Pain, type PainLevel, type Spot } from "./pain";
 import { REGIONS, type Level, type Region, type Strain } from "./strain";
@@ -320,7 +321,7 @@ function buildFigure(o: SceneOpts): Built {
   const level = Math.max(0, Math.min(4, Math.round(o.aura ?? 0)));
   if (level > 0) {
     const gold = level >= 4;
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(gold ? "#fde68a" : "#6ee7b7"), transparent: true, opacity: 0.18 + level * 0.07, depthWrite: false }));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(gold ? "#fde68a" : accentHex()), transparent: true, opacity: 0.18 + level * 0.07, depthWrite: false }));
     halo.scale.set(1.5 + level * 0.12, 2.3 + level * 0.12, 1);
     halo.position.set(0, 0.95 * height, -0.4);
     root.add(halo);

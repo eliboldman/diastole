@@ -1,22 +1,33 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 
+import { asLook } from "@/lib/appearance";
 import { asPeriod, periodRange } from "@/lib/story";
+import { THEMES } from "@/lib/themes";
 import { loadStory } from "@/lib/story-data";
 import { createClient, getProfile } from "@/lib/supabase/server";
 
 // The signed-in athlete's season story as a 1080x1920 PNG (phone story size). Only ever their own.
 
 const BG = "#0d1513";
-const ACCENT = "#6ee7b7";
-const SPORT_COLOR = { run: "#6ee7b7", bike: "#7dd3fc", swim: "#c4b5fd", other: "#fcd34d" } as const;
+// The image follows the person's theme: its accent for the logo, labels, glow and run bars.
+const FIXED: Record<string, string> = { icarus: "#ffc96b", blocks: "#8fd95a" };
+function accentOf(theme: string | null, hue: number): { solid: string; glow: string } {
+  if (theme === "custom") return { solid: `hsl(${hue}, 72%, 72%)`, glow: `hsla(${hue}, 72%, 72%, 0.26)` };
+  const hex = FIXED[theme ?? ""] ?? THEMES.find((t) => t.id === theme && t.swatch.startsWith("#"))?.swatch ?? "#6ee7b7";
+  const n = parseInt(hex.slice(1), 16);
+  return { solid: hex, glow: `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.26)` };
+}
 
 export async function GET(request: NextRequest) {
   const me = await getProfile();
   if (!me) return new Response("Sign in first.", { status: 401 });
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
   const period = periodRange(asPeriod(request.nextUrl.searchParams.get("period")), today);
-  const s = await loadStory(await createClient(), me.id, period.from, period.to, me.timezone);
+  const supabase = await createClient();
+  const [s, { data: look }] = await Promise.all([loadStory(supabase, me.id, period.from, period.to, me.timezone), supabase.from("profiles").select("theme, appearance").eq("id", me.id).maybeSingle()]);
+  const { solid: ACCENT, glow } = accentOf(look?.theme ?? null, asLook(look?.appearance).hue);
+  const SPORT_COLOR = { run: ACCENT, bike: "#7dd3fc", swim: "#c4b5fd", other: "#fcd34d" } as const;
   const mi = me.units === "mi";
   const dist = (km: number) => (km < 1 ? null : `${Math.round(mi ? km / 1.609344 : km).toLocaleString("en-US")} ${mi ? "mi" : "km"}`);
   const maxH = Math.max(1, ...s.bySport.map((x) => x.hours));
@@ -34,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", backgroundColor: BG, backgroundImage: "radial-gradient(circle at 35% 12%, rgba(110,231,183,0.26) 0%, rgba(13,21,19,0) 55%)", color: "white", padding: "110px 90px 90px" }}>
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", backgroundColor: BG, backgroundImage: `radial-gradient(circle at 35% 12%, ${glow} 0%, rgba(13,21,19,0) 55%)`, color: "white", padding: "110px 90px 90px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />

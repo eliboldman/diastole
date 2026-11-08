@@ -67,7 +67,7 @@ export default async function ConnectPage({
               className="success-ring absolute inset-0 rounded-full border border-emerald-300/50"
               aria-hidden
             />
-            <span className="success-pop flex h-20 w-20 items-center justify-center rounded-full bg-emerald-300/90 text-3xl font-semibold text-emerald-950 shadow-[0_0_60px_rgba(110,231,183,0.35)]">
+            <span className="success-pop flex h-20 w-20 items-center justify-center rounded-full bg-emerald-300/90 text-3xl font-semibold text-emerald-950 shadow-[0_0_60px_color-mix(in_oklab,var(--color-emerald-300)_35%,transparent)]">
               ✓
             </span>
           </div>

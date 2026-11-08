@@ -1,12 +1,12 @@
 "use client";
 
 import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, Flag, FlaskConical, LogOut, MessageCircle, Orbit, Settings, Sparkles, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import Logo from "@/components/Logo";
 import NotificationHost, { NotificationButton } from "@/components/layout/Notifications";
 import SearchHost, { SearchButton } from "@/components/layout/SearchDialog";
 
@@ -106,7 +106,7 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
       <aside className="group fixed left-6 top-6 z-50 hidden h-[calc(100vh-3rem)] w-16 overflow-hidden rounded-[32px] border border-white/10 bg-panel/60 backdrop-blur-3xl transition-all duration-700 hover:w-60 hover:shadow-[0_0_80px_rgba(255,255,255,0.06)] md:block">
         <div className="relative z-10 flex h-full flex-col p-4">
           <Link href={home} className="flex items-center gap-3">
-            <Image src="/logo.png" alt="Diastole" width={32} height={32} className="shrink-0 rounded-lg" />
+            <Logo size={32} />
             <span className="whitespace-nowrap text-sm font-semibold opacity-0 transition-opacity duration-500 group-hover:opacity-100">Diastole</span>
           </Link>
 
@@ -276,7 +276,7 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
         style={{ transitionTimingFunction: "var(--ease-soft)" }}
       >
         <Link href={home} tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} className="mb-4 flex min-h-12 items-center gap-3 px-3">
-          <Image src="/logo.png" alt="" width={30} height={30} className="rounded-lg" />
+          <Logo size={30} />
           <span className="font-semibold">Diastole</span>
         </Link>
         {/* The app uses the edge swipe for this menu, so going back lives here instead. */}
@@ -318,7 +318,7 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
         aria-controls="mobile-menu"
         aria-label="Open menu"
       >
-        <Image src="/logo.png" alt="" width={26} height={26} className="rounded-md" />
+        <Logo size={26} />
         <span className="text-sm font-semibold">Diastole</span>
         <ChevronDown size={14} className={`text-white/45 transition-transform ${open ? "-rotate-90" : ""}`} aria-hidden />
       </button>

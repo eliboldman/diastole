@@ -84,7 +84,9 @@ export default function SearchHost() {
         return;
       }
       start(async () => {
-        setHits(await search(term));
+        const found = await search(term);
+        // A secret: typing "icarus" reveals the Icarus mode and sticker.
+        setHits(/^icarus$/i.test(term) ? [{ kind: "page", title: "☀️ Icarus", sub: "You found a secret. Fly high, just not too close.", href: "/account/settings?secret=icarus#appearance" }, ...found] : found);
         setActive(0);
       });
     }, 200);

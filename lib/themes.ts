@@ -10,6 +10,8 @@ export const THEMES = [
   { id: "gold", label: "Gold", swatch: "#fcd34d" },
   { id: "custom", label: "Custom", swatch: "conic-gradient(from 0deg, #fca5a5, #fde68a, #86efac, #7dd3fc, #c4b5fd, #f9a8d4, #fca5a5)" },
   { id: "blocks", label: "Blocks", swatch: "#8fd95a", hidden: true },
+  // A tribute: sun gold over the Aegean. Found by typing "icarus" into search.
+  { id: "icarus", label: "Icarus", swatch: "radial-gradient(circle at 50% 35%, #ffd27a 0 30%, #e8913a 45%, #10375c 75%)", hidden: true },
 ] as const;
 export type ThemeId = (typeof THEMES)[number]["id"];
 export const THEME_COOKIE = "d_theme";

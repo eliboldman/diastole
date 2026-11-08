@@ -40,7 +40,8 @@ function Row({ href, children, sub }: { href: string; children: ReactNode; sub?:
 }
 
 /** Settings (from the Me tab): profile, units, watch, pods and sharing for everyone; coaching settings and tools for coaches. */
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ secret?: string }> }) {
+  const { secret } = await searchParams;
   const me = await requireUser();
   const isCoach = me.role === "coach";
   const supabase = await createClient();
@@ -171,7 +172,7 @@ export default async function SettingsPage() {
           <section id="appearance" className={card}>
             <h2 className="mb-1 text-lg font-medium">Appearance</h2>
             <p className="mb-4 text-sm text-white/55">Make Diastole yours: color, background, text size and more. Saved to your account, so it follows you to every device.</p>
-            <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} />
+            <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} unlock={secret === "icarus" ? "icarus" : undefined} />
           </section>
 
           <section className={card}>

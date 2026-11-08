@@ -80,8 +80,8 @@ function RouteSketch({ route }: { route: [number, number][] }) {
   const d = pts.map((p, i) => `${i ? "L" : "M"}${(ox + (p[0] - x0) * scale).toFixed(1)} ${(oy + (p[1] - y0) * scale).toFixed(1)}`).join("");
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 block h-28 w-full rounded-2xl border border-white/[0.07] bg-white/[0.025]" aria-hidden>
-      <path d={d} fill="none" stroke="rgba(110,231,183,0.25)" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
-      <path d={d} fill="none" stroke="#6ee7b7" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={d} fill="none" stroke="color-mix(in oklab, var(--color-emerald-300) 25%, transparent)" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={d} fill="none" stroke="var(--color-emerald-300)" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }

@@ -783,6 +783,30 @@ body {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
 }
 
+/* Icarus: a hidden tribute theme. Sun gold accent over a deep Aegean blue, the sun's glow at the top,
+   the sea at the bottom, and a faint drift of feathers. All original artwork (simple SVG shapes). */
+:root[data-theme="icarus"] {
+  --color-emerald-50: oklch(97.8% 0.03 85);
+  --color-emerald-100: oklch(95% 0.06 82);
+  --color-emerald-200: oklch(90% 0.1 80);
+  --color-emerald-300: oklch(84% 0.145 75);
+  --color-emerald-400: oklch(75% 0.16 62);
+  --color-emerald-950: oklch(28% 0.07 60);
+  --color-canvas: #08182a;
+  --color-panel: #0d2238;
+}
+:root[data-theme="icarus"] .app-canvas {
+  background-image:
+    radial-gradient(520px 320px at 50% -6%, rgba(255, 214, 122, 0.32), rgba(232, 145, 58, 0.12) 45%, transparent 72%),
+    radial-gradient(1200px 420px at 50% 112%, rgba(30, 110, 170, 0.22), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23ffe3a8' stroke-opacity='.05' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M40 70c18-22 40-30 62-28-18 6-34 18-46 34M52 58l-6-10M64 50l-4-11M77 45l-2-11'/%3E%3Cpath d='M150 170c16-20 36-27 56-25-16 5-30 16-41 31M161 159l-5-9M172 152l-3-10M184 148l-1-10'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: auto, auto, 220px 220px;
+}
+:root[data-theme="icarus"][data-glow="off"] .app-canvas {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23ffe3a8' stroke-opacity='.05' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M40 70c18-22 40-30 62-28-18 6-34 18-46 34M52 58l-6-10M64 50l-4-11M77 45l-2-11'/%3E%3Cpath d='M150 170c16-20 36-27 56-25-16 5-30 16-41 31M161 159l-5-9M172 152l-3-10M184 148l-1-10'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 220px 220px;
+}
+
 /* iOS zooms into any form field under 16px when it's focused (and scrolls the page to it). On
    touch screens, keep every field at least 16px so typing never zooms. */
 @media (pointer: coarse) {

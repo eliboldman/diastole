@@ -44,7 +44,7 @@ export default function NavProgress() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5">
       <div
-        className={`h-full bg-gradient-to-r from-emerald-300/80 to-teal-200 shadow-[0_0_12px_rgba(110,231,183,0.6)] ${
+        className={`h-full bg-gradient-to-r from-emerald-300/80 to-emerald-200 shadow-[0_0_12px_color-mix(in_oklab,var(--color-emerald-300)_60%,transparent)] ${
           state === "loading" ? "w-[85%] opacity-100 transition-[width] duration-[2500ms] ease-out" : state === "done" ? "w-full opacity-0 transition-all duration-300" : "w-0 opacity-0"
         }`}
       />

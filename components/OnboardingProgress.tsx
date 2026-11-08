@@ -7,7 +7,7 @@ export default function OnboardingProgress({ step }: { step: 1 | 2 | 3 }) {
     <div className="mb-10" aria-label={`Setup step ${step} of ${STEPS.length}: ${STEPS[step - 1]}`}>
       <div className="relative h-1.5 overflow-hidden rounded-full bg-white/10">
         <div
-          className="onboarding-fill absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-300/70 to-teal-200"
+          className="onboarding-fill absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-300/70 to-emerald-200"
           style={{ width: `${Math.max(pct, 6)}%` }}
         />
       </div>

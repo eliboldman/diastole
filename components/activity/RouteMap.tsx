@@ -4,6 +4,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { useEffect, useRef, useState } from "react";
 
+import { accentHex } from "@/lib/accent";
+
 // Free vector tiles from OpenFreeMap (no key, no cost). Attribution is shown by the map itself.
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
 
@@ -38,7 +40,7 @@ export default function RouteMap({ route }: { route: [number, number][] }) {
         m.on("load", () => {
           m.addSource("route", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } } });
           m.addLayer({ id: "route-casing", type: "line", source: "route", paint: { "line-color": "#15201d", "line-width": 6 }, layout: { "line-cap": "round", "line-join": "round" } });
-          m.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": "#6ee7b7", "line-width": 3 }, layout: { "line-cap": "round", "line-join": "round" } });
+          m.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": accentHex(), "line-width": 3 }, layout: { "line-cap": "round", "line-join": "round" } });
         });
         m.on("error", (e) => console.warn("Route map", e.error?.message));
       } catch (e) {

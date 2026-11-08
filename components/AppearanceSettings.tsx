@@ -4,6 +4,7 @@ import { HeartPulse, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { applyLook, BACKGROUNDS, CORNERS, DEFAULT_LOOK, DENSITIES, LOOK_COOKIE, lookCookie, TEXT_SIZES, type Look } from "@/lib/appearance";
+import { addSecret, hasSecret } from "@/lib/secrets-local";
 import { saveAppearance } from "@/lib/theme-actions";
 import { THEME_COOKIE, THEMES, type ThemeId } from "@/lib/themes";
 
@@ -52,10 +53,12 @@ const Group = ({ title, children }: { title: string; children: ReactNode }) => (
 );
 
 /** Color theme plus background, glow, text size, corners, spacing and motion. Changes show right away and save on their own. */
-export default function AppearanceSettings({ initialTheme, initialLook }: { initialTheme: ThemeId; initialLook: Look }) {
+export default function AppearanceSettings({ initialTheme, initialLook, unlock }: { initialTheme: ThemeId; initialLook: Look; unlock?: string }) {
   const [theme, setThemeState] = useState<ThemeId>(initialTheme);
   const [look, setLook] = useState<Look>(initialLook);
   const [found, setFound] = useState(initialTheme === "blocks");
+  const [icarus, setIcarus] = useState(initialTheme === "icarus");
+
   const [hint, setHint] = useState<string | null>(null);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const taps = useRef(0);
@@ -98,6 +101,22 @@ export default function AppearanceSettings({ initialTheme, initialLook }: { init
     save("diastole", DEFAULT_LOOK);
   };
 
+  // Icarus: found by typing "icarus" into search (remembered on this device), or already in use.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (unlock === "icarus") {
+        addSecret("icarus");
+        setIcarus(true);
+        setHint("You found Icarus. ☀️ Fly high, just not too close to the sun.");
+        setThemeState("icarus");
+        save("icarus", look);
+      } else if (hasSecret("icarus")) setIcarus(true);
+    }, 0);
+    return () => clearTimeout(t);
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tap = () => {
     if (found) return;
     taps.current += 1;
@@ -135,7 +154,7 @@ export default function AppearanceSettings({ initialTheme, initialLook }: { init
 
       <Group title="Color">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEMES.filter((t) => !("hidden" in t) || found).map((t) => (
+          {THEMES.filter((t) => !("hidden" in t) || (t.id === "blocks" ? found : icarus)).map((t) => (
             <button
               key={t.id}
               type="button"
