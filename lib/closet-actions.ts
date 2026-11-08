@@ -34,3 +34,18 @@ export async function setActivityShoe(activityId: string, shoeId: string | null)
   revalidatePath("/account");
   return { ok: true as const };
 }
+
+/** Which bike a ride was on (null = untagged). The athlete or their coach. */
+export async function setActivityBike(activityId: string, bikeId: string | null) {
+  await requireUser();
+  if (!UUID.test(activityId) || (bikeId !== null && !/^[\w-]{1,40}$/.test(bikeId))) return { ok: false as const };
+  const supabase = await createClient();
+  const { data: act } = await supabase.from("activities").select("athlete_id").eq("id", activityId).maybeSingle();
+  if (!act) return { ok: false as const };
+  const { error } = bikeId
+    ? await supabase.from("activity_bikes").upsert({ activity_id: activityId, athlete_id: act.athlete_id, bike_id: bikeId }, { onConflict: "activity_id" })
+    : await supabase.from("activity_bikes").delete().eq("activity_id", activityId);
+  if (error) return { ok: false as const };
+  revalidatePath("/account");
+  return { ok: true as const };
+}

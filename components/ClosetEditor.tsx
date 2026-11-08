@@ -7,7 +7,7 @@ import GearAdder from "@/components/GearAdder";
 import { searchBikes } from "@/lib/bike-catalog";
 import { saveCloset } from "@/lib/closet-actions";
 import { searchShoes } from "@/lib/shoe-catalog";
-import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
+import { BIKE_KINDS, defaultShoe, EXTRAS, SHOE_KINDS, shoeWear, TRAINER_KINDS, type BikeKind, type BikeTotals, type Closet, type ShoeKind, type TrainerKind } from "@/lib/closet";
 
 const input = "min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-base sm:text-sm placeholder:text-white/35 focus:border-emerald-300/40 focus:outline-none";
 const select = `${input} pr-8`;
@@ -27,12 +27,14 @@ export default function ClosetEditor({
   athleteId,
   initial,
   mileage,
+  bikeMileage,
   units = "mi",
   today,
 }: {
   athleteId: string;
   initial: Closet;
   mileage?: Record<string, number>; // meters per shoe id
+  bikeMileage?: BikeTotals; // meters and rides per bike id
   units?: "mi" | "km";
   today: string; // YYYY-MM-DD in the athlete's timezone: new shoes count runs from today
 }) {
@@ -40,6 +42,8 @@ export default function ClosetEditor({
   const dist = (m: number) => `${Math.round(m / perUnit)} ${units}`;
   const [c, setC] = useState<Closet>(initial);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Just added a pair while an older one of the same type is worn out: offer to retire it.
+  const [retireAsk, setRetireAsk] = useState<{ id: string; model: string; miles: string; next: string } | null>(null);
   const [, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,12 +78,40 @@ export default function ClosetEditor({
               fallbackKind="daily"
               noun="shoe"
               placeholder="Add shoes: search, e.g. Pegasus"
-              onAdd={(model, kind) => update({ ...c, shoes: [...c.shoes, { id: newId(), model, kind, start_m: 0, since: today, default: !c.shoes.some((x) => !x.retired), retired: false }] })}
+              onAdd={(model, kind) => {
+                const id = newId();
+                update({ ...c, shoes: [...c.shoes, { id, model, kind, start_m: 0, since: today, default: !c.shoes.some((x) => !x.retired), retired: false }] });
+                const old = c.shoes.find((x) => !x.retired && x.kind === kind && mileage?.[x.id] !== undefined && shoeWear(mileage[x.id]) !== "fresh");
+                setRetireAsk(old ? { id: old.id, model: old.model, miles: dist(mileage![old.id]), next: id } : null);
+              }}
             />
           ) : (
             <p className="text-xs text-white/45">That&apos;s 12 pairs, the most the closet holds. Remove one to add another.</p>
           )}
         </div>
+        {retireAsk && (
+          <div className="mt-3 rounded-2xl border border-amber-200/20 bg-amber-200/[0.05] p-3 text-sm" role="status">
+            <p>
+              Retire your <span className="font-medium">{retireAsk.model}</span>? They&apos;re at {retireAsk.miles}.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const wasDefault = c.shoes.find((x) => x.id === retireAsk.id)?.default;
+                  update({ ...c, shoes: c.shoes.map((x) => (x.id === retireAsk.id ? { ...x, retired: true, default: false } : wasDefault && x.id === retireAsk.next ? { ...x, default: true } : x)) });
+                  setRetireAsk(null);
+                }}
+                className="min-h-11 rounded-xl bg-amber-200 px-4 font-medium text-black"
+              >
+                Retire them
+              </button>
+              <button type="button" onClick={() => setRetireAsk(null)} className="min-h-11 rounded-xl px-4 text-white/65 hover:bg-white/[0.06]">
+                Keep both
+              </button>
+            </div>
+          </div>
+        )}
         {shoeGroups.map((g) => (
           <div key={g.k} className="mt-4">
             <p className="mb-2 text-xs text-white/55">
@@ -170,7 +202,7 @@ export default function ClosetEditor({
               fallbackKind="road"
               noun="bike"
               placeholder="Add a bike: search, e.g. Cervélo P5"
-              onAdd={(model, kind) => update({ ...c, bikes: [...c.bikes, { id: newId(), model, kind }] })}
+              onAdd={(model, kind) => update({ ...c, bikes: [...c.bikes, { id: newId(), model, kind, since: today }] })}
             />
           ) : (
             <p className="text-xs text-white/45">That&apos;s 12 bikes, the most the closet holds. Remove one to add another.</p>
@@ -184,7 +216,14 @@ export default function ClosetEditor({
             <ul className="space-y-2">
               {g.items.map((b) => (
                 <li key={b.id} className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2 pl-3">
-                  <p className="min-w-0 flex-1 break-words font-medium leading-snug">{b.model || "Unnamed bike"}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-medium leading-snug">{b.model || "Unnamed bike"}</p>
+                    {bikeMileage?.[b.id] && bikeMileage[b.id].rides > 0 && (
+                      <p className="text-xs text-white/50">
+                        {dist(bikeMileage[b.id].m)} · {bikeMileage[b.id].rides} {bikeMileage[b.id].rides === 1 ? "ride" : "rides"}
+                      </p>
+                    )}
+                  </div>
                   <select className={`${select} max-w-[8.5rem]`} value={b.kind} aria-label={`Type for ${b.model || "this bike"}`} onChange={(e) => setBike(b.id, { kind: e.target.value as BikeKind })}>
                     {BIKE_KINDS.map(([k, l]) => (
                       <option key={k} value={k}>

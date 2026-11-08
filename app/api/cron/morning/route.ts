@@ -6,6 +6,7 @@ import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
 import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
+import { runMonthlyRecaps } from "@/lib/recap-job";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Vercel Cron calls this once each morning (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -47,6 +48,8 @@ export async function GET(request: NextRequest) {
   // Pod challenges that ended yesterday: final standings to everyone who joined (rules only).
   const { data: wrapped, error: wrapError } = await admin.rpc("finish_pod_challenges");
   results.challenges = wrapError ? { status: "error", reason: wrapError.message.slice(0, 200) } : { sent: wrapped };
+  // The 1st of the month: last month's recap for athletes, a team line for coaches.
+  results.recaps = await runMonthlyRecaps(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;
   // Read notifications clear themselves after a week; cleared ones are deleted after 30 days.

@@ -24,7 +24,7 @@ import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import CheckIn from "@/components/avatar/CheckIn";
 import ShoePicker from "@/components/ShoePicker";
-import { cleanCloset, defaultShoe } from "@/lib/closet";
+import { cleanCloset, defaultShoe, INDOOR_RIDE } from "@/lib/closet";
 import MusclesWorked from "@/components/avatar/MusclesWorked";
 import { normalizePain } from "@/lib/avatar/pain";
 import { normalizeStrain } from "@/lib/avatar/strain";
@@ -176,16 +176,19 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   // Running form: this run's summary (computed once if missing) and the athlete's earlier runs.
   // Visibility was settled above: whoever can open this run may see this athlete's workout details.
   const isRun = RUN_SPORT.test(act.sport ?? "");
-  // Shoes: which pair this run counts toward (own runs, or the coach's athlete).
-  const [{ data: gearRow }, { data: shoePick }] =
-    isRun && (isOwn || isCoach)
+  // Gear: which shoes a run, or which bike a ride, counts toward (own sessions, or the coach's athlete).
+  const isRide = !isRun && /cycl|bik|ride/i.test(act.sport ?? "") && !INDOOR_RIDE.test(act.sport ?? "");
+  const [{ data: gearRow }, { data: shoePick }, { data: bikePick }] =
+    (isRun || isRide) && (isOwn || isCoach)
       ? await Promise.all([
           supabase.from("athlete_gear").select("gear").eq("athlete_id", act.athlete_id).maybeSingle(),
-          supabase.from("activity_shoes").select("shoe_id").eq("activity_id", act.id).maybeSingle(),
+          isRun ? supabase.from("activity_shoes").select("shoe_id").eq("activity_id", act.id).maybeSingle() : Promise.resolve({ data: null }),
+          isRide ? supabase.from("activity_bikes").select("bike_id").eq("activity_id", act.id).maybeSingle() : Promise.resolve({ data: null }),
         ])
-      : [{ data: null }, { data: null }];
+      : [{ data: null }, { data: null }, { data: null }];
   const runCloset = cleanCloset(gearRow?.gear);
   const pickable = runCloset.shoes.filter((s) => !s.retired || s.id === shoePick?.shoe_id);
+  const onlyBike = runCloset.bikes.length === 1 ? runCloset.bikes[0] : null;
   let form: FormSummary | null = (detail?.form as FormSummary | null) ?? null;
   let formHistory: Awaited<ReturnType<typeof recentFormRuns>> = [];
   if (isRun && streams) {
@@ -316,6 +319,12 @@ export default async function ActivityPage({ params, searchParams }: { params: P
       {isRun && (isOwn || isCoach) && pickable.length > 0 && (
         <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-2">
           <ShoePicker activityId={act.id} shoes={pickable.map((s) => ({ id: s.id, model: s.model }))} defaultId={defaultShoe(runCloset)?.id ?? null} initial={shoePick?.shoe_id ?? null} />
+        </section>
+      )}
+
+      {isRide && (isOwn || isCoach) && runCloset.bikes.length > 0 && (
+        <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-2">
+          <ShoePicker gear="bike" activityId={act.id} shoes={runCloset.bikes.map((b) => ({ id: b.id, model: b.model }))} defaultId={onlyBike?.id ?? null} initial={bikePick?.bike_id ?? null} />
         </section>
       )}
 

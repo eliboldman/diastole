@@ -11,6 +11,8 @@ import SyncedAgo from "@/components/SyncedAgo";
 import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggestions";
 import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
+import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
+import WorkoutRequests from "@/components/coach/WorkoutRequests";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
 import { getRoster, type AthleteSummary } from "@/lib/coach-data";
@@ -100,6 +102,9 @@ export default async function TodayPage() {
           <ClipboardList size={16} aria-hidden /> Weekly digest
         </Link>
       </div>
+      {/* "Doing this instead": the coach's own schedule, or any athlete they name */}
+      <ChangeOfPlans today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} />
+      <WorkoutRequests coachId={coach.id} units={coach.units === "km" ? "km" : "mi"} />
       {/* The coach trains too: their own post-workout check */}
       <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
       <CheckinPrompt athleteId={coach.id} />

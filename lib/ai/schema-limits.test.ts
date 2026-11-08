@@ -3,9 +3,9 @@
 import assert from "node:assert/strict";
 
 import { unionParams, UNION_LIMIT } from "./schema-limits.ts";
-import { BuildOut, FixOut, PlanOut } from "./step-schema.ts";
+import { BuildOut, FixOut, PlanOut, SwapOut } from "./step-schema.ts";
 
-for (const [name, schema] of Object.entries({ BuildOut, PlanOut, FixOut })) {
+for (const [name, schema] of Object.entries({ BuildOut, PlanOut, FixOut, SwapOut })) {
   const n = unionParams(schema);
   assert.ok(n <= UNION_LIMIT, `${name} has ${n} nullable/union parameters; the API allows ${UNION_LIMIT}`);
 }

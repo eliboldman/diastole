@@ -55,3 +55,18 @@ export const PlanOut = z.object({
   assumptions: z.string().describe("anything assumed or missing (e.g. no current FTP), for the coach; empty if none"),
 });
 export const FixOut = z.object({ workouts: z.array(PlanWorkout) });
+
+/** "Change of plans": what to remove, move and add for one athlete. No nullable fields (empty = none). */
+export const SwapOut = z.object({
+  athlete_id: z.string().describe("id from the roster: who this is about; the coach themself unless another athlete is named"),
+  summary: z.string().describe("one short line for the coach, e.g. Swap today's ride for an easy 75 min run"),
+  question: z.string().describe("only if you truly can't tell what the coach wants: one short question; otherwise empty"),
+  remove_ids: z.array(z.string()).describe("ids of scheduled workouts to take off the calendar"),
+  moves: z.array(z.object({ id: z.string(), date: z.string().describe("YYYY-MM-DD") })),
+  adds: z.array(
+    z.object({
+      date: z.string().describe("YYYY-MM-DD"),
+      description: z.string().describe("the new workout in plain words for the workout builder: sport, length (time or distance) and effort, plus structure if any"),
+    }),
+  ),
+});

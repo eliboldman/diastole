@@ -14,7 +14,7 @@ import { FORM, type FormMetric } from "@/lib/activity/form";
 import { recentFormRuns } from "@/lib/activity/form-store";
 import type { ReadinessRow, WellnessPoint } from "@/lib/coach-data";
 import { cleanCloset } from "@/lib/closet";
-import { getShoeMileage } from "@/lib/shoes";
+import { getBikeMileage, getShoeMileage } from "@/lib/shoes";
 import { resolveLayout, visibleSections } from "@/lib/layout-prefs";
 import { familyOf, oneFamily } from "@/lib/readiness/source";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
@@ -50,7 +50,7 @@ export default async function MePage() {
   const today = rows[0];
   const closet = cleanCloset(gearRow?.gear);
   const localToday = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
-  const mileage = await getShoeMileage(supabase, me.id, closet, me.timezone);
+  const [mileage, bikeMiles] = await Promise.all([getShoeMileage(supabase, me.id, closet, me.timezone), getBikeMileage(supabase, me.id, closet, me.timezone)]);
   // A brand-new athlete gets one clear card instead of eight empty tiles.
   const hasData = rows.some((r) => r.overall !== "unknown") || trend.some((w) => w.hrv_ms ?? w.resting_hr ?? w.sleep_seconds ?? w.stress_avg);
 
@@ -138,7 +138,7 @@ export default async function MePage() {
         <p className="mb-5 mt-1 text-sm text-white/55">
           Your shoes, bikes and the gear you can use. Your coach plans around it, and each workout shows what to pack.
         </p>
-        <ClosetEditor athleteId={me.id} initial={closet} mileage={mileage} units={me.units} today={localToday} />
+        <ClosetEditor athleteId={me.id} initial={closet} mileage={mileage} bikeMileage={bikeMiles} units={me.units} today={localToday} />
       </section>
     ),
     story: (

@@ -7,7 +7,35 @@ export const PERIODS: { id: StoryPeriod; label: string; days: number }[] = [
   { id: "quarter", label: "Last 3 months", days: 91 },
   { id: "year", label: "Last 12 months", days: 365 },
 ];
-export const asPeriod = (v: unknown): StoryPeriod => (PERIODS.some((p) => p.id === v) ? (v as StoryPeriod) : "quarter");
+/** A calendar month, "2026-10". */
+export const isMonth = (v: unknown): v is string => typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+/** A rolling period id, or a calendar month ("2026-10"); anything else falls back to the last 3 months. */
+export const asPeriod = (v: unknown): StoryPeriod | string => (isMonth(v) ? v : PERIODS.some((p) => p.id === v) ? (v as StoryPeriod) : "quarter");
+
+const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export const monthName = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1];
+/** The month before ("2026-01" → "2025-12"). */
+export function prevMonth(m: string) {
+  const y = Number(m.slice(0, 4));
+  const mo = Number(m.slice(5, 7));
+  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
+}
+const nextMonth = (m: string) => {
+  const y = Number(m.slice(0, 4));
+  const mo = Number(m.slice(5, 7));
+  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, "0")}`;
+};
+
+/** Local dates [from, to) for a period, with the labels the page and image use. */
+export function periodRange(period: string, today: string): { from: string; to: string; label: string; heading: string; monthly: boolean } {
+  if (isMonth(period)) {
+    const year = period.slice(0, 4);
+    return { from: `${period}-01`, to: `${nextMonth(period)}-01`, label: `${monthName(period)} ${year}`, heading: monthName(period), monthly: true };
+  }
+  const p = PERIODS.find((x) => x.id === period) ?? PERIODS[1];
+  return { from: addDays(today, -p.days + 1), to: addDays(today, 1), label: p.label, heading: "season", monthly: false };
+}
 
 type Act = { sport: string | null; start_time: string; duration_s: number | null; distance_m: number | null };
 export type Story = {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { cleanCloset, closetForPrompt, defaultShoe, EMPTY_CLOSET, isEmptyCloset, packFor, SHOE_REPLACE_M, shoeMileage, shoeWear } from "./closet.ts";
+import { bikeMileage, cleanCloset, closetForPrompt, defaultShoe, EMPTY_CLOSET, isEmptyCloset, packFor, SHOE_REPLACE_M, shoeMileage, shoeWear } from "./closet.ts";
 
 const c = cleanCloset({
   shoes: [
@@ -95,4 +95,16 @@ assert.equal(shoeWear(0), "fresh");
 assert.ok(!packFor({ sport: "run", title: "Race day tempo" }, sh).some((p) => p.item === "Vaporfly"), "retired shoes aren't packed");
 const worn = packFor({ sport: "run", title: "Easy" }, sh, { n: SHOE_REPLACE_M + 10 });
 assert.ok(worn[0].why?.includes("400 miles"));
+// Bike mileage: tagged rides, and untagged outdoor rides only when there's one bike (from its add date).
+const oneBike = cleanCloset({ bikes: [{ id: "b1", model: "Tarmac", kind: "road", since: "2026-11-01" }] });
+const rides = [
+  { id: "x1", date: "2026-11-02", distance_m: 40000, indoor: false },
+  { id: "x2", date: "2026-11-03", distance_m: 30000, indoor: true },
+  { id: "x3", date: "2026-10-30", distance_m: 50000, indoor: false },
+];
+assert.deepEqual(bikeMileage(oneBike, rides, {}), { b1: { m: 40000, rides: 1 } });
+const twoBikes = cleanCloset({ bikes: [{ id: "b1", model: "Tarmac", kind: "road", since: "2026-11-01" }, { id: "b2", model: "P5", kind: "tt" }] });
+assert.deepEqual(bikeMileage(twoBikes, rides, { x3: "b2" }), { b1: { m: 0, rides: 0 }, b2: { m: 50000, rides: 1 } }, "two bikes: only tagged rides count");
+assert.equal(cleanCloset({ bikes: [{ model: "X", since: "nope" }] }).bikes[0].since, null);
+
 console.log("closet: all passed");

@@ -886,3 +886,10 @@ body {
   background: var(--color-emerald-300);
   border: 3px solid white;
 }
+
+/* Phones: room under the page for the fixed tab bar (components/layout/Sidebar.tsx). */
+@media (max-width: 767px) {
+  body:has(.tabbar) {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

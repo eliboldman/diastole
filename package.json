@@ -20,7 +20,7 @@
     "test:stickers": "node lib/pod-stickers.test.ts",
     "test:fit": "node lib/activity/fit.test.ts",
     "test:compare": "node lib/activity/compare.test.ts",
-    "test:connect": "node lib/workouts/connect-import.test.ts",
+    "test:connect": "node lib/workouts/connect-import.test.ts && node lib/workouts/json-import.test.ts",
     "test:form": "node lib/activity/form.test.ts",
     "test:swim": "node lib/activity/swim.test.ts",
     "test:bests": "node lib/activity/bests.test.ts",

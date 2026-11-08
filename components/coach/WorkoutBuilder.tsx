@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { draftWhyForBuilder } from "@/lib/ai/why";
+import { requestWorkout, saveMyWorkout } from "@/lib/workouts/athlete-actions";
 import { describe } from "@/lib/workouts/describe";
 import {
   DRILLS,
@@ -509,7 +510,12 @@ export default function WorkoutBuilder({
   initial,
   startSport = "run",
   units = "mi",
+  mode = "coach",
+  hasCoach = true,
 }: {
+  // athlete: their own builder. No AI; saves to My workouts and asks the coach to add it.
+  mode?: "coach" | "athlete";
+  hasCoach?: boolean;
   startSport?: Sport;
   units?: "mi" | "km";
   athleteId: string;
@@ -537,7 +543,8 @@ export default function WorkoutBuilder({
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
-  const editable = !initial || initial.status === "draft";
+  const athleteMode = mode === "athlete";
+  const editable = athleteMode || !initial || initial.status === "draft";
 
   // Describe it: Claude turns the coach's words into steps that fill this builder for review.
   const [prompt, setPrompt] = useState("");
@@ -556,6 +563,7 @@ export default function WorkoutBuilder({
       if (r.description) setDescription(r.description);
       navigator.vibrate?.([8, 30, 8]);
     });
+  const mine = () => ({ id, title, sport, description, steps: stripIds(steps), pool: swim ? pool : null });
   const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why });
   const draftTheWhy = () =>
     startDraft(async () => {
@@ -590,7 +598,7 @@ export default function WorkoutBuilder({
 
   return (
     <div className="grid gap-5">
-      {editable && (
+      {editable && !athleteMode && (
         <section className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.04] p-3">
           <label className="block">
             <span className="mb-1.5 flex items-center gap-2 text-sm font-medium">
@@ -666,13 +674,13 @@ export default function WorkoutBuilder({
       </div>
       <textarea
         className={`${field} min-h-20`}
-        placeholder="Description for the athlete (optional)"
+        placeholder={athleteMode ? "Notes (optional)" : "Description for the athlete (optional)"}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         disabled={!editable}
         maxLength={1024}
       />
-      {editable && (
+      {editable && !athleteMode && (
         <div>
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Why this workout</span>
@@ -823,7 +831,32 @@ export default function WorkoutBuilder({
         </p>
       )}
 
-      {editable ? (
+      {athleteMode ? (
+        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <button
+            disabled={pending}
+            onClick={() => run(() => saveMyWorkout(mine()))}
+            className="min-h-12 rounded-2xl border border-white/15 bg-white/[0.05] px-5 text-sm font-medium hover:bg-white/[0.1] disabled:opacity-50"
+          >
+            Save to My workouts
+          </button>
+          {hasCoach && (
+            <button
+              disabled={pending}
+              onClick={() =>
+                // The request's id is a calendar entry, not this library workout: don't keep it.
+                run(async () => {
+                  const r = await requestWorkout({ ...mine(), id: undefined, date });
+                  return r.ok ? { ok: true, message: r.message } : r;
+                })
+              }
+              className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black transition active:scale-[0.98] disabled:opacity-50"
+            >
+              Ask coach to add it on {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+            </button>
+          )}
+        </div>
+      ) : editable ? (
         <div className="flex flex-wrap items-center gap-3">
           <button
             disabled={pending}

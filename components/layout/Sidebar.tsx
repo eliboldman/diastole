@@ -33,6 +33,23 @@ const NAV: Record<NavRole, Item[]> = {
   ],
 };
 
+// Phones: a fixed bar at the bottom with the four most used places. Everything else stays in the
+// slide-out menu (tap the logo), and Messages sits in the top bar.
+const TABS: Record<NavRole, Item[]> = {
+  coach: [
+    { label: "Today", href: "/dashboard", icon: Sun, match: /^\/digest(\/|$)/ },
+    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods)(\/|$)|^\/activity\// },
+    { label: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
+    { label: "Messages", href: "/messages", icon: MessageCircle },
+  ],
+  athlete: [
+    { label: "Me", href: "/me", icon: Sun, match: /^\/me$|^\/me\/story|^\/(account|connect|races)(\/|$)/ },
+    { label: "Pods", href: "/me/pods", icon: Orbit },
+    { label: "Training", href: "/training", icon: Dumbbell, match: /^\/(calendar|activity)(\/|$)/ },
+    { label: "Fuel", href: "/fuel", icon: Utensils },
+  ],
+};
+
 // Desktop has room for one-click shortcuts below the tabs.
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
@@ -117,10 +134,36 @@ export default function Sidebar({ role = "coach" }: { role?: NavRole }) {
           <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
           <div className="flex items-center">
             <SearchButton />
+            {role === "athlete" && (
+              <Link href="/messages" aria-label="Messages" className={`flex h-11 w-11 items-center justify-center rounded-xl ${pathname.startsWith("/messages") ? "text-emerald-200" : "text-white/70"}`}>
+                <MessageCircle size={19} />
+              </Link>
+            )}
             <NotificationButton />
           </div>
         </div>
       </header>
+
+      {/* Mobile: the tab bar */}
+      <nav aria-label="Tabs" className="tabbar fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">
+        <ul className="grid grid-cols-4">
+          {TABS[role].map((item) => {
+            const active = isActive(pathname, item);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition active:scale-95 ${active ? "text-emerald-200" : "text-white/55"}`}
+                >
+                  <item.icon size={22} strokeWidth={active ? 2.2 : 1.7} aria-hidden />
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
     </>
   );
 }

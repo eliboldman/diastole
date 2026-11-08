@@ -6,6 +6,7 @@ import SyncedAgo from "@/components/SyncedAgo";
 
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
+import GearCheck from "@/components/GearCheck";
 import Streaks from "@/components/Streaks";
 import Welcome from "@/components/Welcome";
 import FuelToday from "@/components/fuel/FuelToday";
@@ -70,6 +71,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     checkin: (
       <>
       <CheckinPrompt athleteId={me.id} />
+      </>
+    ),
+    gear: (
+      <>
+      <GearCheck athleteId={me.id} today={today} />
       </>
     ),
     readiness: (

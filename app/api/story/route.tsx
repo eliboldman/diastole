@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 
-import { asPeriod, buildStory, PERIODS } from "@/lib/story";
+import { asPeriod, periodRange } from "@/lib/story";
+import { loadStory } from "@/lib/story-data";
 import { createClient, getProfile } from "@/lib/supabase/server";
 
 // The signed-in athlete's season story as a 1080x1920 PNG (phone story size). Only ever their own.
@@ -13,25 +14,16 @@ const SPORT_COLOR = { run: "#6ee7b7", bike: "#7dd3fc", swim: "#c4b5fd", other: "
 export async function GET(request: NextRequest) {
   const me = await getProfile();
   if (!me) return new Response("Sign in first.", { status: 401 });
-  const period = PERIODS.find((p) => p.id === asPeriod(request.nextUrl.searchParams.get("period")))!;
-  const since = new Date(Date.now() - period.days * 86_400_000);
-  const sinceIso = since.toISOString();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
-
-  const supabase = await createClient();
-  const [{ data: acts }, { count: prs }, { count: races }, { data: ready }] = await Promise.all([
-    supabase.from("activities").select("sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).gte("start_time", sinceIso).limit(2000),
-    supabase.from("achievements").select("id", { count: "exact", head: true }).eq("athlete_id", me.id).like("key", "pr_%").gte("achieved_at", sinceIso),
-    supabase.from("races").select("id", { count: "exact", head: true }).eq("athlete_id", me.id).gte("race_date", sinceIso.slice(0, 10)).lte("race_date", today),
-    supabase.from("readiness_scores").select("overall").eq("athlete_id", me.id).gte("date", sinceIso.slice(0, 10)),
-  ]);
-  const s = buildStory({ activities: acts ?? [], prs: prs ?? 0, races: races ?? 0, readiness: (ready ?? []).map((r) => r.overall as string) });
-
+  const period = periodRange(asPeriod(request.nextUrl.searchParams.get("period")), today);
+  const s = await loadStory(await createClient(), me.id, period.from, period.to, me.timezone);
   const mi = me.units === "mi";
   const dist = (km: number) => (km < 1 ? null : `${Math.round(mi ? km / 1.609344 : km).toLocaleString("en-US")} ${mi ? "mi" : "km"}`);
   const maxH = Math.max(1, ...s.bySport.map((x) => x.hours));
   const first = (me.full_name ?? "").trim().split(/\s+/)[0] || "";
-  const range = `${since.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const fmt = (d: string, year = false) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: year ? "numeric" : undefined, timeZone: "UTC" });
+  const lastDay = new Date(Date.parse(`${period.to}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const range = `${fmt(period.from)} – ${fmt(lastDay > today ? today : lastDay, true)}`;
   const tiles = [
     s.longest ? { k: "Longest session", v: s.longest.minutes >= 60 ? `${Math.floor(s.longest.minutes / 60)}h ${s.longest.minutes % 60}m` : `${s.longest.minutes} min`, sub: s.longest.label } : null,
     s.bestStreakWeeks >= 2 ? { k: "Best streak", v: `${s.bestStreakWeeks} weeks`, sub: "in a row" } : null,
@@ -52,8 +44,8 @@ export async function GET(request: NextRequest) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", marginTop: 120 }}>
-          <div style={{ fontSize: 34, letterSpacing: 8, color: ACCENT, textTransform: "uppercase" }}>{period.label}</div>
-          <div style={{ fontSize: 76, fontWeight: 700, marginTop: 18, letterSpacing: -2, lineHeight: 1.05 }}>{first ? `${first}'s season` : "My season"}</div>
+          <div style={{ fontSize: 34, letterSpacing: 8, color: ACCENT, textTransform: "uppercase" }}>{period.monthly ? "Monthly recap" : period.label}</div>
+          <div style={{ fontSize: 76, fontWeight: 700, marginTop: 18, letterSpacing: -2, lineHeight: 1.05 }}>{first ? `${first}'s ${period.heading}` : `My ${period.heading}`}</div>
           <div style={{ fontSize: 32, color: "rgba(255,255,255,0.55)", marginTop: 14 }}>{range}</div>
         </div>
 

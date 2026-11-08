@@ -51,7 +51,8 @@ export type ExtraKey = (typeof EXTRAS)[number][0];
  * history, left out of packing.
  */
 export type Shoe = { id: string; model: string; kind: ShoeKind; start_m: number; since: string | null; default: boolean; retired: boolean };
-export type Bike = { id: string; model: string; kind: BikeKind };
+/** `since`: the day the bike was added; with only one bike, untagged outdoor rides from then on count toward it. */
+export type Bike = { id: string; model: string; kind: BikeKind; since: string | null };
 export type Closet = {
   shoes: Shoe[];
   bikes: Bike[];
@@ -89,7 +90,12 @@ export function cleanCloset(raw: unknown): Closet {
     else sh.default = false;
   }
   const bikes = list(r.bikes)
-    .map((b: Record<string, unknown>, i) => ({ id: id(b?.id, i), model: text(b?.model, 60), kind: oneOf(b?.kind, BIKE_KINDS, "road") }))
+    .map((b: Record<string, unknown>, i) => ({
+      id: id(b?.id, i),
+      model: text(b?.model, 60),
+      kind: oneOf(b?.kind, BIKE_KINDS, "road"),
+      since: typeof b?.since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.since) ? b.since : null,
+    }))
     .filter((b) => b.model);
   const t = (r.trainer && typeof r.trainer === "object" ? r.trainer : {}) as Record<string, unknown>;
   const trainerKind = oneOf(t.kind, TRAINER_KINDS, "none");
@@ -149,6 +155,29 @@ export function shoeMileage(c: Closet, runs: RunForShoes[], assigned: Record<str
     } else if (def && (!def.since || r.date >= def.since)) out[def.id] += d;
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k]);
+  return out;
+}
+
+export type RideForBikes = { id: string; date: string; distance_m: number | null; indoor: boolean };
+export type BikeTotals = Record<string, { m: number; rides: number }>;
+
+/** Indoor and virtual rides happen on a trainer, not a bike's tires and chain. */
+export const INDOOR_RIDE = /indoor|virtual|trainer|spin|zwift|rouvy|erg/i;
+
+/**
+ * Distance and ride count on each bike: rides tagged to it, plus (when there's exactly one bike)
+ * untagged outdoor rides on or after the day it was added.
+ */
+export function bikeMileage(c: Closet, rides: RideForBikes[], assigned: Record<string, string>): BikeTotals {
+  const out: BikeTotals = Object.fromEntries(c.bikes.map((b) => [b.id, { m: 0, rides: 0 }]));
+  const only = c.bikes.length === 1 ? c.bikes[0] : null;
+  for (const r of rides) {
+    const to = assigned[r.id] ?? (only && !r.indoor && only.since && r.date >= only.since ? only.id : null);
+    if (!to || !(to in out)) continue;
+    out[to].m += Math.max(0, r.distance_m ?? 0);
+    out[to].rides += 1;
+  }
+  for (const k of Object.keys(out)) out[k].m = Math.round(out[k].m);
   return out;
 }
 

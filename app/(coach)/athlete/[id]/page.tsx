@@ -25,8 +25,9 @@ import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
 import ClosetEditor from "@/components/ClosetEditor";
+import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
-import { getShoeMileage } from "@/lib/shoes";
+import { getBikeMileage, getShoeMileage } from "@/lib/shoes";
 
 export default async function AthletePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,7 +60,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const athleteTz = profile.timezone || "America/Chicago";
   const athleteToday = new Date().toLocaleDateString("en-CA", { timeZone: athleteTz });
   const closet = cleanCloset(gearRow?.gear);
-  const shoeMiles = await getShoeMileage(supabase, id, closet, athleteTz);
+  const [shoeMiles, bikeMiles] = await Promise.all([getShoeMileage(supabase, id, closet, athleteTz), getBikeMileage(supabase, id, closet, athleteTz)]);
   const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
   const [mealDay, races] = await Promise.all([getMealDay(id, athleteToday, athleteTz, fuelToday.level), getRaces(id, { from: athleteToday, limit: 10 })]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
@@ -100,6 +101,8 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
         </div>
         <FlagBadge flag={overall} large />
       </div>
+
+      <ChangeOfPlans athleteId={profile.id} today={athleteToday} placeholder={`Change of plans for ${(profile.full_name ?? "").split(" ")[0] || "them"}? e.g. move Tuesday's intervals to Thursday`} />
 
       <ReadinessAreas today={today} />
       <ReadinessTrend trend={trend} readiness={readiness} />
@@ -191,7 +194,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
           <details className="mt-3">
             <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-emerald-200">Edit closet</summary>
             <div className="mt-3">
-              <ClosetEditor athleteId={profile.id} initial={closet} mileage={shoeMiles} units={me.units} today={athleteToday} />
+              <ClosetEditor athleteId={profile.id} initial={closet} mileage={shoeMiles} bikeMileage={bikeMiles} units={me.units} today={athleteToday} />
             </div>
           </details>
           <p className="mt-3 text-xs text-white/45">Suggested workouts use this, and each workout shows {(profile.full_name || "the athlete").split(" ")[0]} what to pack.</p>

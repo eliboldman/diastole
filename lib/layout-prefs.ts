@@ -7,6 +7,7 @@ export const LAYOUT_PAGES = {
     { key: "progress", label: "Weekly progress" },
     { key: "streaks", label: "Streaks" },
     { key: "checkin", label: "Check-in prompt" },
+    { key: "gear", label: "Which shoes?" },
     { key: "readiness", label: "Readiness" },
     { key: "fuel", label: "Today's fuel" },
     { key: "upcoming", label: "Coming up" },
