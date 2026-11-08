@@ -48,3 +48,6 @@ next-env.d.ts
 *.MOV
 *.m4v
 recovery-videos/
+
+# Walkthrough recordings (walkthroughs/record.ts output)
+walkthroughs/out/

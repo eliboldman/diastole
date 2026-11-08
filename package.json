@@ -10,6 +10,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:db": "node supabase/tests/rls.test.mjs",
+    "walkthrough:record": "node walkthroughs/record.ts",
+    "walkthrough:edit": "node walkthroughs/edit.ts",
+    "walkthrough:upload": "node walkthroughs/upload.ts",
     "test:workouts": "node lib/workouts/garmin-format.test.ts",
     "test:readiness": "node lib/readiness/engine.test.ts",
     "test:adjust": "node lib/workouts/adjust.test.ts",
@@ -63,6 +66,7 @@
     "@types/three": "0.180.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "playwright": "^1.65.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

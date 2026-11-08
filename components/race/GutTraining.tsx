@@ -57,7 +57,7 @@ export default function GutTraining({ sessions, best }: { sessions: { id: string
           </div>
         </fieldset>
         <div className="col-span-2 flex items-center gap-3">
-          <button disabled={pending || !f.comfort || !f.carbs} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-[#0d1513] disabled:opacity-50">
+          <button disabled={pending || !f.comfort || !f.carbs} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-black disabled:opacity-50">
             Log session
           </button>
           {msg && <p className="text-sm text-white/60">{msg}</p>}

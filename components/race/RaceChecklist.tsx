@@ -26,7 +26,7 @@ export default function RaceChecklist({ raceId, items, done }: { raceId: string;
               }
               className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-left text-sm"
             >
-              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${on ? "border-emerald-300 bg-emerald-300 text-[#0d1513]" : "border-white/25"}`}>{on && <Check size={15} strokeWidth={3} />}</span>
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${on ? "border-emerald-300 bg-emerald-300 text-black" : "border-white/25"}`}>{on && <Check size={15} strokeWidth={3} />}</span>
               <span className={on ? "text-white/50 line-through" : "text-white/85"}>{it.label}</span>
             </button>
           </li>

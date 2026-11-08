@@ -78,7 +78,7 @@ export default function SweatTest({ units, tests }: { units: "mi" | "km"; tests:
           </select>
         </label>
         <div className="col-span-2 flex flex-wrap items-center gap-3">
-          <button disabled={pending || !f.pre || !f.post} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-[#0d1513] disabled:opacity-50">
+          <button disabled={pending || !f.pre || !f.post} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-black disabled:opacity-50">
             Work it out
           </button>
           {msg && <p className="text-sm text-white/70">{msg}</p>}

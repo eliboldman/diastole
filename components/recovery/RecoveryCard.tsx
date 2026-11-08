@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Leaf } from "lucide-react";
 
+import Spotlight from "@/components/Spotlight";
+import { TIPS } from "@/lib/discovery";
 import { minutesLabel, routineSeconds, suggestRoutine, type RoutineItem } from "@/lib/recovery/catalog";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
  * Recovery on Today, only when there's a reason: a routine the coach assigned (today or overdue
  * this week), else a suggestion from recent sore spots or a low readiness day. Hidden otherwise.
  */
-export default async function RecoveryCard({ athleteId, today }: { athleteId: string; today: string }) {
+export default async function RecoveryCard({ athleteId, today, tipSeen = true }: { athleteId: string; today: string; tipSeen?: boolean }) {
   const supabase = await createClient();
   const day = (n: number) => new Date(Date.parse(`${today}T12:00:00Z`) + n * 86_400_000).toISOString();
   const [{ data: assigned }, { data: checks }, { data: ready }, { data: doneToday }] = await Promise.all([
@@ -29,6 +31,8 @@ export default async function RecoveryCard({ athleteId, today }: { athleteId: st
   if (!item) return null;
 
   return (
+    <>
+    {!tipSeen && <Spotlight tip={TIPS.recovery} seen={false} />}
     <section className="row-in mt-6 rounded-[28px] border border-emerald-300/15 bg-gradient-to-br from-emerald-300/[0.07] to-white/[0.02] p-5">
       <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-emerald-200/70">
         <Leaf size={13} aria-hidden /> {item.label}
@@ -44,5 +48,6 @@ export default async function RecoveryCard({ athleteId, today }: { athleteId: st
         </Link>
       </div>
     </section>
+    </>
   );
 }

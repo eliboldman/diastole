@@ -1,0 +1,35 @@
+// Spotlight tips (shown once, the first time a feature matters) and "What's new" (once per
+// release, at most 3 highlights). Dismissed ids live in profiles.seen_tips. Pure.
+
+export type Tip = { id: string; title: string; body: string };
+
+export const TIPS = {
+  lifeHappened: { id: "tip:life-happened", title: "Missed one? It happens.", body: "Tap “Life happened?” and say what's up. Small changes fix themselves; bigger ones go to your coach." },
+  recovery: { id: "tip:recovery", title: "Recovery, with your coach's demos", body: "Follow along with a timer and spoken cues. It counts toward your week." },
+  gear: { id: "tip:gear", title: "Keep your shoe miles right", body: "One tap tells Diastole which pair (or bike) you used, so you know when they're worn." },
+  changeOfPlans: { id: "tip:change-of-plans", title: "Plans changed? Just say it.", body: "Type something like “easy long run instead of the bike today” and approve the swap in one tap." },
+  myWorkouts: { id: "tip:my-workouts", title: "Build your own sessions", body: "Make workouts or import a set, then ask your coach to add one to your calendar." },
+} satisfies Record<string, Tip>;
+
+export type Release = { id: string; athlete: Highlight[]; coach: Highlight[] };
+export type Highlight = { emoji: string; title: string; body: string; href?: string };
+
+/** Newest first. Only the newest release shows, and only until it's dismissed. */
+export const RELEASES: Release[] = [
+  {
+    id: "new:2026-11b",
+    athlete: [
+      { emoji: "🌿", title: "Recovery routines", body: "Rolling, stretching and breathing with your coach's demos.", href: "/recovery" },
+      { emoji: "🤷", title: "Life happened?", body: "Short on time or feeling off? Your plan adjusts.", href: "/me" },
+      { emoji: "🔨", title: "Build your own workouts", body: "Make or import sessions and ask your coach to add them.", href: "/training/mine" },
+    ],
+    coach: [
+      { emoji: "🔀", title: "Change of plans", body: "Say what's changing in a sentence; approve in one tap.", href: "/dashboard" },
+      { emoji: "🌿", title: "Recovery library", body: "Build routines from your demos and assign them like workouts.", href: "/lab/recovery" },
+      { emoji: "📥", title: "Requests and plan changes", body: "Athletes' requests and life-happened swaps land on Today.", href: "/dashboard" },
+    ],
+  },
+];
+
+export const latestRelease = () => RELEASES[0] ?? null;
+export const seen = (list: string[] | null | undefined, id: string) => (list ?? []).includes(id);

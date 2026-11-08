@@ -12,6 +12,9 @@ import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggest
 import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
+import Spotlight from "@/components/Spotlight";
+import WhatsNew from "@/components/WhatsNew";
+import { latestRelease, seen, TIPS } from "@/lib/discovery";
 import WorkoutRequests from "@/components/coach/WorkoutRequests";
 import PlanChanges from "@/components/coach/PlanChanges";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -93,6 +96,8 @@ export default async function TodayPage() {
   );
   const tone = counts.red ? "red" : counts.yellow ? "yellow" : "green";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: coach.timezone });
+  const { data: prof } = await supabase.from("profiles").select("seen_tips").eq("id", coach.id).maybeSingle();
+  const release = latestRelease();
 
   return (
     <DashboardShell tone={tone}>
@@ -104,6 +109,8 @@ export default async function TodayPage() {
         </Link>
       </div>
       {/* "Doing this instead": the coach's own schedule, or any athlete they name */}
+      {release && !seen(prof?.seen_tips, release.id) && <WhatsNew id={release.id} items={release.coach} />}
+      <Spotlight tip={TIPS.changeOfPlans} seen={seen(prof?.seen_tips, TIPS.changeOfPlans.id)} />
       <ChangeOfPlans today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} />
       <PlanChanges coachId={coach.id} />
       <WorkoutRequests coachId={coach.id} units={coach.units === "km" ? "km" : "mi"} />

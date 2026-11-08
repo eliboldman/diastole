@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, Flag, FlaskConical, LogOut, MessageCircle, Orbit, Settings, Sparkles, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, Flag, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Settings, Sparkles, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -63,6 +63,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "My races", href: "/races", icon: Flag },
     { label: "Season story", href: "/me/story", icon: Sparkles },
     { label: "Settings", href: "/account/settings", icon: Settings },
+    { label: "Help", href: "/help", icon: LifeBuoy },
   ],
   athlete: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
@@ -70,6 +71,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "My pods", href: "/me/pods", icon: Orbit },
     { label: "Season story", href: "/me/story", icon: Sparkles },
     { label: "Settings", href: "/account/settings", icon: Settings },
+    { label: "Help", href: "/help", icon: LifeBuoy },
   ],
 };
 

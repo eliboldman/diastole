@@ -7,6 +7,9 @@ import SyncedAgo from "@/components/SyncedAgo";
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import WeeklyProgress from "@/components/WeeklyProgress";
 import GearCheck from "@/components/GearCheck";
+import Spotlight from "@/components/Spotlight";
+import WhatsNew from "@/components/WhatsNew";
+import { latestRelease, seen, TIPS } from "@/lib/discovery";
 import LifeHappened from "@/components/LifeHappened";
 import PausedCard from "@/components/PausedCard";
 import RecoveryCard from "@/components/recovery/RecoveryCard";
@@ -44,7 +47,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
     supabase.from("profiles").select("welcomed_at").eq("id", me.id).maybeSingle(),
     searchParams,
-    supabase.from("profiles").select("layout, health_pause").eq("id", me.id).maybeSingle(),
+    supabase.from("profiles").select("layout, health_pause, seen_tips").eq("id", me.id).maybeSingle(),
   ]);
   // "Life happened": yesterday's session if it wasn't done, and sick/injured mode.
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
@@ -55,6 +58,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const pause = (layoutRow?.health_pause ?? null) as { kind: "sick" | "injured"; since: string } | null;
   const todayWorkout = (workouts ?? []).find((w) => w.scheduled_date === today && (w.status === "approved" || w.status === "sent")) ?? null;
   const hasCoach = Boolean(me.coach_id && me.coach_id !== me.id);
+  const seenTips = (layoutRow?.seen_tips ?? []) as string[];
+  const release = latestRelease();
 
   const invites = (memberships ?? []).filter((m) => m.status === "invited");
   const pods = (memberships ?? []).filter((m) => m.status === "active");
@@ -87,12 +92,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     ),
     gear: (
       <>
-      <GearCheck athleteId={me.id} today={today} />
+      <GearCheck athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.gear.id)} />
       </>
     ),
     recovery: (
       <>
-      <RecoveryCard athleteId={me.id} today={today} />
+      <RecoveryCard athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.recovery.id)} />
       </>
     ),
     readiness: (
@@ -150,6 +155,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         {device?.source === "garmin" && workouts?.length ? (
           <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
         ) : null}
+        {!pause && missedRow && <Spotlight tip={TIPS.lifeHappened} seen={seen(seenTips, TIPS.lifeHappened.id)} />}
         {!pause && <LifeHappened today={todayWorkout ? { id: todayWorkout.id, title: todayWorkout.title } : null} missed={missedRow ?? null} hasCoach={hasCoach} />}
       </section>
       </>
@@ -213,6 +219,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <LayoutCustomizer page="today" initial={layout} />
       </div>
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
+
+      {!showWelcome && release && !seen(seenTips, release.id) && <WhatsNew id={release.id} items={me.role === "coach" ? release.coach : release.athlete} />}
 
       {pause && <PausedCard kind={pause.kind} since={pause.since} today={today} logged={symptomsToday ?? null} hasCoach={hasCoach} />}
 

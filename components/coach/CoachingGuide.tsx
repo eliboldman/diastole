@@ -74,7 +74,7 @@ export default function CoachingGuide({ initial }: { initial: string }) {
                 router.refresh();
               })
             }
-            className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-[#0d1513] disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-black disabled:opacity-50"
           >
             Save all
           </button>

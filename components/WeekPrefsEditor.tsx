@@ -93,7 +93,7 @@ export default function WeekPrefsEditor({ initial, athleteId }: { initial: WeekP
               }
             })
           }
-          className="min-h-11 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-[#0d1513] disabled:opacity-40"
+          className="min-h-11 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black disabled:opacity-40"
         >
           Save week
         </button>

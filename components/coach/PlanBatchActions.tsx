@@ -20,11 +20,11 @@ export default function PlanBatchActions({ batchId, drafts }: { batchId: string;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {confirm === "approve" ? (
-        <button disabled={pending} onClick={() => run(approvePlanBatch)} className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-[#0d1513] disabled:opacity-50">
+        <button disabled={pending} onClick={() => run(approvePlanBatch)} className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black disabled:opacity-50">
           {pending ? "Sending…" : `Yes, send all ${drafts}`}
         </button>
       ) : (
-        <button onClick={() => setConfirm("approve")} className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-[#0d1513]">
+        <button onClick={() => setConfirm("approve")} className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black">
           Approve all {drafts}
         </button>
       )}

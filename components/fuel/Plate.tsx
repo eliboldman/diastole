@@ -23,7 +23,7 @@ export default function Plate({ plate, size = 120, legend = true }: { plate: Pla
       <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={`Plate: ${words}`} className="shrink-0">
         <circle cx="50" cy="50" r="48" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)" />
         {slices.map((s) => (
-          <path key={s.key} d={s.d} fill={s.color} fillOpacity={0.82} stroke="#0d1513" strokeWidth="1.5" />
+          <path key={s.key} d={s.d} fill={s.color} fillOpacity={0.82} stroke="var(--color-canvas)" strokeWidth="1.5" />
         ))}
         <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.18)" />
       </svg>

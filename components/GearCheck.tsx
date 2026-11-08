@@ -1,6 +1,8 @@
 import { cleanCloset, defaultShoe, INDOOR_RIDE } from "@/lib/closet";
 import { createClient } from "@/lib/supabase/server";
 
+import Spotlight from "@/components/Spotlight";
+import { TIPS } from "@/lib/discovery";
 import GearCheckList, { type GearAsk } from "@/components/GearCheckList";
 
 const RUN = /run|treadmill|trail|track/i;
@@ -10,7 +12,7 @@ const RIDE = /cycl|bik|ride/i;
  * "Which shoes?" on Today: the last week's runs (and outdoor rides) that aren't tagged yet, when the
  * athlete has more than one pair (or bike) to choose from. One tap tags each. Hidden otherwise.
  */
-export default async function GearCheck({ athleteId, today }: { athleteId: string; today: string }) {
+export default async function GearCheck({ athleteId, today, tipSeen = true }: { athleteId: string; today: string; tipSeen?: boolean }) {
   const supabase = await createClient();
   const { data: gearRow } = await supabase.from("athlete_gear").select("gear").eq("athlete_id", athleteId).maybeSingle();
   const closet = cleanCloset(gearRow?.gear);
@@ -39,5 +41,10 @@ export default async function GearCheck({ athleteId, today }: { athleteId: strin
     if (asks.length >= 3) break;
   }
   if (!asks.length) return null;
-  return <GearCheckList asks={asks} />;
+  return (
+    <>
+      {!tipSeen && <Spotlight tip={TIPS.gear} seen={false} />}
+      <GearCheckList asks={asks} />
+    </>
+  );
 }

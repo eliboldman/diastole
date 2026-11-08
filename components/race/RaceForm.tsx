@@ -106,7 +106,7 @@ export default function RaceForm({ athleteId, units, initial, onDone }: { athlet
         <textarea value={f.notes} onChange={set("notes")} maxLength={500} rows={2} placeholder="Start time, wave, aid stations…" className={`${field} mt-1`} />
       </label>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-        <button disabled={pending || !f.name.trim() || !f.date} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-[#0d1513] disabled:opacity-50">
+        <button disabled={pending || !f.name.trim() || !f.date} className="min-h-12 rounded-2xl bg-emerald-300 px-6 font-medium text-black disabled:opacity-50">
           {pending ? "Saving…" : initial ? "Save race" : "Add race"}
         </button>
         {onDone && (

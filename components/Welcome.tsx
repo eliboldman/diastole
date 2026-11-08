@@ -118,7 +118,7 @@ export default function Welcome({ firstName, hasWatch, replay }: { firstName?: s
       role="dialog"
       aria-modal="true"
       aria-label="Welcome to Diastole"
-      className="fixed inset-0 z-[90] flex flex-col bg-[#0d1513]/95 text-white backdrop-blur-2xl"
+      className="fixed inset-0 z-[90] flex flex-col bg-canvas/95 text-white backdrop-blur-2xl"
       onTouchStart={(e) => {
         e.stopPropagation(); // keep the app's edge-swipe menu out of the tour
         touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -161,9 +161,14 @@ export default function Welcome({ firstName, hasWatch, replay }: { firstName?: s
             <span key={n} className={`h-1.5 rounded-full transition-all ${n === i ? "w-6 bg-emerald-300" : "w-1.5 bg-white/25"}`} />
           ))}
         </div>
-        <button onClick={next} className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-300 font-medium text-[#0d1513] active:scale-[0.98]">
+        <button onClick={next} className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-300 font-medium text-black active:scale-[0.98]">
           {last ? "Let's go" : i === 0 ? "Show me around" : "Next"}
         </button>
+        {last && (
+          <Link href="/help" onClick={() => void finish(false)} className="mt-2 flex min-h-11 w-full items-center justify-center text-sm text-white/60 hover:text-white">
+            Or watch a short video tour
+          </Link>
+        )}
       </div>
     </div>,
     document.body,

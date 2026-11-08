@@ -51,7 +51,7 @@ export default function StoryShare({ src }: { src: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- generated per request, private */}
         <img src={src} alt="Your season story" onLoad={() => setLoaded(true)} className="h-full w-full object-cover" />
       </div>
-      <button onClick={share} disabled={busy || !loaded} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-[#0d1513] disabled:opacity-50">
+      <button onClick={share} disabled={busy || !loaded} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-black disabled:opacity-50">
         <Share size={18} aria-hidden /> {busy ? "Getting it ready…" : "Share"}
       </button>
       <a href={src} download="diastole-season.png" className="mt-2 flex min-h-11 items-center justify-center gap-2 text-sm text-white/55 hover:text-white">

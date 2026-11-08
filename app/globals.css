@@ -917,3 +917,12 @@ body {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Spotlight tips and "What's new": a short, calm entrance (off when animations are off). */
+@keyframes spotlight-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.spotlight-in { animation: spotlight-in 0.45s ease-out both; }
+:root[data-motion="off"] .spotlight-in { animation: none; }
+@media (prefers-reduced-motion: reduce) { .spotlight-in { animation: none; } }

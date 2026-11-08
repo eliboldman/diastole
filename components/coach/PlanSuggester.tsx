@@ -88,7 +88,7 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
         Replace earlier suggestions in these dates that I haven&apos;t approved
       </label>
       {missing.length > 0 && <p className="mt-1 text-xs text-amber-100/70">Better with: {missing.join(", ")}.</p>}
-      <button onClick={go} disabled={busy} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-[#0d1513] disabled:opacity-50 sm:w-auto sm:px-6">
+      <button onClick={go} disabled={busy} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-300 font-medium text-black disabled:opacity-50 sm:w-auto sm:px-6">
         {busy ? (
           <>
             <Loader2 size={18} className="animate-spin" aria-hidden /> Planning {days === 1 ? "the day" : `${days / 7 >= 1 ? days / 7 : days} ${days >= 7 ? (days === 7 ? "week" : "weeks") : "days"}`}… {elapsed}s
