@@ -11,14 +11,22 @@ const bridge = () => (window as unknown as Bridge).webkit?.messageHandlers?.dias
 const noop = () => () => {};
 
 export default function RideButtons({ workoutId, hub = false, quietOnWeb = false }: { workoutId?: string; hub?: boolean; quietOnWeb?: boolean }) {
-  // null while server rendering, then whether we're inside the iPhone/iPad app.
-  const inApp = useSyncExternalStore(
+  // null while server rendering; "ride" = iPhone/iPad app with the ride screen, "old" = an app build
+  // from before it (its bridge ignores startRide), "web" = the website.
+  const where = useSyncExternalStore(
     noop,
-    () => Boolean(bridge()) && document.documentElement.dataset.app === "ios",
+    () => {
+      const html = document.documentElement;
+      if (!bridge() || html.dataset.app !== "ios") return "web";
+      return html.dataset.ride === "1" ? "ride" : "old";
+    },
     () => null,
   );
-  if (inApp === null) return null;
-  if (!inApp) {
+  if (where === null) return null;
+  if (where === "old") {
+    return quietOnWeb ? null : <p className="mt-4 text-sm text-white/45">Update the Diastole app to ride this on your smart trainer.</p>;
+  }
+  if (where === "web") {
     if (quietOnWeb) return null;
     return <p className="mt-4 text-sm text-white/45">Ride this on your smart trainer with the Diastole iPhone, iPad or Apple TV app.</p>;
   }
