@@ -7,6 +7,7 @@ import { AI_MODELS, costOf, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } f
 import { createAdminClient, createClient, requireCoach } from "@/lib/supabase/server";
 import { BuildOut as Output } from "@/lib/ai/step-schema";
 import { leafToStep } from "@/lib/workouts/ai-steps";
+import { bikeStepsToPower } from "@/lib/workouts/bike-power";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
@@ -28,10 +29,9 @@ const SYSTEM = `You turn an endurance coach's description of one workout into st
 Rules:
 - Steps: WARMUP, ACTIVE, INTERVAL, RECOVERY, REST, COOLDOWN (MAIN is swim-only). Use a repeat for "N x (...)"; repeats can't be nested; repeat count 2-99.
 - Durations: time in seconds, distance with its unit (m, km, yd, mi), open (until lap button). For swims, distances are in the pool's unit and must be whole lengths; rest at the wall is a REST step with seconds, or a send-off ("on the 1:30") is a REST step with duration_type sendoff.
-- Run targets: pace_range as m:ss in the given pace unit (fast end and slow end, about 10-15 s apart unless the coach gave exact paces), hr_zone 1-5, or hr_range bpm. Bike: power_pct_ftp (% of FTP), power_watts, or hr. Swim: swim_effort 1-10 or swim_pace_per_100 (m:ss per 100 of the pool unit), plus stroke, drill (kick/pull) and equipment when mentioned.
+- Run targets: pace_range as m:ss in the given pace unit (fast end and slow end, about 10-15 s apart unless the coach gave exact paces), hr_zone 1-5, or hr_range bpm. Bike: always power, never heart rate: power_pct_ftp (% of FTP) or power_watts; if the coach says a heart-rate zone on the bike, use the matching % of FTP. Swim: swim_effort 1-10 or swim_pace_per_100 (m:ss per 100 of the pool unit), plus stroke, drill (kick/pull) and equipment when mentioned.
 - Named efforts: when the coach says "easy", "tempo", "threshold", "5K pace", "Z2" and so on without numbers, derive them from the athlete's zones given (threshold pace, FTP, max HR). Rough guide from threshold pace T: 5K ~ T minus 4%, 10K ~ T minus 1%, half marathon ~ T plus 3%, marathon ~ T plus 8%, easy ~ T plus 22-30%. If the needed zone isn't known, use an hr_zone or no target, and say so in assumptions.
 - Never use a pace or power target on a swim, or a swim target on a run or ride.
-- If the athlete's closet is given and shows no power meter or smart trainer, use heart-rate or effort targets instead of power unless the coach asked for watts, and say so in assumptions.
 - title: short and specific. description: only if the coach gave context for the athlete. assumptions: brief note to the coach about anything you assumed or couldn't represent; null if nothing.`;
 
 export type BuildResult =
@@ -120,9 +120,10 @@ export async function buildWorkoutFromPrompt(input: {
     const o = r.parsed_output;
     const pool = o.sport === "swim" ? input.pool : null;
     const ctx = { paceUnit: input.paceUnit, ftp: zones?.ftp_w ?? null, pool };
-    const steps: Step[] = o.steps.map((x) =>
+    const raw: Step[] = o.steps.map((x) =>
       x.kind === "repeat" ? { kind: "repeat", times: x.times, steps: x.steps.map((l) => leafToStep(l, ctx)) } : leafToStep(x, ctx),
     );
+    const steps = o.sport === "bike" ? bikeStepsToPower(raw, ctx.ftp, zones?.max_hr ?? null) : raw;
     return { o, steps, errors: validateSteps(steps, 0, o.sport, pool) };
   };
 

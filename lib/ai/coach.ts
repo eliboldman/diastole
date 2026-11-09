@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { localDate, refreshReadiness } from "@/lib/readiness/run";
 import { createAdminClient } from "@/lib/supabase/server";
+import { bikeStepsToPower } from "@/lib/workouts/bike-power";
 import { validateSteps, type Step, type Target } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
@@ -95,7 +96,7 @@ Guidelines:
 - Base every statement on the data provided. Say plainly when data is thin (few days of baseline, missing nights).
 - Prefer the smallest change that addresses the flag: keep the plan if the flag is mild and the next session is easy; reduce intensity or swap to an easy session for caution; recommend rest when several markers are suppressed together or load is spiking.
 - Only reference a target_workout_id that appears in that athlete's upcoming workouts. Use action "replace" or include proposed_workout only when you are proposing a concrete session; for "keep" and "rest", proposed_workout is null.
-- Proposed workouts are run or bike only, use simple structure (warm-up, main set, cool-down), and prefer heart-rate zone targets (zone 1-2 for easy days). If the athlete's closet is given, only propose what their gear allows (for example an indoor ride only with a trainer).
+- Proposed workouts are run or bike only, use simple structure (warm-up, main set, cool-down), and use heart-rate zone targets on runs (zone 1-2 for easy days). Bike sessions always use power_range watts from the athlete's ftp_watts (easy about 50-65% of FTP), never heart rate. If the athlete's closet is given, only propose what their gear allows (for example an indoor ride only with a trainer).
 - This is training guidance for a coach, not medical advice. Never diagnose. If the data could indicate illness, injury or overtraining, say the coach may want to check in with the athlete.
 - Write for a busy coach: short, specific, no filler. Return exactly one suggestion per athlete provided.`;
 
@@ -107,18 +108,21 @@ async function buildPayload(athleteId: string, name: string, timeZone: string): 
   const since = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10);
   const until = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
 
-  const [{ data: readiness }, { data: wellness }, { data: activities }, { data: upcoming }, { data: gear }] = await Promise.all([
+  const [{ data: readiness }, { data: wellness }, { data: activities }, { data: upcoming }, { data: gear }, { data: zones }] = await Promise.all([
     admin.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", athleteId).order("date", { ascending: false }).limit(1).maybeSingle(),
     admin.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, sleep_score, stress_avg, body_battery_high").eq("athlete_id", athleteId).gte("date", since).order("date"),
     admin.from("activities").select("sport, start_time, duration_s, distance_m, avg_hr, max_hr").eq("athlete_id", athleteId).gte("start_time", since).order("start_time"),
     admin.from("planned_workouts").select("id, scheduled_date, title, sport, status, steps").eq("athlete_id", athleteId).is("deleted_at", null).gte("scheduled_date", today).lte("scheduled_date", until).neq("status", "draft").order("scheduled_date"),
     admin.from("athlete_gear").select("gear").eq("athlete_id", athleteId).maybeSingle(),
+    admin.from("athlete_zones").select("ftp_w, max_hr").eq("athlete_id", athleteId).maybeSingle(),
   ]);
 
   return {
     athlete_id: athleteId,
     name,
     today,
+    ftp_watts: zones?.ftp_w ?? null,
+    max_hr: zones?.max_hr ?? null,
     readiness,
     wellness_last_14_days: wellness ?? [],
     activities_last_14_days: (activities ?? []).map((a) => ({
@@ -248,9 +252,11 @@ export async function runCoachAssistant(coachId: string, trigger: "cron" | "manu
 
     let proposed = null;
     if (sug.proposed_workout) {
-      const steps: Step[] = sug.proposed_workout.steps.map((s) =>
+      const raw: Step[] = sug.proposed_workout.steps.map((s) =>
         s.kind === "repeat" ? { kind: "repeat", times: s.times, steps: s.steps.map(toStep) } : toStep(s),
       );
+      const p = payload.find((x) => x.athlete_id === athlete.id);
+      const steps = sug.proposed_workout.sport === "bike" ? bikeStepsToPower(raw, p?.ftp_watts as number | null, p?.max_hr as number | null) : raw;
       const validDate = /^\d{4}-\d{2}-\d{2}$/.test(sug.proposed_workout.scheduled_date) && sug.proposed_workout.scheduled_date >= athlete.today;
       if (!validateSteps(steps).length && validDate) proposed = { ...sug.proposed_workout, steps };
     }

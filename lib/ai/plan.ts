@@ -11,6 +11,7 @@ import { createAdminClient, createClient, type Profile } from "@/lib/supabase/se
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
+import { bikeStepsToPower } from "@/lib/workouts/bike-power";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
 
@@ -32,7 +33,7 @@ How to plan:
 - Follow the coach's guide first. Where it names a training framework (periodization, pace systems, key-session rules), apply it.
 - Numbers come only from the app: every target uses this athlete's zones in the context (FTP, threshold pace, max and threshold heart rate). The coach's guide and notes give the structure (session types, intervals and durations, % of FTP or threshold, progression and key-session rules, and this athlete's preferences and injuries); any FTP, pace or heart rate in them has been removed and must never be used or guessed at. If a zone you need isn't in the app, use heart-rate zones or effort cues in the step notes, and say so in assumptions.
 - The weekly layout comes only from the athlete's preferred_week, which the athlete filled in: which disciplines on which days, how many sessions and how much time each day. The guide's own weekly schedule has been removed; don't impose one. If preferred_week is empty, spread the sessions sensibly and say so in assumptions. The coach's guidance for this request (events, travel) can still move days.
-- Use the athlete's closet (their shoes, bikes, trainer, and pool, track or gym access). Only plan what they can do with it: indoor trainer sessions only if they have a trainer, TT-bike or trail sessions only with that bike or those shoes, pool or open-water swims only with access, power targets only with a power meter or smart trainer (otherwise heart rate or effort). When the gear matters, name it in the description (for example "TT bike", "race shoes", "trainer in ERG mode", "pull buoy") so the athlete can pack for it.
+- Use the athlete's closet (their shoes, bikes, trainer, and pool, track or gym access). Only plan what they can do with it: indoor trainer sessions only if they have a trainer, TT-bike or trail sessions only with that bike or those shoes, pool or open-water swims only with access, bike sessions always with power targets. When the gear matters, name it in the description (for example "TT bike", "race shoes", "trainer in ERG mode", "pull buoy") so the athlete can pack for it.
 - Apply the coach's guidance for this request (events, travel, constraints) to volume and intensity around those dates: build into key events, freshen up before them, recover after, keep travel days short or adapted to what's available.
 - Races: build toward A races and taper the last 10-14 days before one; treat B races as hard days with a short freshen-up; C races are training.
 - Recovery: if recent readiness is yellow or red, or check-ins mention pain or bad sessions, start the block conservatively and say so in the summary.
@@ -43,7 +44,7 @@ How to plan:
 Workout steps:
 - Steps: WARMUP, ACTIVE, INTERVAL, RECOVERY, REST, COOLDOWN (MAIN is swim-only). Use a repeat for "N x (...)"; repeats can't be nested; repeat count 2-99. Include warm-ups and cool-downs where the session calls for them.
 - Durations: time in seconds, distance with its unit (m, km, yd, mi), or open. Swims: distances in the pool's unit, whole lengths; rest at the wall is a REST step with seconds, or a send-off is a REST step with duration_type sendoff; give pool_length and pool_unit.
-- Run targets: pace_range as m:ss in the given pace unit, worked out from the threshold pace in zones (fast and slow ends), hr_zone 1-5, or hr_range from the heart rates in zones. Bike: power_pct_ftp (preferred: the app turns it into watts from the athlete's FTP), power_watts only from the FTP in zones, or hr. Swim: swim_effort 1-10 or swim_pace_per_100, plus stroke, drill and equipment when useful. Never a pace or power target on a swim, or a swim target on a run or ride.
+- Run targets: pace_range as m:ss in the given pace unit, worked out from the threshold pace in zones (fast and slow ends), hr_zone 1-5, or hr_range from the heart rates in zones. Bike: always power, never heart rate: power_pct_ftp (the app turns it into watts from the athlete's FTP), or power_watts only from the FTP in zones. Easy and recovery rides too (for example 50-65% of FTP). Swim: swim_effort 1-10 or swim_pace_per_100, plus stroke, drill and equipment when useful. Never a pace or power target on a swim, or a swim target on a run or ride.
 - Step notes: short and actionable.
 
 Every workout's date must fall inside the requested window.`;
@@ -217,7 +218,8 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
   };
   const convert = (w: AiWorkout) => {
     const c = ctx(w);
-    const steps: Step[] = w.steps.map((x) => (x.kind === "repeat" ? { kind: "repeat", times: x.times, steps: x.steps.map((l) => leafToStep(l, c)) } : leafToStep(x, c)));
+    const raw: Step[] = w.steps.map((x) => (x.kind === "repeat" ? { kind: "repeat", times: x.times, steps: x.steps.map((l) => leafToStep(l, c)) } : leafToStep(x, c)));
+    const steps = w.sport === "bike" ? bikeStepsToPower(raw, c.ftp, g.context.zones.max_hr) : raw;
     const errors = validateSteps(steps, 0, w.sport as Sport, c.pool);
     if (w.date < input.start || w.date > end) errors.push(`date ${w.date} is outside ${input.start} to ${end}`);
     return { w, steps, pool: c.pool, errors };
