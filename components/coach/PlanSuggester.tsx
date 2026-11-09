@@ -58,7 +58,7 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
     }
   }
 
-  const missing = [!ready.guide && "your coaching guide (Me → Coaching assistant)", !ready.notes && `notes on ${firstName}`, !ready.week && `${firstName}'s preferred week`].filter(Boolean) as string[];
+  const missing = [!ready.guide && "your coaching guide (Me › Settings › Coaching assistant)", !ready.notes && `notes on ${firstName}`, !ready.week && `${firstName}'s preferred week`].filter(Boolean) as string[];
 
   return (
     <div>
@@ -104,7 +104,7 @@ export default function PlanSuggester({ athleteId, firstName, ready }: { athlete
         <p className="mt-3 text-sm text-amber-100">
           Add your coaching guide first: every suggestion follows it.{" "}
           <Link href="/account/settings#coaching" className="font-medium text-emerald-200 underline">
-            Me → Coaching assistant
+            Me › Settings › Coaching assistant
           </Link>
         </p>
       ) : (

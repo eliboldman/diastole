@@ -11,7 +11,7 @@ export default async function UploadActivityPage() {
   const me = await requireUser();
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <BackLink href="/training" label="Training" />
+      <BackLink href="/connect" label="Connections" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Upload a workout</h1>
       <p className="mt-2 max-w-xl text-white/60">
         For workouts that don&apos;t sync on their own, like rides from Rouvy, Zwift or TrainerRoad. Garmin doesn&apos;t share workouts

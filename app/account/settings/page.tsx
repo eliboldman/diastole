@@ -9,7 +9,6 @@ import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import NotifySettings from "@/components/NotifySettings";
 import PodSharing from "@/components/PodSharing";
-import SyncedAgo from "@/components/SyncedAgo";
 import AppearanceSettings from "@/components/AppearanceSettings";
 import { cleanTabs } from "@/lib/tabs";
 import ConditionsToggle from "@/components/ConditionsToggle";
@@ -41,20 +40,19 @@ function Row({ href, children, sub }: { href: string; children: ReactNode; sub?:
   );
 }
 
-/** Settings (from the Me tab): profile, units, watch, pods and sharing for everyone; coaching settings and tools for coaches. */
+/** Settings (from the Me tab): profile, units, pods and sharing for everyone; coaching settings and tools for coaches. */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ secret?: string }> }) {
   const { secret } = await searchParams;
   const me = await requireUser();
   const isCoach = me.role === "coach";
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: device }, { data: memberships }, { data: aiRow }, spent, { data: secretRows }] = await Promise.all([
+  const [{ data: profile }, { data: memberships }, { data: aiRow }, spent, { data: secretRows }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar, eggs")
       .eq("id", me.id)
       .single(),
-    supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     isCoach ? supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd, philosophy").eq("coach_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     isCoach ? monthToDateSpend(me.id) : Promise.resolve(0),
@@ -69,40 +67,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <h1 className="mt-4 text-4xl font-bold tracking-tight">Settings</h1>
       <p className="mt-1 truncate text-sm text-white/50">{me.email}</p>
 
-      {/* Coaches train too: everything an athlete has, one tap away, without a second account */}
-      {isCoach && (
-        <section className={`${card} mt-6`}>
-          <h2 className="mb-1 text-lg font-medium">Your own training</h2>
-          <p className="mb-4 text-sm text-white/55">Everything your athletes see, for you.</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <Row href="/me" sub="Readiness, next workouts, check-ins">
-              My day
-            </Row>
-            <Row href="/training" sub="Your planned and past workouts">
-              My training
-            </Row>
-            <Row href="/fuel" sub="Workout fueling and fuel days">
-              My fuel
-            </Row>
-            <Row href="/races" sub="Race plans and fueling tools">
-              My races
-            </Row>
-            <Row href="/me/pods" sub="Pods you train in">
-              My pods
-            </Row>
-          </div>
-        </section>
-      )}
-
-      {/* Closet, numbers and training days live together in My setup. */}
-      <Link href="/me/setup" className="lift mt-8 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-5">
-        <span className="min-w-0">
-          <span className="block text-lg font-medium">My setup</span>
-          <span className="block text-sm text-white/55">Closet and gear, your numbers, training days and metrics</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
-
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className={card}>
           <h2 className="mb-4 text-lg font-medium">Profile</h2>
@@ -110,29 +74,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </section>
 
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          <section className={card}>
-            <h2 className="mb-1 text-lg font-medium">Watch</h2>
-            <p className="mb-4 text-sm text-white/55">
-              {device ? (
-                <>
-                  {device.source === "garmin" ? "Garmin" : "Apple Watch"} connected · <SyncedAgo at={device.last_synced_at} />
-                </>
-              ) : (
-                "No watch connected yet."
-              )}
-            </p>
-            <div className="grid gap-2">
-              <Row href="/connect">{device ? "Manage watch connection" : "Connect Garmin or Apple Watch"}</Row>
-              {device?.source === "garmin" && (
-                <Row href="/me/import" sub="Past months of health data, plus charts and laps for past workouts">
-                  Import Garmin history
-                </Row>
-              )}
-              <Row href="/me/upload" sub="Rouvy, Zwift and other workouts that don't sync on their own">
-                Upload a workout file
-              </Row>
-            </div>
-          </section>
 
           <section className={card}>
             <h2 className="mb-4 text-lg font-medium">Pods</h2>

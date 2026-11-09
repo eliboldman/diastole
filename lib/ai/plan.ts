@@ -161,12 +161,12 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
 
   const { data: s } = await admin.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle();
   const settings = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
-  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me → Coaching assistant." };
-  if ((await monthToDateSpend(me.id)) >= Number(settings.ai_monthly_cap_usd) - 0.05) return { ok: false, error: "Monthly AI cap reached. Raise it in Me → Coaching assistant." };
+  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me › Settings › Coaching assistant." };
+  if ((await monthToDateSpend(me.id)) >= Number(settings.ai_monthly_cap_usd) - 0.05) return { ok: false, error: "Monthly AI cap reached. Raise it in Me › Settings › Coaching assistant." };
   const model = settings.ai_model as AiModel;
 
   const g = await gather(input.athleteId, me.id, input.start, end, me.units);
-  if (!g.philosophy) return { ok: false, error: "Add your coaching guide first (Me → Coaching assistant)." };
+  if (!g.philosophy) return { ok: false, error: "Add your coaching guide first (Me › Settings › Coaching assistant)." };
 
   const client = new Anthropic();
   let total = 0;

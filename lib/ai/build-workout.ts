@@ -60,7 +60,7 @@ export async function buildWorkoutFromPrompt(input: {
 
   const { data: s } = await admin.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle();
   const settings = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
-  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me → Coaching assistant." };
+  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me › Settings › Coaching assistant." };
   const spent = await monthToDateSpend(me.id);
   if (spent >= Number(settings.ai_monthly_cap_usd) - 0.01) return { ok: false, error: "Monthly AI cap reached." };
 

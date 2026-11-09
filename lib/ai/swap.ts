@@ -57,7 +57,7 @@ export async function planChange(input: { text: string; athleteId?: string | nul
 
   const { data: s } = await admin.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", me.id).maybeSingle();
   const settings = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
-  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me → Coaching assistant." };
+  if (!settings.ai_enabled) return { ok: false, error: "The coaching assistant is turned off in Me › Settings › Coaching assistant." };
   if ((await monthToDateSpend(me.id)) >= Number(settings.ai_monthly_cap_usd) - 0.01) return { ok: false, error: "Monthly AI cap reached." };
 
   // Roster: the coach and their athletes (row-level security keeps this to the coach's own).

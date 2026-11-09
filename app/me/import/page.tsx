@@ -23,7 +23,7 @@ export default async function MyImportPage() {
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <BackLink href="/account/settings" label="Settings" />
+      <BackLink href="/connect" label="Connections" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Import your Garmin history</h1>
       <p className="mt-2 max-w-xl text-white/60">
         Garmin only shares new data with Diastole. Bring in your past months so your baseline is ready today instead of in a week.

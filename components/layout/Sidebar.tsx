@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, Flag, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Settings, Sparkles, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -33,7 +33,7 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Training", href: "/training", icon: Dumbbell, match: /^\/(calendar|activity)(\/|$)/ },
     { label: "Fuel", href: "/fuel", icon: Utensils },
     { label: "Messages", href: "/messages", icon: MessageCircle },
-    { label: "Me", href: "/account", icon: User, match: /^\/(me\/|connect)/ },
+    { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods)|connect|races|profile)/ },
   ],
 };
 
@@ -45,27 +45,19 @@ const tabItems = (role: NavRole, ids: string[]): Item[] =>
     return t ? [{ label: t.label, href: t.href, icon: TAB_ICON[id] ?? Sun, match: t.match ? new RegExp(t.match) : undefined }] : [];
   });
 
-// Desktop has room for one-click shortcuts below the tabs.
+// Desktop has room for one-click shortcuts below the tabs. Anything about you (your own training,
+// races, setup, connections, settings) lives under Me, so it isn't repeated here.
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
     { label: "Pods", href: "/pods", icon: Orbit },
-    { label: "My day", href: "/me", icon: Sun },
-    { label: "My training", href: "/training", icon: Dumbbell },
-    { label: "My fuel", href: "/fuel", icon: Utensils },
-    { label: "My races", href: "/races", icon: Flag },
-    { label: "Season story", href: "/me/story", icon: Sparkles },
-    { label: "Settings", href: "/account/settings", icon: Settings },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
   athlete: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
-    { label: "Races", href: "/races", icon: Flag },
     { label: "My pods", href: "/me/pods", icon: Orbit },
-    { label: "Season story", href: "/me/story", icon: Sparkles },
-    { label: "Settings", href: "/account/settings", icon: Settings },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
 };

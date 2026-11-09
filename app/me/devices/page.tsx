@@ -25,7 +25,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <BackLink href="/connect" label="Devices" />
+      <BackLink href="/connect" label="Connections" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Watch &amp; TV apps</h1>
       <p className="mt-2 max-w-xl text-white/60">
         The Diastole Garmin watch app shows today&apos;s plan and your readiness on your wrist. The Apple TV app runs your coach&apos;s bike

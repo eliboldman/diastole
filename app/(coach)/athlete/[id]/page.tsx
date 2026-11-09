@@ -188,7 +188,7 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
                 ))}
               </ul>
             ) : (
-              <p className="mt-1 text-sm text-white/55">{(profile.full_name || "This athlete").split(" ")[0]} hasn&apos;t filled in their closet yet (Me → My closet).</p>
+              <p className="mt-1 text-sm text-white/55">{(profile.full_name || "This athlete").split(" ")[0]} hasn&apos;t filled in their closet yet (Me › Gear &amp; closet).</p>
             );
           })()}
           <details className="mt-3">

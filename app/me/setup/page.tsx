@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 
 import ClosetEditor from "@/components/ClosetEditor";
 import ZonesForm from "@/components/coach/ZonesForm";
@@ -17,7 +16,7 @@ export const metadata: Metadata = { title: "My setup · Diastole" };
 
 const card = "mt-6 scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 sm:p-6";
 
-/** Everything about you that shapes your plan, in one place: closet and gear, numbers, training days, metrics. */
+/** Everything about you that shapes your plan, in one place: closet and gear, numbers, training days. */
 export default async function MySetupPage() {
   const me = await requireUser();
   const supabase = await createClient();
@@ -34,12 +33,11 @@ export default async function MySetupPage() {
     ["#closet", "Closet and gear"],
     ["#numbers", "My numbers"],
     ["#week", "Training days"],
-    ["/account", "Metrics"],
   ] as const;
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <BackLink href="/me" label="Today" />
+      <BackLink href="/account" label="Me" />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">My setup</h1>
       <p className="mt-2 text-white/55">What you own, your numbers and when you train. Your coach plans around all of it.</p>
       <nav aria-label="Sections" className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -77,13 +75,6 @@ export default async function MySetupPage() {
         <WeekPrefsEditor initial={cleanWeek(week?.days)} />
       </section>
 
-      <Link href="/account" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-5">
-        <span className="min-w-0">
-          <span className="block text-lg font-medium">Metrics</span>
-          <span className="block text-sm text-white/55">Readiness, trends, running form, PRs and your metric cards</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
     </DashboardShell>
   );
 }

@@ -88,14 +88,14 @@ export default function Welcome({ firstName, hasWatch, replay }: { firstName?: s
       icon: Orbit,
       kicker: "Step 6",
       title: "Pods",
-      body: "Train alongside teammates. Send props, see each other's wins, and choose exactly what you share in Me → Pods.",
+      body: "Train alongside teammates. Send props, see each other's wins, and choose exactly what you share in Me › Settings › Pods.",
     },
     {
       icon: Bell,
       kicker: "Last thing",
       title: "Stay in the loop",
       body: inApp
-        ? "Allow notifications when your phone asks, so you hear from your coach right away. Pick the sounds you like in Me → Notifications."
+        ? "Allow notifications when your phone asks, so you hear from your coach right away. Pick the sounds you like in Me › Settings › Notifications."
         : "Get the Diastole iPhone app to hear from your coach right away. Your coach can send you the invite.",
       extra: <p className="text-sm text-white/50 md:hidden">Tap the Diastole logo at the top any time to get around{inApp ? ", or swipe in from the left edge" : ""}.</p>,
     },

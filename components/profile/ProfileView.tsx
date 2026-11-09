@@ -27,7 +27,23 @@ const daysUntil = (date: string) => Math.ceil((Date.parse(`${date}T12:00:00Z`) -
  * `sections` adds or replaces keyed sections (the Me tab adds readiness, form and more). `header`
  * sits above the avatar.
  */
-export default async function ProfileView({ id, me, header, sections, order }: { id: string; me: Profile; header?: ReactNode; sections?: Record<string, ReactNode>; order?: string[] }) {
+// hero: the avatar block on top. "compact" for the Me menu, "none" for pages under it that already
+// sit below the avatar.
+export default async function ProfileView({
+  id,
+  me,
+  header,
+  sections,
+  order,
+  hero = "full",
+}: {
+  id: string;
+  me: Profile;
+  header?: ReactNode;
+  sections?: Record<string, ReactNode>;
+  order?: string[];
+  hero?: "full" | "compact" | "none";
+}) {
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -238,9 +254,9 @@ export default async function ProfileView({ id, me, header, sections, order }: {
       {coaching && !own && <BackLink href={`/athlete/${id}`} label={person.full_name || "Athlete"} />}
       {shares && <BackLink href={me.role === "coach" ? "/pods" : "/me/pods"} label="Pods" />}
       <div className="mx-auto max-w-3xl">
-        <section className="flex flex-col items-center text-center">
+        {hero !== "none" && <section className="flex flex-col items-center text-center">
           <div className="relative">
-            <Avatar look={look} mood={mood} strain={strain} aura={aura} badges={badges} className="h-72 w-48 sm:h-80 sm:w-52" title={`${first}'s avatar`} />
+            <Avatar look={look} mood={mood} strain={strain} aura={aura} badges={badges} className={hero === "compact" ? "h-48 w-32" : "h-72 w-48 sm:h-80 sm:w-52"} title={`${first}'s avatar`} />
           </div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">{person.full_name || "Athlete"}</h1>
           <p className="mt-2 max-w-md text-[15px] text-white/70">{sentence}</p>
@@ -264,7 +280,7 @@ export default async function ProfileView({ id, me, header, sections, order }: {
               <Pencil size={16} /> {look ? "Edit avatar" : "Create your avatar"}
             </Link>
           )}
-        </section>
+        </section>}
 
         {(order ?? DEFAULT_ORDER).map((k) => (
           <Fragment key={k}>{blocks[k]}</Fragment>

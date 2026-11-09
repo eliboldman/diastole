@@ -125,8 +125,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <FlagRow flags={readiness as Record<"recovery" | "sleep" | "stress" | "load", Flag>} />
           </div>
         )}
-        <Link href="/account" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
-          Recovery, trends and running form →
+        <Link href="/account/body" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
+          Recovery and trends →
         </Link>
       </section>
       </>
@@ -223,7 +223,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     <AthleteShell isCoach={me.role === "coach"}>
       <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">{firstName ? `Hi, ${firstName}` : "Welcome"}</p>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">Today</h1>
+        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{me.role === "coach" ? "My day" : "Today"}</h1>
         <LayoutCustomizer page="today" initial={layout} />
       </div>
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
@@ -234,7 +234,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-medium">My setup</span>
-          <span className="block truncate text-sm text-white/55">Closet, gear, numbers, training days, metrics</span>
+          <span className="block truncate text-sm text-white/55">Closet, gear, numbers, training days</span>
         </span>
         <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
       </Link>

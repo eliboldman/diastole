@@ -5,11 +5,12 @@ import type { ReactNode } from "react";
 import AppleConnect from "@/components/AppleConnect";
 import OnboardingProgress from "@/components/OnboardingProgress";
 import AthleteShell from "@/components/AthleteShell";
+import BackLink from "@/components/layout/BackLink";
 import PublicShell from "@/components/PublicShell";
 import { garminConfigured } from "@/lib/garmin/client";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Connect your device · Diastole" };
+export const metadata: Metadata = { title: "Connections · Diastole" };
 
 const garminMessages: Record<string, { text: string; ok: boolean }> = {
   connected: {
@@ -123,17 +124,29 @@ export default async function ConnectPage({
   return (
     <DeviceShell onboarding={onboarding} isCoach={!isAthlete}>
       <div className={`mx-auto max-w-xl ${onboarding ? "pt-16" : ""}`}>
-        {onboarding && <OnboardingProgress step={2} />}
-        <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">
-          Welcome{firstName ? `, ${firstName}` : ""}
-        </p>
-        <h1 className="mt-3 text-3xl font-medium tracking-tight">
-          Connect your watch
-        </h1>
-        <p className="mt-3 text-white/55">
-          Choose the watch you wear every day. Diastole only reads data from
-          today forward, and you can disconnect anytime.
-        </p>
+        {onboarding ? (
+          <>
+            <OnboardingProgress step={2} />
+            <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">
+              Welcome{firstName ? `, ${firstName}` : ""}
+            </p>
+            <h1 className="mt-3 text-3xl font-medium tracking-tight">
+              Connect your watch
+            </h1>
+            <p className="mt-3 text-white/55">
+              Choose the watch you wear every day. Diastole only reads data from
+              today forward, and you can disconnect anytime.
+            </p>
+          </>
+        ) : (
+          <>
+            <BackLink href="/account" label="Me" />
+            <h1 className="mt-3 text-3xl font-medium tracking-tight">Connections</h1>
+            <p className="mt-3 text-white/55">
+              Your watch, your trainer apps and getting older workouts in. Everything that talks to Diastole, in one place.
+            </p>
+          </>
+        )}
 
         {message && (
           <p
@@ -153,13 +166,7 @@ export default async function ConnectPage({
             connected={connected.has("garmin")}
             body="Sign in with your Garmin Connect account and approve access to your health and activity data."
             disconnect={
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Link
-                  href="/me/import"
-                  className="inline-flex min-h-11 items-center text-sm font-medium text-emerald-200 hover:underline"
-                >
-                  Import your Garmin history →
-                </Link>
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <form action="/api/garmin/disconnect" method="post">
                   <button className="min-h-11 text-sm text-white/55 hover:text-white/70">
                     Disconnect Garmin
@@ -188,43 +195,32 @@ export default async function ConnectPage({
             disconnect={<AppleConnect connected garmin={connected.has("garmin")} />}
             action={<AppleConnect connected={false} garmin={connected.has("garmin")} />}
           />
-          <Link
-            href="/me/intervals"
-            className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-4 transition hover:border-white/20 active:scale-[0.99]"
-          >
-            <span className="min-w-0">
-              <span className="block font-medium">Zwift &amp; Rouvy</span>
-              <span className="block text-sm text-white/55">Your coach&apos;s bike workouts on your smart trainer, through intervals.icu</span>
-            </span>
-            <span aria-hidden className="text-white/40">→</span>
-          </Link>
-          <Link
-            href="/me/devices"
-            className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-4 transition hover:border-white/20 active:scale-[0.99]"
-          >
-            <span className="min-w-0">
-              <span className="block font-medium">Watch &amp; TV apps</span>
-              <span className="block text-sm text-white/55">Today&apos;s plan on your Garmin, bike workouts on Apple TV</span>
-            </span>
-            <span aria-hidden className="text-white/40">→</span>
-          </Link>
+          <ConnRow href="/me/intervals" title="Zwift & Rouvy" sub="Your coach's bike workouts on your smart trainer, through intervals.icu" />
+          <ConnRow href="/me/devices" title="Watch & TV apps" sub="Today's plan on your Garmin, bike workouts on Apple TV" />
         </div>
 
+        {!onboarding && (
+          <>
+            <h2 className="mb-3 mt-10 px-1 text-xs font-medium uppercase tracking-[0.2em] text-white/45">Bring workouts in</h2>
+            <div className="space-y-4">
+              {connected.has("garmin") && (
+                <ConnRow href="/me/import" title="Import Garmin history" sub="Past months of health data, plus charts and laps for past workouts" />
+              )}
+              <ConnRow href="/me/upload" title="Upload a workout file" sub="A .fit file from any app that doesn't sync on its own" />
+            </div>
+          </>
+        )}
+
         <div className="mt-12 flex items-center justify-between text-sm text-white/55">
-          {profile.role === "coach" ? (
-            <Link
-              href="/dashboard"
-              className="flex min-h-11 items-center hover:text-white/70"
-            >
-              ← Back to dashboard
-            </Link>
-          ) : (
+          {onboarding ? (
             <Link
               href="/me"
               className="flex min-h-11 items-center hover:text-white/70"
             >
-              {onboarding ? "Skip for now →" : "← My Diastole"}
+              Skip for now →
             </Link>
+          ) : (
+            <span />
           )}
           <form action="/auth/signout" method="post">
             <button className="min-h-11 hover:text-white/70">Sign out</button>
@@ -269,5 +265,20 @@ function DeviceCard({
       <p className="mt-2 text-sm leading-relaxed text-white/55">{body}</p>
       <div className="mt-5">{connected ? disconnect : action}</div>
     </div>
+  );
+}
+
+function ConnRow({ href, title, sub }: { href: string; title: string; sub: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-4 transition hover:border-white/20 active:scale-[0.99]"
+    >
+      <span className="min-w-0">
+        <span className="block font-medium">{title}</span>
+        <span className="block text-sm text-white/55">{sub}</span>
+      </span>
+      <span aria-hidden className="text-white/40">→</span>
+    </Link>
   );
 }

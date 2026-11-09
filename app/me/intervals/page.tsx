@@ -27,7 +27,7 @@ export default async function IntervalsPage() {
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <BackLink href="/connect" label="Devices" />
+      <BackLink href="/connect" label="Connections" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Zwift &amp; Rouvy</h1>
       <p className="mt-2 max-w-xl text-white/60">
         Your coach&apos;s bike workouts show up in Zwift and Rouvy on their day, with the trainer set for you. Diastole sends them through

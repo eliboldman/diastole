@@ -1,163 +1,105 @@
-import { ChevronRight } from "lucide-react";
+import { Backpack, CalendarDays, Dumbbell, Flag, Footprints, Gauge, HeartPulse, KeyRound, LifeBuoy, Plug, Settings, Sparkles, Sun, Target, Utensils } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactNode } from "react";
 
-import { FlagBadge } from "@/components/coach/Flags";
-import LayoutCustomizer from "@/components/LayoutCustomizer";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { MeGroup, type MeRow } from "@/components/me/MeMenu";
 import ProfileView from "@/components/profile/ProfileView";
-import FormTrends from "@/components/readiness/FormTrends";
-import { ReadinessAreas, ReadinessTrend } from "@/components/readiness/ReadinessDetail";
 import { FORM, type FormMetric } from "@/lib/activity/form";
-import { recentFormRuns } from "@/lib/activity/form-store";
-import type { ReadinessRow, WellnessPoint } from "@/lib/coach-data";
-import { resolveLayout, visibleSections } from "@/lib/layout-prefs";
-import { familyOf, oneFamily } from "@/lib/readiness/source";
-import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
+import { paceOf } from "@/lib/activity/format";
+import { cleanCloset } from "@/lib/closet";
+import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Me · Diastole" };
 
-const card = "mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6";
-const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
-
-type CoachNote = { id: string; issue_key: string; summary: string; evidence: string | null; drills: string[] | null; created_at: string };
+const FLAG_WORD: Record<string, string> = { green: "Ready", yellow: "Caution", red: "Recover" };
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /**
- * The Me tab: your avatar and numbers, plus the same readiness, recovery and running-form analysis
- * your coach sees (without the AI tools). Settings live one tap away.
+ * The Me tab: your avatar, then one row for each thing about you, each opening its own page.
+ * Every number and setting has exactly one home; rows only summarize.
  */
 export default async function MePage() {
   const me = await requireUser();
   const supabase = await createClient();
+  const isCoach = me.role === "coach";
+  const units = me.units === "km" ? "km" : "mi";
 
-  const [{ data: readiness }, { data: wellness }, { data: device }, formRuns, { data: notes }, { data: layoutRow }] = await Promise.all([
-    supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", me.id).order("date", { ascending: false }).limit(14),
-    supabase.from("daily_wellness").select("date, source, hrv_ms, resting_hr, sleep_seconds, stress_avg").eq("athlete_id", me.id).gte("date", daysAgo(28)).order("date"),
-    supabase.from("device_connections").select("source").eq("athlete_id", me.id).maybeSingle(),
-    // Your own runs, so the service role is fine here (it also back-fills older runs' summaries).
-    recentFormRuns(createAdminClient(), me.id, { limit: 30, timeZone: me.timezone }),
+  const [{ data: readiness }, { data: devices }, { data: intervals }, { data: zones }, { data: gearRow }, { data: goals }, { data: notes }] = await Promise.all([
+    supabase.from("readiness_scores").select("overall, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("device_connections").select("source").eq("athlete_id", me.id),
+    supabase.from("intervals_connections").select("athlete_id").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("athlete_zones").select("ftp_w, threshold_speed_mps, threshold_hr").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("athlete_gear").select("gear").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("athlete_goals").select("race_name, race_date").eq("athlete_id", me.id).maybeSingle(),
     supabase.rpc("my_form_insights"),
-    supabase.from("profiles").select("layout").eq("id", me.id).maybeSingle(),
   ]);
-  const rows = (readiness ?? []) as ReadinessRow[];
-  const trend = oneFamily(wellness ?? [], familyOf(device?.source ?? "garmin")) as WellnessPoint[];
-  const coachNotes = (notes ?? []) as CoachNote[];
-  const today = rows[0];
-  // A brand-new athlete gets one clear card instead of eight empty tiles.
-  const hasData = rows.some((r) => r.overall !== "unknown") || trend.some((w) => w.hrv_ms ?? w.resting_hr ?? w.sleep_seconds ?? w.stress_avg);
 
-  const layout = resolveLayout("me", layoutRow?.layout);
+  const flag = readiness?.overall && FLAG_WORD[readiness.overall];
+  const body = flag ? `${flag}${readiness?.note ? ` · ${readiness.note}` : ""}` : "Recovery, sleep, stress and load";
 
-  const header = (
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Me</p>
-      <LayoutCustomizer page="me" initial={layout} />
-    </div>
-  );
+  const firstNote = ((notes ?? []) as { issue_key: string }[])[0];
+  const formMetric = firstNote ? FORM[firstNote.issue_key.split(":")[0] as FormMetric]?.label : null;
+  const form = formMetric ? `${formMetric} flagged in recent runs` : "Your runs compared with your usual";
 
-  const sections: Record<string, ReactNode> = {
-    readiness: hasData ? (
-      <ReadinessAreas
-        today={today}
-        title={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-medium">Readiness</h2>
-            <FlagBadge flag={today?.overall ?? "unknown"} />
-          </div>
-        }
-      />
-    ) : (
-        <section className={card}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-medium">Readiness</h2>
-            <FlagBadge flag="unknown" />
-          </div>
-          <p className="mt-2 text-sm leading-relaxed text-white/65">
-            {device
-              ? "Your recovery, sleep, stress and training-load breakdown fills in here as your watch syncs. Flags start after about a week of nights."
-              : "Connect your watch to see your recovery, sleep, stress and training-load breakdown here, with 14-day trends."}
-          </p>
-          {!device && (
-            <Link href="/connect" className="mt-4 inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-50 active:scale-95">
-              Connect Garmin or Apple Watch →
-            </Link>
-          )}
-        </section>
-    ),
-    trends: hasData ? <ReadinessTrend trend={trend} readiness={rows} /> : null,
-    form: (
-      <section id="form" className={`${card} scroll-mt-6`}>
-        <h2 className="text-lg font-medium">Running form</h2>
-        <p className="mb-4 mt-1 text-sm text-white/55">Your latest run for each metric, compared with your usual and common ranges. Tap a run in Training for the full breakdown.</p>
-        <FormTrends runs={formRuns} />
-      </section>
-    ),
-    notes: (
-      <>
-      {coachNotes.length > 0 && (
-        <section className={card}>
-          <h2 className="text-lg font-medium">Form notes</h2>
-          <p className="mb-4 mt-1 text-sm text-white/55">The form summaries your coach sees about your recent runs.</p>
-          <ul className="space-y-3">
-            {coachNotes.map((n) => {
-              const [metric, kind] = n.issue_key.split(":");
-              return (
-                <li key={n.id} className="rounded-2xl border border-white/[0.09] bg-white/[0.04] p-4">
-                  <p className="text-xs uppercase tracking-[0.15em] text-white/50">
-                    {FORM[metric as FormMetric]?.label ?? metric} · {kind === "fatigue" ? "drifts late in runs" : "across recent runs"} ·{" "}
-                    {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: me.timezone })}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-white/80">{n.summary}</p>
-                  {n.evidence && <p className="mt-2 text-xs text-white/50">{n.evidence}</p>}
-                  {n.drills && n.drills.length > 0 && (
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
-                      {n.drills.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-      </>
-    ),
-    setup: (
-      <Link href="/me/setup" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
-        <span className="min-w-0">
-          <span className="block font-medium">My setup</span>
-          <span className="block truncate text-sm text-white/55">Closet and gear, your numbers and training days</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
-    ),
-    secrets: (
-      <Link href="/me/secrets" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-amber-200/15 bg-amber-200/[0.04] p-4 pl-5">
-        <span className="min-w-0">
-          <span className="block font-medium">🗝️ Secrets</span>
-          <span className="block truncate text-sm text-white/55">Little surprises hidden around Diastole</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
-    ),
-    story: (
-      <Link href="/me/story" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.05] p-4 pl-5">
-        <span className="min-w-0">
-          <span className="block font-medium">Season story</span>
-          <span className="block truncate text-sm text-white/55">Your training in one shareable picture</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
-    ),
-  };
+  const pace = zones?.threshold_speed_mps ? paceOf(Number(zones.threshold_speed_mps), units) : null;
+  const numbers = [zones?.ftp_w ? `FTP ${zones.ftp_w} W` : null, pace ? `${pace} /${units}` : null, zones?.threshold_hr ? `LTHR ${zones.threshold_hr}` : null].filter(Boolean).join(" · ") || "FTP, threshold pace, heart rates";
+
+  const closet = cleanCloset(gearRow?.gear);
+  const gear = closet.shoes.length || closet.bikes.length ? [closet.shoes.length ? plural(closet.shoes.length, "shoe") : null, closet.bikes.length ? plural(closet.bikes.length, "bike") : null, closet.trainer.kind !== "none" ? "trainer" : null].filter(Boolean).join(" · ") : "Shoes, bikes, trainer, pool access";
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  const days = goals?.race_date ? Math.round((Date.parse(`${goals.race_date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000) : null;
+  const goal = goals?.race_name ? `${goals.race_name}${days != null && days >= 0 ? ` · in ${days} days` : ""}` : "Goal race, block, PRs and your numbers over time";
+
+  const sources = new Set((devices ?? []).map((d) => d.source));
+  const linked = [sources.has("garmin") ? "Garmin" : null, sources.has("apple") ? "Apple Watch" : null, intervals ? "Zwift & Rouvy" : null].filter(Boolean);
+  const connections = linked.length ? `${linked.join(" · ")} connected` : "Connect your watch";
+
+  // A coach's own athlete pages live here (their tabs are for coaching).
+  const myTraining: MeRow[] = isCoach
+    ? [
+        { href: "/me", icon: Sun, title: "My day", summary: "Today's workout, fuel and check-in" },
+        { href: "/training", icon: Dumbbell, title: "My training", summary: "Calendar and finished workouts" },
+        { href: "/fuel", icon: Utensils, title: "My fuel", summary: "Today's targets and log" },
+      ]
+    : [];
 
   return (
-    <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <ProfileView id={me.id} me={me} header={header} sections={sections} order={visibleSections(layout)} />
-      <p className="mx-auto mt-6 max-w-3xl text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
+    <DashboardShell role={isCoach ? "coach" : "athlete"}>
+      <ProfileView id={me.id} me={me} order={[]} hero="compact" />
+      <div className="mx-auto max-w-3xl pb-6">
+        <MeGroup title="My training" rows={myTraining} />
+        <MeGroup
+          title="How I'm doing"
+          rows={[
+            { href: "/account/body", icon: HeartPulse, title: "Body & recovery", summary: body },
+            { href: "/account/form", icon: Footprints, title: "Running form", summary: form },
+            { href: "/account/progress", icon: Target, title: "Goals & progress", summary: goal },
+            { href: "/races", icon: Flag, title: "Races", summary: "Your race calendar and results" },
+          ]}
+        />
+        <MeGroup
+          title="My setup"
+          rows={[
+            { href: "/me/setup#numbers", icon: Gauge, title: "My numbers", summary: numbers },
+            { href: "/me/setup#closet", icon: Backpack, title: "Gear & closet", summary: gear },
+            { href: "/me/setup#week", icon: CalendarDays, title: "Training days", summary: "When you train and for how long" },
+          ]}
+        />
+        <MeGroup
+          rows={[
+            { href: "/connect", icon: Plug, title: "Connections", summary: connections },
+            { href: "/account/settings", icon: Settings, title: "Settings", summary: "Profile, notifications, appearance, tabs" },
+          ]}
+        />
+        <MeGroup
+          rows={[
+            { href: "/me/story", icon: Sparkles, title: "Season story", summary: "Your training in one shareable picture" },
+            { href: "/me/secrets", icon: KeyRound, title: "Secrets", summary: "Little surprises hidden around Diastole" },
+            { href: "/help", icon: LifeBuoy, title: "Help" },
+          ]}
+        />
+      </div>
     </DashboardShell>
   );
 }
