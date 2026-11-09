@@ -11,11 +11,13 @@ export const metadata: Metadata = { title: "Help · Diastole" };
 export default async function HelpPage() {
   const me = await requireUser();
   const supabase = await createClient();
-  const { data: files } = await supabase.storage.from("media").list("walkthroughs", { limit: 100 });
-  const have = new Set((files ?? []).map((f) => `walkthroughs/${f.name}`));
   const url = (p: string) => supabase.storage.from("media").getPublicUrl(p).data.publicUrl;
   const roles = me.role === "coach" ? (["coach", "athlete"] as const) : (["athlete"] as const);
-  const videos = WALKTHROUGHS.filter((w) => (roles as readonly string[]).includes(w.role) && have.has(w.file));
+  // Which videos are uploaded: a quick check of each public link (cached for an hour). Listing the
+  // folder would need a storage permission the public bucket doesn't have.
+  const mine = WALKTHROUGHS.filter((w) => (roles as readonly string[]).includes(w.role));
+  const ok = await Promise.all(mine.map((w) => fetch(url(w.file), { method: "HEAD", next: { revalidate: 3600 } }).then((r) => r.ok, () => false)));
+  const videos = mine.filter((_, i) => ok[i]);
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
