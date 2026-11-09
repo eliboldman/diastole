@@ -1,6 +1,7 @@
 import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
+import { guideForAi } from "@/lib/ai/redact-numbers";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
@@ -29,8 +30,8 @@ const SYSTEM = `You are the planning assistant for an endurance coach. You draft
 
 How to plan:
 - Follow the coach's guide first. Where it names a training framework (periodization, pace systems, key-session rules), apply it.
-- Use only this athlete's numbers: their zones and the coach's private notes about them. If a number you need is unknown, or the notes say not to use it (for example an old FTP), don't invent one: use heart-rate zones or effort cues in the step notes, and say so in assumptions.
-- Respect the athlete's preferred week (disciplines on which days, time available). If the coach's guidance for this request conflicts with it, the guidance wins.
+- Numbers come only from the app: every target uses this athlete's zones in the context (FTP, threshold pace, max and threshold heart rate). The coach's guide and notes give the structure (session types, intervals and durations, % of FTP or threshold, progression and key-session rules, and this athlete's preferences and injuries); any FTP, pace or heart rate in them has been removed and must never be used or guessed at. If a zone you need isn't in the app, use heart-rate zones or effort cues in the step notes, and say so in assumptions.
+- The weekly layout comes only from the athlete's preferred_week, which the athlete filled in: which disciplines on which days, how many sessions and how much time each day. The guide's own weekly schedule has been removed; don't impose one. If preferred_week is empty, spread the sessions sensibly and say so in assumptions. The coach's guidance for this request (events, travel) can still move days.
 - Use the athlete's closet (their shoes, bikes, trainer, and pool, track or gym access). Only plan what they can do with it: indoor trainer sessions only if they have a trainer, TT-bike or trail sessions only with that bike or those shoes, pool or open-water swims only with access, power targets only with a power meter or smart trainer (otherwise heart rate or effort). When the gear matters, name it in the description (for example "TT bike", "race shoes", "trainer in ERG mode", "pull buoy") so the athlete can pack for it.
 - Apply the coach's guidance for this request (events, travel, constraints) to volume and intensity around those dates: build into key events, freshen up before them, recover after, keep travel days short or adapted to what's available.
 - Races: build toward A races and taper the last 10-14 days before one; treat B races as hard days with a short freshen-up; C races are training.
@@ -42,7 +43,7 @@ How to plan:
 Workout steps:
 - Steps: WARMUP, ACTIVE, INTERVAL, RECOVERY, REST, COOLDOWN (MAIN is swim-only). Use a repeat for "N x (...)"; repeats can't be nested; repeat count 2-99. Include warm-ups and cool-downs where the session calls for them.
 - Durations: time in seconds, distance with its unit (m, km, yd, mi), or open. Swims: distances in the pool's unit, whole lengths; rest at the wall is a REST step with seconds, or a send-off is a REST step with duration_type sendoff; give pool_length and pool_unit.
-- Run targets: pace_range as m:ss in the given pace unit (fast and slow ends), hr_zone 1-5, or hr_range. Bike: power_watts from the athlete's CURRENT FTP only (or power_pct_ftp), or hr. Swim: swim_effort 1-10 or swim_pace_per_100, plus stroke, drill and equipment when useful. Never a pace or power target on a swim, or a swim target on a run or ride.
+- Run targets: pace_range as m:ss in the given pace unit, worked out from the threshold pace in zones (fast and slow ends), hr_zone 1-5, or hr_range from the heart rates in zones. Bike: power_pct_ftp (preferred: the app turns it into watts from the athlete's FTP), power_watts only from the FTP in zones, or hr. Swim: swim_effort 1-10 or swim_pace_per_100, plus stroke, drill and equipment when useful. Never a pace or power target on a swim, or a swim target on a run or ride.
 - Step notes: short and actionable.
 
 Every workout's date must fall inside the requested window.`;
@@ -96,12 +97,13 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
 
   return {
     name: (profile.data?.full_name ?? "").split(" ")[0] || "the athlete",
-    philosophy: settings.data?.philosophy?.trim() || null,
+    // Structure from the coach's document; numbers and the weekly layout only from the app (see guideForAi).
+    philosophy: settings.data?.philosophy?.trim() ? guideForAi(settings.data.philosophy.trim()) : null,
     context: {
       today: iso(today),
       window: { start, end, days: Math.round((Date.parse(end) - Date.parse(start)) / DAY) + 1, first_weekday: new Date(`${start}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }) },
       pace_unit: units,
-      coach_notes_about_this_athlete: notes.data?.notes?.trim() || null,
+      coach_notes_about_this_athlete: notes.data?.notes?.trim() ? guideForAi(notes.data.notes.trim()) || null : null,
       preferred_week: weekForPrompt(cleanWeek(week.data?.days)),
       closet: closetForPrompt(cleanCloset(gear.data?.gear)) ?? "Not filled in: assume a road bike, running shoes and pool access, and keep sessions simple to do anywhere.",
       zones: {
