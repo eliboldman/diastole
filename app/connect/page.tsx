@@ -189,6 +189,16 @@ export default async function ConnectPage({
             action={<AppleConnect connected={false} garmin={connected.has("garmin")} />}
           />
           <Link
+            href="/me/intervals"
+            className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-4 transition hover:border-white/20 active:scale-[0.99]"
+          >
+            <span className="min-w-0">
+              <span className="block font-medium">Zwift &amp; Rouvy</span>
+              <span className="block text-sm text-white/55">Your coach&apos;s bike workouts on your smart trainer, through intervals.icu</span>
+            </span>
+            <span aria-hidden className="text-white/40">→</span>
+          </Link>
+          <Link
             href="/me/devices"
             className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/[0.05] px-5 py-4 transition hover:border-white/20 active:scale-[0.99]"
           >

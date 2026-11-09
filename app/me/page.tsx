@@ -27,6 +27,8 @@ import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import { resolveLayout, visibleSections } from "@/lib/layout-prefs";
 import type { Flag } from "@/lib/readiness/engine";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import { pullIfStale } from "@/lib/intervals/pull-soon";
+import { after } from "next/server";
 
 export const metadata: Metadata = { title: "My Diastole" };
 
@@ -37,6 +39,8 @@ const SHARED_WITH_POD = [
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const me = await requireUser();
+  // Rides from Zwift/Rouvy (via intervals.icu) come in after the page is sent, at most every two hours.
+  after(() => pullIfStale(me.id));
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
 

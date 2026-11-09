@@ -1088,5 +1088,43 @@ check("can't remove someone else's device", (r.rows?.length ?? 0) === 0);
 r = await as(A1, `delete from public.device_links returning id`);
 check("can remove own device", r.rows?.length === 1);
 
+// ---------------------------------------------------------------- intervals.icu (Zwift / Rouvy bridge)
+await db.query(`insert into public.intervals_connections (athlete_id, icu_athlete_id, icu_name) values ('${A1}', 'i12345', 'Al')`);
+await db.query(`select public.save_intervals_key('${A1}', 'secret-key-123456')`);
+r = await as(A1, "select icu_athlete_id from public.intervals_connections");
+check("athlete sees their intervals.icu connection", r.rows?.length === 1);
+r = await as(COACH, `select icu_athlete_id from public.intervals_connections where athlete_id = '${A1}'`);
+check("coach sees the athlete's connection", r.rows?.length === 1);
+r = await as(A2, "select icu_athlete_id from public.intervals_connections");
+check("other athletes don't", r.rows?.length === 0);
+r = await as(A1, `select public.get_intervals_key('${A1}')`);
+check("athletes can't read API keys back", !!r.error);
+r = await as(A1, `update public.intervals_connections set sync_ftp = false where athlete_id = '${A1}' returning athlete_id`);
+check("athletes can't write the connection directly", !!r.error || (r.rows?.length ?? 0) === 0);
+await db.exec(`revoke all on public.intervals_events, public.intervals_pulled from authenticated;`); // harness grants wholesale; mirror the migration
+r = await as(A1, "select * from public.intervals_events");
+check("event map is server-only", !!r.error);
+check("server can read the key", (await db.query(`select public.get_intervals_key('${A1}') as k`)).rows[0]?.k === "secret-key-123456");
+
+await db.query(`delete from net.pings`);
+await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title) values ('${A1}', '${COACH}', '2026-12-01', 'bike', 'Sweet spot')`);
+let ip = (await db.query(`select url, body from net.pings where url like '%intervals%'`)).rows;
+check("a new bike workout pings the intervals sync", ip.length === 1 && ip[0].body.athlete === A1);
+check("and marks the athlete dirty", !!(await db.query(`select dirty_at from public.intervals_connections where athlete_id = '${A1}'`)).rows[0]?.dirty_at);
+await db.query(`delete from net.pings`);
+await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title) values ('${A1}', '${COACH}', '2026-12-01', 'run', 'Easy run')`);
+await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title) values ('${A2}', '${COACH}', '2026-12-01', 'bike', 'Not connected')`);
+check("runs and unconnected athletes don't ping", (await db.query(`select count(*)::int as n from net.pings where url like '%intervals%'`)).rows[0].n === 0);
+await db.query(`update public.planned_workouts set title = 'Sweet spot 2' where title = 'Sweet spot'`);
+check("editing the bike workout pings again", (await db.query(`select count(*)::int as n from net.pings where url like '%intervals%'`)).rows[0].n === 1);
+await db.query(`delete from net.pings`);
+await db.query(`update public.planned_workouts set sport = 'run' where title = 'Sweet spot 2'`);
+check("changing it away from bike pings (so its event is removed)", (await db.query(`select count(*)::int as n from net.pings where url like '%intervals%'`)).rows[0].n === 1);
+await db.query(`delete from net.pings`);
+await db.query(`insert into public.athlete_zones (athlete_id, ftp_w) values ('${A1}', 280) on conflict (athlete_id) do update set ftp_w = 280`);
+check("an FTP change pings", (await db.query(`select count(*)::int as n from net.pings where url like '%intervals%'`)).rows[0].n === 1);
+await db.query(`select public.delete_intervals_key('${A1}')`);
+check("key can be deleted", (await db.query(`select public.get_intervals_key('${A1}') as k`)).rows[0]?.k === null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

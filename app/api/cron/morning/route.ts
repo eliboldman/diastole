@@ -6,6 +6,7 @@ import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
 import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
+import { pullRides, syncAthlete } from "@/lib/intervals/sync";
 import { runMonthlyRecaps } from "@/lib/recap-job";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -44,6 +45,13 @@ export async function GET(request: NextRequest) {
         return { status: "sent" };
       })().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     }
+  }
+  // intervals.icu: re-send the coming weeks (catches anything a missed ping skipped) and bring in rides.
+  const { data: icu } = await admin.from("intervals_connections").select("athlete_id");
+  for (const c of icu ?? []) {
+    const s = await syncAthlete(c.athlete_id, { force: true }, admin).catch((e) => ({ status: "error", error: String(e).slice(0, 200) }));
+    const p = await pullRides(c.athlete_id, admin).catch((e) => ({ status: "error", error: String(e).slice(0, 200) }));
+    results[`${c.athlete_id}:intervals`] = { sync: s.status, pull: p.status };
   }
   // Pod challenges that ended yesterday: final standings to everyone who joined (rules only).
   const { data: wrapped, error: wrapError } = await admin.rpc("finish_pod_challenges");

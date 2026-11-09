@@ -157,6 +157,7 @@ export default function PrivacyPage() {
             <li>OpenFreeMap: map images behind workout routes. Your browser requests the map area being viewed; the route itself is drawn in your browser and never sent to them.</li>
             <li>Anthropic: AI summaries for the coach and meal estimates for athletes, as described above.</li>
             <li>Open Food Facts: when you scan a barcode, only the barcode number is sent to look up the product&apos;s nutrition.</li>
+            <li>intervals.icu (only if you connect it under Devices › Zwift &amp; Rouvy): your coach&apos;s bike workouts and your FTP are sent to your intervals.icu account, which passes the workouts to Zwift or Rouvy if you connected them there; rides from those apps are read back. Your intervals.icu API key is stored privately and deleted when you disconnect.</li>
             <li>Apple: push notifications to the Diastole iPhone app, if you allow them. Apple receives the notification&apos;s title and text to deliver it to your phone.</li>
           </ul>
           <p>We may disclose data if required by law.</p>
