@@ -18,11 +18,15 @@ const steps: Step[] = [
   { kind: "step", intensity: "COOLDOWN", duration: { type: "open" } },
 ];
 
-// With FTP: power as % so Zwift/Rouvy scale it to the rider.
+// With FTP: power as % so Zwift/Rouvy scale it to the rider; HR steps become the matching power zone
+// (Zwift/Rouvy can't drive a trainer from HR). 140-152 of 190 = 74-80% max HR → zone 3.
 assert.equal(
   toIntervalsText(steps, { ftp: 290, maxHr: 190 }),
-  ["- 10m 50-60%", "", "4x", "- Stay seated, rpm 4m 95-100%", "- 1m30s Z2 HR", "", "- 5km 74-80% HR", "- 400mtr freeride", "- Open step 5m freeride"].join("\n"),
+  ["- 10m 50-60%", "", "4x", "- Stay seated, rpm 4m 95-100%", "- 1m30s 60-72%", "", "- 5km 76-88%", "- 400mtr freeride", "- Open step 5m freeride"].join("\n"),
 );
+
+// Without FTP, HR targets stay HR.
+assert.equal(toIntervalsText(steps.slice(1, 3), { maxHr: 190 }).split("\n").slice(-3).join("\n"), ["- 1m30s Z2 HR", "", "- 5km 74-80% HR"].join("\n"));
 
 // Without FTP: absolute watts; without max HR an HR range rides free.
 assert.equal(

@@ -6,6 +6,8 @@
 // distance, target. Repeats are an "Nx" line with a blank line before and after; no nesting.
 // "m" means minutes ("mtr" = meters). Absolute bpm isn't supported, so HR ranges become % of max
 // HR when we know it. There's no lap-button step in text, so open steps become 5 min free ride.
+// Zwift and Rouvy can only drive the trainer from power: an HR-only step shows up there as a flat,
+// empty ride. So when we know FTP, HR targets go as the matching power zone (% of FTP) instead.
 
 import type { Duration, Step, Target } from "../workouts/garmin-format.ts";
 
@@ -34,6 +36,15 @@ function length(d: Duration): { text: string; open: boolean } {
 
 const range = (lo: number, hi: number, unit: string) => (lo === hi ? `${lo}${unit}` : `${lo}-${hi}${unit}`);
 
+/** Heart-rate zone → the power band (% of FTP) a rider usually holds there; ERG rides the middle. */
+const HR_ZONE_POWER: Record<number, [number, number]> = { 1: [45, 55], 2: [60, 72], 3: [76, 88], 4: [91, 100], 5: [105, 115] };
+/** % of max HR → zone, on the common five-zone split (60/70/80/90). */
+const zoneFromMaxPct = (pct: number) => (pct < 60 ? 1 : pct < 70 ? 2 : pct < 80 ? 3 : pct < 90 ? 4 : 5);
+const powerFromZone = (zone: number) => {
+  const band = HR_ZONE_POWER[Math.min(5, Math.max(1, Math.round(zone)))];
+  return range(band[0], band[1], "%");
+};
+
 function target(t: Target | undefined, o: IntervalsOptions): string | null {
   if (!t) return null;
   switch (t.type) {
@@ -43,10 +54,13 @@ function target(t: Target | undefined, o: IntervalsOptions): string | null {
       return range(Math.round(t.low), Math.round(t.high), "w");
     }
     case "hr_zone":
-      return `Z${t.zone} HR`;
-    case "hr_range":
+      return o.ftp && o.ftp > 0 ? powerFromZone(t.zone) : `Z${t.zone} HR`;
+    case "hr_range": {
       if (!(o.maxHr && o.maxHr > 0 && t.low > 0 && t.high >= t.low)) return null;
-      return `${range(Math.round((t.low / o.maxHr) * 100), Math.round((t.high / o.maxHr) * 100), "%")} HR`;
+      const lo = Math.round((t.low / o.maxHr) * 100);
+      const hi = Math.round((t.high / o.maxHr) * 100);
+      return o.ftp && o.ftp > 0 ? powerFromZone(zoneFromMaxPct((lo + hi) / 2)) : `${range(lo, hi, "%")} HR`;
+    }
     default:
       return null; // pace/swim targets don't apply on the bike
   }
