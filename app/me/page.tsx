@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Backpack, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 
@@ -21,7 +20,7 @@ import FuelToday from "@/components/fuel/FuelToday";
 import RaceWeek from "@/components/race/RaceWeek";
 import AthleteShell from "@/components/AthleteShell";
 import LayoutCustomizer from "@/components/LayoutCustomizer";
-import { FlagBadge, FlagRow } from "@/components/coach/Flags";
+import { FlagBadge } from "@/components/coach/Flags";
 import { RespondToInvite } from "@/components/PodButtons";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import { resolveLayout, visibleSections } from "@/lib/layout-prefs";
@@ -120,13 +119,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           )}
         </div>
         <p className="mt-3 text-white/70">{readiness?.note ?? "Waiting for your first data."}</p>
-        {readiness && (
-          <div className="mt-4 max-w-md">
-            <FlagRow flags={readiness as Record<"recovery" | "sleep" | "stress" | "load", Flag>} />
-          </div>
-        )}
         <Link href="/account/body" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
-          Recovery and trends →
+          Recovery, sleep, stress and load →
         </Link>
       </section>
       </>
@@ -227,17 +221,6 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <LayoutCustomizer page="today" initial={layout} />
       </div>
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
-      {/* One obvious way to closet, gear, numbers and training days. */}
-      <Link href="/me/setup" className="lift mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">
-          <Backpack size={19} aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium">My setup</span>
-          <span className="block truncate text-sm text-white/55">Closet, gear, numbers, training days</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
-      </Link>
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
 
       {!showWelcome && release && !seen(seenTips, release.id) && <WhatsNew id={release.id} items={me.role === "coach" ? release.coach : release.athlete} />}
@@ -273,11 +256,6 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <Fragment key={k}>{blocks[k]}</Fragment>
       ))}
 
-      {device?.source === "garmin" && (
-        <Link href="/me/import" className="mt-6 inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
-          Import your Garmin history →
-        </Link>
-      )}
 
       <p className="mt-10 text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
     </AthleteShell>

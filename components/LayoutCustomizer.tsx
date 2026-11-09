@@ -6,7 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 
 import { saveLayout } from "@/lib/layout-actions";
-import { LAYOUT_PAGES, type LayoutPage, type PageLayout } from "@/lib/layout-prefs";
+import { LAYOUT_PAGES, resolveLayout, type LayoutPage, type PageLayout } from "@/lib/layout-prefs";
 
 /**
  * "Customize" button + sheet: show or hide each section of a page and move it up or down.
@@ -55,7 +55,7 @@ export default function LayoutCustomizer({ page, initial }: { page: LayoutPage; 
   const toggle = (key: string) =>
     commit({ ...layout, hidden: layout.hidden.includes(key) ? layout.hidden.filter((k) => k !== key) : [...layout.hidden, key] });
   const reset = () => {
-    setLayout({ order: LAYOUT_PAGES[page].map((s) => s.key), hidden: [] });
+    setLayout(resolveLayout(page, null));
     commit(null);
   };
 

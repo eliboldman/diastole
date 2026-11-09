@@ -17,6 +17,19 @@ export type Highlight = { emoji: string; title: string; body: string; href?: str
 /** Newest first. Only the newest release shows, and only until it's dismissed. */
 export const RELEASES: Release[] = [
   {
+    id: "new:2026-11c",
+    athlete: [
+      { emoji: "🧭", title: "Me is a simple menu now", body: "Body & recovery, running form, your numbers, gear, connections and settings: one row each.", href: "/account" },
+      { emoji: "☀️", title: "A calmer Today", body: "Your workout first, then readiness, fuel and check-in. Customize brings anything back.", href: "/me" },
+      { emoji: "🚴", title: "Zwift & Rouvy", body: "Your coach's bike workouts on your trainer. Set it up in Me › Connections.", href: "/me/intervals" },
+    ],
+    coach: [
+      { emoji: "🧭", title: "Me is a simple menu now", body: "Your own day, training and fuel sit at the top; settings and connections have one home.", href: "/account" },
+      { emoji: "🚴", title: "Zwift & Rouvy", body: "Bike workouts reach athletes' trainers through intervals.icu, always as power.", href: "/me/intervals" },
+      { emoji: "📺", title: "Ride screen and Apple TV", body: "Trainer-controlled rides from the iPhone, iPad and Apple TV apps (rolling out).", href: "/me/devices" },
+    ],
+  },
+  {
     id: "new:2026-11b",
     athlete: [
       { emoji: "🌿", title: "Recovery routines", body: "Rolling, stretching and breathing with your coach's demos.", href: "/recovery" },

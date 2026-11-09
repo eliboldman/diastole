@@ -22,4 +22,10 @@ assert.deepEqual(custom.hidden, ["form"]);
 assert.ok(!visibleSections(custom).includes("form"));
 
 assert.deepEqual(resolveLayout("today", { today: "garbage" }).order, resolveLayout("today", {}).order);
+
+// Today: the workout comes first; tallies and history start hidden until someone saves a layout.
+const today = resolveLayout("today", null);
+assert.equal(today.order[1], "upcoming");
+assert.deepEqual(today.hidden, ["progress", "streaks", "recent", "pods"]);
+assert.deepEqual(resolveLayout("today", { today: { order: today.order, hidden: [] } }).hidden, [], "a saved layout keeps its own choices");
 console.log("layout prefs: all passed");
