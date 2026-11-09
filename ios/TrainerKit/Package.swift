@@ -7,9 +7,14 @@ import PackageDescription
 let package = Package(
   name: "TrainerKit",
   platforms: [.iOS(.v18), .tvOS(.v18), .macOS(.v15)],
-  products: [.library(name: "TrainerKit", targets: ["TrainerKit"])],
+  products: [
+    .library(name: "TrainerKit", targets: ["TrainerKit"]),
+    .library(name: "RideUI", targets: ["RideUI"]),
+  ],
   targets: [
     .target(name: "TrainerKit"),
-    .testTarget(name: "TrainerKitTests", dependencies: ["TrainerKit"]),
+    // SwiftUI ride screens shared by the iPhone/iPad app and the Apple TV app.
+    .target(name: "RideUI", dependencies: ["TrainerKit"]),
+    .testTarget(name: "TrainerKitTests", dependencies: ["TrainerKit", "RideUI"]),
   ]
 )

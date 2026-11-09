@@ -157,6 +157,14 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
             BarcodeScanner.shared.start(from: message.webView)
             return
         }
+        if type == "startRide" {
+            RideCoordinator.startRide(id: (body["id"] as? String).flatMap { $0.range(of: "^[0-9a-fA-F-]{36}$", options: .regularExpression) != nil ? $0 : nil }, from: message.webView)
+            return
+        }
+        if type == "openHub" {
+            RideCoordinator.openHub()
+            return
+        }
         if type == "shareImage", let b64 = body["data"] as? String {
             ShareSheet.present(base64PNG: b64)
             return

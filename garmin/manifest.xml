@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- Diastole for Garmin: today's plan, readiness and overnight numbers. A widget, so it lives in
+     the glance loop and opens full screen. Product list: add athletes' watches as needed. -->
+<iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:application id="cc4ab2e667f44c54a100fb66e43693d1" type="widget" name="@Strings.AppName" entry="DiastoleApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.3.0">
+        <iq:products>
+            <iq:product id="fr965"/>
+            <iq:product id="fr955"/>
+            <iq:product id="fr265"/>
+            <iq:product id="fr265s"/>
+            <iq:product id="fr255"/>
+            <iq:product id="fr255s"/>
+            <iq:product id="fr165"/>
+            <iq:product id="fenix7"/>
+            <iq:product id="fenix7s"/>
+            <iq:product id="fenix7x"/>
+            <iq:product id="epix2"/>
+            <iq:product id="venu3"/>
+            <iq:product id="vivoactive5"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="Background"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+        <iq:barrels/>
+    </iq:application>
+</iq:manifest>

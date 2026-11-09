@@ -13,13 +13,14 @@ public struct FoundDevice: Identifiable, Hashable, Sendable {
 }
 
 /// Live numbers from whatever is connected (trainer and/or heart-rate strap).
-public struct LiveMetrics: Equatable, Sendable {
+public struct LiveMetrics: Codable, Equatable, Sendable {
   public var powerW: Int?
   public var cadenceRpm: Double?
   public var speedKph: Double?
   public var heartRateBpm: Int?
   /// Trainer-reported distance since connect, metres.
   public var distanceM: Double?
+  public init() {}
 }
 
 /// CoreBluetooth wrapper for one trainer plus one optional heart-rate strap. Apple TV allows only
@@ -27,7 +28,7 @@ public struct LiveMetrics: Equatable, Sendable {
 ///
 /// Runs on the main queue so the UI can read it directly; all CoreBluetooth callbacks arrive there.
 @MainActor @Observable
-public final class TrainerConnection: NSObject {
+public final class TrainerConnection: NSObject, TrainerLink {
   public enum State: Equatable, Sendable { case off, unauthorized, idle, scanning, connecting, connected }
 
   public private(set) var state: State = .idle
@@ -54,7 +55,8 @@ public final class TrainerConnection: NSObject {
   @ObservationIgnored private var distanceBase: Int?
   @ObservationIgnored private var wantTrainer: UUID?
   @ObservationIgnored private var wantStrap: UUID?
-  @ObservationIgnored private var lastTarget: Int?
+  /// .none = nothing sent yet (so the first "free ride" is sent too); .some(nil) = released.
+  @ObservationIgnored private var lastTarget: Int?? = .none
 
   private static let scanServices = [GATT.ftmsService, GATT.cyclingPowerService, GATT.heartRateService].map(CBUUID.init(string:))
 
@@ -109,20 +111,28 @@ public final class TrainerConnection: NSObject {
   /// ERG: hold `watts`. Nil releases the trainer to a light fixed resistance (free ride / paused).
   /// Repeating the same target is ignored.
   public func setTarget(_ watts: Int?) {
-    guard watts != lastTarget else { return }
-    lastTarget = watts
+    if case let .some(last) = lastTarget, last == watts { return }
+    lastTarget = .some(watts)
     if let w = watts {
       send(.setTargetPower(watts: powerRange?.clamp(w) ?? w))
-    } else if features?.canSetResistance ?? false {
+    } else if features == nil || features?.canSimulate == true {
+      send(Self.flatRoad) // feels like riding on the flat: easiest to keep pedaling or restart
+    } else if features?.canSetResistance == true {
       send(.setResistance(level: 5))
+    } else {
+      send(.setTargetPower(watts: powerRange?.min ?? 50)) // ERG-only trainer: hold something light
     }
   }
+
+  static let flatRoad = ControlCommand.simulation(windMps: 0, gradePercent: 0, crr: 0.004, cwKgPerM: 0.51)
 
   public func send(_ command: ControlCommand) {
     guard controlPoint != nil else { return }
     if !inControl && command != .requestControl && !pending.contains(.requestControl) && inFlight != .requestControl {
       pending.append(.requestControl)
     }
+    // Only the newest target matters: drop older ones still waiting behind a slow trainer.
+    if command.setsTarget { pending.removeAll { $0.setsTarget } }
     pending.append(command)
     pump()
   }
@@ -157,7 +167,7 @@ public final class TrainerConnection: NSObject {
 
   private func cleanUp(_ p: CBPeripheral) {
     if p == trainer {
-      controlPoint = nil; inControl = false; pending = []; inFlight = nil; lastTarget = nil
+      controlPoint = nil; inControl = false; pending = []; inFlight = nil; lastTarget = .none
       features = nil; powerRange = nil; distanceBase = nil
       metrics.powerW = nil; metrics.cadenceRpm = nil; metrics.speedKph = nil
       if wantTrainer == p.identifier { state = .connecting; central.connect(p) } // auto-reconnect

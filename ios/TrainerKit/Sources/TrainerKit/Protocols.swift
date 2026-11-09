@@ -157,6 +157,14 @@ public enum ControlCommand: Equatable, Sendable {
   }
 
   public var data: Data { Data(bytes) }
+
+  /// ERG, resistance and simulation all set "what the trainer should feel like"; newer replaces older.
+  var setsTarget: Bool {
+    switch self {
+    case .setTargetPower, .setResistance, .simulation: true
+    default: false
+    }
+  }
 }
 
 /// The trainer's answer to a control point write (sent as an indication: 0x80, opcode, result).
