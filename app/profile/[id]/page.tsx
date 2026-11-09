@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -13,8 +13,10 @@ const UUID = /^[0-9a-f-]{36}$/i;
 /** Someone else's profile (a coach's athlete or a pod mate). Your own lives on the Me tab. */
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireUser();
-  const { id } = await params;
-  if (id === "me" || id === me.id) redirect("/account");
+  // No redirects here: this route has a loading screen, and a redirect after it has started
+  // crashes in-app navigation (React error #310). Your own profile simply shows here.
+  const raw = (await params).id;
+  const id = raw === "me" ? me.id : raw;
   if (!UUID.test(id)) notFound();
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>

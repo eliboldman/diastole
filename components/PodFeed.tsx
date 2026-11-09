@@ -164,7 +164,7 @@ export default function PodFeed({
             >
               <div className="flex items-start justify-between gap-3">
                 <h2 className="min-w-0 text-xl font-semibold tracking-tight">
-                  <Link href={`/profile/${m.id}`} className="flex min-w-0 items-center gap-3 rounded-2xl transition hover:text-emerald-100 active:scale-[0.98]">
+                  <Link href={m.is_me ? "/account" : `/profile/${m.id}`} className="flex min-w-0 items-center gap-3 rounded-2xl transition hover:text-emerald-100 active:scale-[0.98]">
                     <AvatarCircle look={avatars[m.id]} name={m.name} size={44} />
                     <span className="min-w-0 truncate">{m.name}</span>
                     {m.is_me && <span className="text-sm font-normal text-white/50">(you)</span>}

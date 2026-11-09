@@ -28,7 +28,8 @@ export default async function MyPodsPage({ searchParams }: { searchParams: Promi
   const invites = rows.filter((r) => r.status === "invited");
 
   // Athletes go straight into their pod (the one they opened last, if they're in several). The list
-  // stays for invites waiting on an answer and for sharing settings (?all=1).
+  // stays for invites waiting on an answer and for sharing settings (?all=1). This route has no
+  // loading.tsx on purpose: a redirect after a loading screen starts crashes in-app taps.
   if (me.role !== "coach" && !invites.length && active.length && (await searchParams).all !== "1") {
     const last = (await cookies()).get("d_last_pod")?.value;
     redirect(`/me/pods/${active.find((a) => a.pod_id === last)?.pod_id ?? active[0].pod_id}`);
