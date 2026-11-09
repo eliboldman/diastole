@@ -1061,5 +1061,32 @@ check("suggested drafts carry their batch", !r.error);
 r = await as(A1, `select count(*)::int as n from public.plan_batches`);
 check("athletes can't see plan batches", r.rows?.[0]?.n === 0);
 
+// ---------------------------------------------------------------- Watch & TV pairing codes
+await db.query(`insert into public.device_pairings (code, kind, secret_hash) values ('ABC234', 'garmin_watch', 'h1'), ('OLD234', 'apple_tv', 'h2')`);
+await db.query(`update public.device_pairings set expires_at = now() - interval '1 minute' where code = 'OLD234'`);
+r = await as(A1, "select * from public.device_pairings");
+check("athletes can't list pairing codes", !!r.error || r.rows?.length === 0);
+r = await as(A1, `select public.claim_device_code(' abc 234 ') as k`);
+check("typing a code claims it (case and spaces ignored)", r.rows?.[0]?.k === "garmin_watch");
+check("claimed for the signed-in athlete", (await db.query(`select athlete_id from public.device_pairings where code = 'ABC234'`)).rows[0]?.athlete_id === A1);
+r = await as(A2, `select public.claim_device_code('ABC234') as k`);
+check("a claimed code can't be taken by someone else", r.rows?.[0]?.k === "used");
+r = await as(A2, `select public.claim_device_code('OLD234') as k`);
+check("expired codes are refused", r.rows?.[0]?.k === "expired");
+for (let i = 0; i < 9; i++) await as(A2, `select public.claim_device_code('ZZZ999')`);
+r = await as(A2, `select public.claim_device_code('ZZZ998') as k`);
+check("guessing is rate limited", r.rows?.[0]?.k === "too_many");
+await db.query(`insert into public.device_links (athlete_id, kind, label, token_hash) values ('${A1}', 'garmin_watch', 'FR965', 't1'), ('${A2}', 'apple_tv', 'TV', 't2')`);
+r = await as(A1, "select id, label from public.device_links");
+check("athletes see only their own devices", r.rows?.length === 1 && r.rows[0].label === "FR965");
+// The harness grants every table wholesale after migrations; re-apply this migration's column grant.
+await db.exec(`revoke all on public.device_links from authenticated; grant select (id, athlete_id, kind, label, created_at, last_seen_at), delete on public.device_links to authenticated;`);
+r = await as(A1, "select token_hash from public.device_links");
+check("token hashes stay hidden", !!r.error);
+r = await as(A1, `delete from public.device_links where kind = 'apple_tv' returning id`);
+check("can't remove someone else's device", (r.rows?.length ?? 0) === 0);
+r = await as(A1, `delete from public.device_links returning id`);
+check("can remove own device", r.rows?.length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

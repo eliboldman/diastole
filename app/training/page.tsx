@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
+import RideButtons from "@/components/RideButtons";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
@@ -61,6 +62,8 @@ export default async function TrainingPage() {
           </Link>
         </div>
       </div>
+
+      <RideButtons hub quietOnWeb />
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Next two weeks</h2>

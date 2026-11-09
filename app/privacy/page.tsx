@@ -61,6 +61,13 @@ export default function PrivacyPage() {
               after the athlete grants permission): HRV, resting heart rate, sleep and workouts.
             </li>
             <li>
+              <strong className="text-white/80">Indoor rides and the watch &amp; TV apps</strong> (only if used): rides recorded by
+              the Diastole iPhone, iPad or Apple TV app from your smart trainer and heart-rate sensor (power, cadence, heart rate,
+              speed and distance; no location). The Diastole Garmin watch app and Apple TV app sign in with a one-time code and
+              can read your plan and readiness; we keep only a scrambled form of their sign-in key, and you can sign a device out
+              at any time under Devices › Watch &amp; TV apps. Bluetooth and local-network access stay on your devices.
+            </li>
+            <li>
               <strong className="text-white/80">Coaching data:</strong> planned workouts, readiness
               scores we calculate, and notes the coach adds.
             </li>

@@ -13,7 +13,7 @@
     "walkthrough:record": "node walkthroughs/record.ts",
     "walkthrough:edit": "node walkthroughs/edit.ts",
     "walkthrough:upload": "node walkthroughs/upload.ts",
-    "test:workouts": "node lib/workouts/garmin-format.test.ts",
+    "test:workouts": "node lib/workouts/garmin-format.test.ts && node lib/workouts/ride.test.ts",
     "test:readiness": "node lib/readiness/engine.test.ts",
     "test:adjust": "node lib/workouts/adjust.test.ts",
     "test:scenarios": "node lib/ai/scenarios.test.ts",
