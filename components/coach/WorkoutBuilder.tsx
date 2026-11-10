@@ -14,6 +14,7 @@ import {
   DRILLS,
   EQUIPMENT,
   hundredMeters,
+  inferPool,
   STROKES,
   SWIM_EFFORTS,
   YARD,
@@ -95,11 +96,11 @@ const swimDefault = (pool: Pool): Step[] => {
   ];
 };
 
-const POOLS: { key: string; label: string; pool: Pool }[] = [
-  { key: "25YARD", label: "25 yd pool", pool: { length: 25, unit: "YARD" } },
-  { key: "25METER", label: "25 m pool", pool: { length: 25, unit: "METER" } },
-  { key: "50METER", label: "50 m pool", pool: { length: 50, unit: "METER" } },
-  { key: "any", label: "Any pool", pool: null },
+const POOLS: { key: string; label: string; sub: string; pool: Pool }[] = [
+  { key: "25YARD", label: "25 yd", sub: "Short course yards", pool: { length: 25, unit: "YARD" } },
+  { key: "25METER", label: "25 m", sub: "Short course meters", pool: { length: 25, unit: "METER" } },
+  { key: "50METER", label: "50 m", sub: "Long course meters", pool: { length: 50, unit: "METER" } },
+  { key: "any", label: "Any pool", sub: "Numbers as written", pool: null },
 ];
 const poolKey = (p: Pool) => (p ? `${p.length}${p.unit}` : "any");
 
@@ -538,8 +539,22 @@ export default function WorkoutBuilder({
     withIds(initial?.steps ?? (startSport === "swim" ? swimDefault({ length: 25, unit: "YARD" }) : DEFAULT_STEPS)),
   );
   const [paceUnit, setPaceUnit] = useState<"mi" | "km">(units);
-  const [pool, setPool] = useState<Pool>(initial ? (initial.pool ?? null) : { length: 25, unit: "YARD" });
+  const [pool, setPool] = useState<Pool>(initial ? inferPool(initial.steps, initial.pool ?? null) : { length: 25, unit: "YARD" });
   const swim = sport === "swim";
+  // Keep the same number of lengths' worth of distance in the new unit (100 yd -> 100 m).
+  const changePool = (next: Pool) => {
+    const factor = hundredMeters(next) / hundredMeters(pool);
+    const rescale = (list: UiStep[]): UiStep[] =>
+      list.map((s) =>
+        s.kind === "repeat"
+          ? { ...s, steps: rescale(s.steps) }
+          : s.duration.type === "distance"
+            ? { ...s, duration: { type: "distance", meters: Number((s.duration.meters * factor).toFixed(2)) } }
+            : s,
+      );
+    if (factor !== 1) setSteps(rescale(steps));
+    setPool(next);
+  };
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -710,6 +725,28 @@ export default function WorkoutBuilder({
         </div>
       )}
 
+      {swim && (
+        <div role="radiogroup" aria-label="Pool" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {POOLS.map((p) => {
+            const on = poolKey(pool) === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={!editable}
+                onClick={() => changePool(p.pool)}
+                className={`min-h-14 rounded-2xl border px-3 py-2 text-left transition disabled:opacity-60 ${on ? "border-emerald-300/40 bg-emerald-300/[0.12] text-emerald-50" : "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"}`}
+              >
+                <span className="block text-sm font-medium">{p.label}</span>
+                <span className="block text-[11px] text-white/50">{p.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Live totals: stays in view while the steps below are edited. */}
       <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 md:top-2">
         <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} className="bg-canvas/90 backdrop-blur-xl" />
@@ -717,37 +754,6 @@ export default function WorkoutBuilder({
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Steps</h2>
-        {swim && (
-          <label className="flex items-center gap-2 text-xs text-white/60">
-            Pool
-            <select
-              className={sel}
-              value={poolKey(pool)}
-              disabled={!editable}
-              onChange={(e) => {
-                const next = POOLS.find((p) => p.key === e.target.value)?.pool ?? null;
-                // Keep the same number of lengths' worth of distance in the new unit (100 yd -> 100 m).
-                const factor = hundredMeters(next) / hundredMeters(pool);
-                const rescale = (list: UiStep[]): UiStep[] =>
-                  list.map((s) =>
-                    s.kind === "repeat"
-                      ? { ...s, steps: rescale(s.steps) }
-                      : s.duration.type === "distance"
-                        ? { ...s, duration: { type: "distance", meters: Number((s.duration.meters * factor).toFixed(2)) } }
-                        : s,
-                  );
-                if (factor !== 1) setSteps(rescale(steps));
-                setPool(next);
-              }}
-            >
-              {POOLS.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         {sport === "run" && (
           <label className="flex items-center gap-2 text-xs text-white/60">
             Pace in

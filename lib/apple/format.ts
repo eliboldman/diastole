@@ -5,7 +5,7 @@
 // WorkoutKit's shape is: optional warmup, blocks (each a list of work/recovery steps repeated N
 // times), optional cooldown. Repeats inside repeats don't exist there, so inner repeats are expanded.
 
-import type { Duration, Pool, Step, Target } from "../workouts/garmin-format.ts";
+import { inferPool, type Duration, type Pool, type Step, type Target } from "../workouts/garmin-format.ts";
 
 const YARD = 0.9144; // garmin-format's YARD (kept local: this module only imports types)
 
@@ -80,6 +80,7 @@ const single = (s: Flat): AppleStep => ({ goal: goal(s.duration), ...(alert(s.ta
 export function toAppleWorkout(w: { id: string; date: string; title: string; sport: string; steps: Step[]; pool?: Pool }): AppleWorkout | null {
   const activity = ACTIVITY[w.sport];
   if (!activity) return null;
+  if (activity === "swimming") w = { ...w, pool: inferPool(w.steps ?? [], w.pool ?? null) };
   const steps = [...(w.steps ?? [])];
 
   const first = steps[0];

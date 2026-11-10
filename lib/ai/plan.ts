@@ -12,7 +12,7 @@ import { cleanCloset, closetForPrompt } from "@/lib/closet";
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { bikeStepsToPower } from "@/lib/workouts/bike-power";
-import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { inferPool, validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
 
 // "Suggest workouts": Claude drafts up to four weeks for ONE athlete from the coach's guide, that
@@ -220,6 +220,8 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
     const c = ctx(w);
     const raw: Step[] = w.steps.map((x) => (x.kind === "repeat" ? { kind: "repeat", times: x.times, steps: x.steps.map((l) => leafToStep(l, c)) } : leafToStep(x, c)));
     const steps = w.sport === "bike" ? bikeStepsToPower(raw, c.ftp, g.context.zones.max_hr) : raw;
+    // The AI sometimes leaves out the pool; yard distances then still mean a yard pool.
+    if (w.sport === "swim") c.pool = inferPool(steps, c.pool);
     const errors = validateSteps(steps, 0, w.sport as Sport, c.pool);
     if (w.date < input.start || w.date > end) errors.push(`date ${w.date} is outside ${input.start} to ${end}`);
     return { w, steps, pool: c.pool, errors };

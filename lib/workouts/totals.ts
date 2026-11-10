@@ -6,7 +6,7 @@
 // is estimated from the step's pace target, then the athlete's threshold, then an easy default,
 // and marked "~". "Until lap" steps can't be counted and are reported separately.
 
-import type { Pool, Sport, Step, Target } from "./garmin-format.ts";
+import { inferPool, type Pool, type Sport, type Step, type Target } from "./garmin-format.ts";
 
 const YARD = 0.9144;
 const MILE = 1609.344;
@@ -114,6 +114,7 @@ export type Summary = { time: string | null; distance: string | null; hard: stri
 
 /** Everything the summary card shows, as text. */
 export function summarize(steps: Step[], sport: Sport | string, pool: Pool, units: "mi" | "km", zones: Zones = null): Summary {
+  if (sport === "swim") pool = inferPool(steps, pool);
   const t = workoutTotals(steps, sport, pool, zones);
   // Bike distance from time is a guess at best (wind, hills, trainer); only show it when the steps set it.
   const bikeGuess = sport === "bike" && t.distanceEstimated;

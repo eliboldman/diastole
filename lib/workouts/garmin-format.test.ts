@@ -95,3 +95,16 @@ assert.match(validateSteps([{ kind: "step", intensity: "MAIN", duration: { type:
 assert.match(validateSteps([{ kind: "step", intensity: "ACTIVE", duration: { type: "open" }, stroke: "FREESTYLE" }], 0, "bike").join(), /for swims/);
 
 console.log("garmin-format: all checks passed");
+
+// A pool-less swim written in yards goes to Garmin as a 25 yd pool, so 100 yd shows "100", not "91".
+{
+  const { inferPool } = await import("./garmin-format.ts");
+  const yd = [{ kind: "step", intensity: "MAIN", duration: { type: "distance", meters: 91.44 } }, { kind: "step", intensity: "REST", duration: { type: "time", seconds: 20 } }] as never;
+  assert.deepEqual(inferPool(yd, null), { length: 25, unit: "YARD" });
+  assert.equal(inferPool([{ kind: "step", intensity: "MAIN", duration: { type: "distance", meters: 100 } }] as never, null), null);
+  assert.deepEqual(inferPool(yd, { length: 50, unit: "METER" }), { length: 50, unit: "METER" });
+  const g = toGarminWorkout({ title: "Swim", sport: "swim", steps: yd });
+  assert.equal(g.poolLength, 25);
+  assert.equal(g.poolLengthUnit, "YARD");
+  console.log("inferPool: passed");
+}

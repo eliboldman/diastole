@@ -19,7 +19,7 @@ import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
-import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
+import { inferPool, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -48,7 +48,8 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   // Heat and altitude (the athlete's opt-in): targets as they'd feel at today's conditions.
   const { data: optIn } = await supabase.from("profiles").select("adjust_conditions").eq("id", w.athlete_id).maybeSingle();
 
-  const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
+  const saved: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
+  const pool: Pool = w.sport === "swim" ? inferPool(w.steps as Step[], saved) : saved;
   const lines = describe(w.steps as Step[], me.units, pool, w.sport === "swim");
   const session = estimateSession(w.steps as Step[], w.sport, zones, pool);
   const closet = cleanCloset(gearRow?.gear);

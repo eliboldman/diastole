@@ -81,6 +81,23 @@ export const poolMeters = (pool: Pool) => (pool ? pool.length * (pool.unit === "
 /** Metres in "100" of the pool's unit (100 yd or 100 m). Meters when the pool is unspecified. */
 export const hundredMeters = (pool: Pool) => (pool?.unit === "YARD" ? 100 * YARD : 100);
 
+/**
+ * A swim saved without a pool whose distances are clearly yards (every one a whole number of 25 yd
+ * lengths, at least one not a whole number of 25 m ones): treat it as a 25 yd pool. Without this,
+ * Garmin shows a pool-less workout's numbers as written, so 100 yd (stored as 91.44 m) read "91".
+ */
+export function inferPool(steps: Step[], pool: Pool): Pool {
+  if (pool) return pool;
+  const dists: number[] = [];
+  const walk = (list: Step[]) =>
+    list.forEach((s) => (s.kind === "repeat" ? walk(s.steps) : s.duration.type === "distance" && s.intensity !== "REST" && dists.push(s.duration.meters)));
+  walk(steps ?? []);
+  if (!dists.length) return null;
+  const whole = (m: number, len: number) => Math.abs(m / len - Math.round(m / len)) < 0.005;
+  if (dists.every((m) => whole(m, 25 * YARD)) && dists.some((m) => !whole(m, 25))) return { length: 25, unit: "YARD" };
+  return null;
+}
+
 const EMPTY_TARGET = {
   targetType: "OPEN",
   targetValue: null,
@@ -195,7 +212,7 @@ export function countSteps(steps: Step[]): number {
 }
 
 export function toGarminWorkout(w: { title: string; description?: string | null; sport: Sport; steps: Step[]; pool?: Pool }) {
-  const pool = w.sport === "swim" ? (w.pool ?? null) : null;
+  const pool = w.sport === "swim" ? inferPool(w.steps, w.pool ?? null) : null;
   const errors = validateSteps(w.steps, 0, w.sport, pool);
   if (!SPORTS[w.sport]) errors.push(`Unsupported sport for Garmin: ${w.sport}`);
   if (countSteps(w.steps) > 100) errors.push("Garmin allows at most 100 steps in a single-sport workout.");
