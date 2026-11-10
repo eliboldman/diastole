@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { CalendarDays, CalendarRange, ClipboardList, Plus } from "lucide-react";
+import { CalendarDays, CalendarRange, ClipboardList, Plus, Sparkles } from "lucide-react";
 
 import QuickLinks from "@/components/layout/QuickLinks";
 import SyncedAgo from "@/components/SyncedAgo";
@@ -134,6 +134,7 @@ export default async function TodayPage() {
       <WatchCard rows={roster.map((r) => ({ id: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", status: watches.get(r.id)! })).filter((r) => r.status)} />
       <QuickLinks
         links={[
+          { href: "/ask", label: "Ask Diastole", icon: <Sparkles size={16} aria-hidden /> },
           { href: "/endurance-lab", label: "Build a workout", icon: <Plus size={16} aria-hidden /> },
           { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
           { href: "/workouts", label: "All workouts", icon: <CalendarDays size={16} aria-hidden /> },

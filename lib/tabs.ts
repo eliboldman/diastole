@@ -29,6 +29,7 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
     { id: "library", label: "Library", href: "/library" },
     { id: "pods", label: "Pods", href: "/pods" },
     { id: "myday", label: "My day", href: "/me" },
+    { id: "ask", label: "Ask", href: "/ask" },
     { id: "fuel", label: "Fuel", href: "/fuel" },
     { id: "training", label: "My training", href: "/training", match: "^/training(/|$)" },
     { id: "recovery", label: "Recovery", href: "/recovery" },
