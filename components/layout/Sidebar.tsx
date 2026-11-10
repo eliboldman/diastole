@@ -52,6 +52,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
     { label: "Pods", href: "/pods", icon: Orbit },
+    { label: "My fuel", href: "/fuel", icon: Utensils },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
   athlete: [
