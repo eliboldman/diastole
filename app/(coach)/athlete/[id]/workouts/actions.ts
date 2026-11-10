@@ -45,7 +45,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
   const supabase = await createClient();
   // Remember each target as a % of this athlete's zones too, so the Library can scale it to others.
   const { data: zones } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle();
-  const steps = annotate(stripRel(input.steps), zones as RelZones);
+  const steps = annotate(stripRel(input.steps), zones as RelZones, input.sport === "swim" ? (input.pool ?? null) : null);
   const brick = input.sport === "bike" && input.brick?.steps?.length ? { sport: "run" as const, steps: annotate(stripRel(input.brick.steps), zones as RelZones) } : null;
   const row = {
     athlete_id: input.athleteId,

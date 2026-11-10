@@ -27,6 +27,7 @@ import BackLink from "@/components/layout/BackLink";
 import WeekReview from "@/components/training/WeekReview";
 import FitnessSection from "@/components/training/FitnessSection";
 import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
+import SaveAsPlan from "@/components/plans/SaveAsPlan";
 import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
@@ -46,7 +47,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
   const me = await requireCoach();
   const supabase = await createClient();
   const [{ data: zones }, { data: recentMax }, { data: insightRows }, fuelMode, { data: gearRow }] = await Promise.all([
-    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", id).maybeSingle(),
+    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m").eq("athlete_id", id).maybeSingle(),
     supabase
       .from("activities")
       .select("max_hr")
@@ -169,6 +170,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
             </Link>
           </div>
           <WorkoutList athleteId={profile.id} workouts={workouts} removed={removed} device={device?.source ?? null} />
+          <SaveAsPlan athleteId={profile.id} today={athleteToday} />
         </section>
 
         <section id="form" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
@@ -198,6 +200,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
             units={me.units}
             ftp={zones?.ftp_w ?? null}
             thresholdHr={zones?.threshold_hr ?? null}
+            css={zones?.css_sec_per_100m ? Number(zones.css_sec_per_100m) : null}
             estimatedMaxHr={estimateMaxHr((recentMax ?? []).map((r) => r.max_hr))}
           />
         </section>

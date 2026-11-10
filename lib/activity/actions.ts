@@ -23,6 +23,7 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   const paceText = String(form.get("threshold_pace") ?? "").trim();
   const ftpText = String(form.get("ftp") ?? "").trim();
   const thrText = String(form.get("threshold_hr") ?? "").trim();
+  const cssText = String(form.get("css") ?? "").trim();
 
   const max_hr = maxHrText ? wholeNumber(maxHrText) : null;
   if (maxHrText && (max_hr === null || max_hr < 120 || max_hr > 230)) return { error: "Max heart rate should be a number between 120 and 230." };
@@ -35,16 +36,21 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   const threshold_hr = thrText ? wholeNumber(thrText) : null;
   if (thrText && (threshold_hr === null || threshold_hr < 100 || threshold_hr > 220)) return { error: "Threshold heart rate should be a number between 100 and 220." };
 
+  // CSS is typed per 100 of the coach's swim unit (yd for miles) and stored per 100 m.
+  const cssSec = cssText ? parsePace(cssText) : null;
+  const css_sec_per_100m = cssSec ? Math.round((units === "mi" ? cssSec / 0.9144 : cssSec) * 10) / 10 : null;
+  if (cssText && (css_sec_per_100m === null || css_sec_per_100m < 50 || css_sec_per_100m > 300)) return { error: `Swim CSS should be minutes and seconds per 100 ${units === "mi" ? "yd, like 1:35 (or type 135)" : "m, like 1:45"}.` };
+
   const supabase = await createClient();
   const { data: before } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", athleteId).maybeSingle();
   const { error } = await supabase
     .from("athlete_zones")
-    .upsert({ athlete_id: athleteId, max_hr, threshold_speed_mps, ftp_w, threshold_hr, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
+    .upsert({ athlete_id: athleteId, max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
   if (error) {
     console.error("saveZones failed", error.code, error.message);
     return { error: "Couldn't save those numbers. Try again." };
   }
-  const note = await rescaleUpcoming(supabase, athleteId, before as RelZones, { max_hr, threshold_speed_mps, ftp_w, threshold_hr });
+  const note = await rescaleUpcoming(supabase, athleteId, before as RelZones, { max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m });
   revalidatePath(`/athlete/${athleteId}`);
   revalidatePath(`/profile/${athleteId}`);
   revalidatePath("/account");

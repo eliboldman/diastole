@@ -15,6 +15,7 @@ export default function ZonesForm({
   thresholdPace,
   ftp,
   thresholdHr = null,
+  css = null,
   estimatedMaxHr,
   units = "mi",
   saveLabel = "Save zones",
@@ -26,16 +27,21 @@ export default function ZonesForm({
   thresholdPace: string | null; // "7:15" per mile or km
   ftp: number | null;
   thresholdHr?: number | null;
+  css?: number | null; // swim threshold, seconds per 100 m
   estimatedMaxHr: number | null;
 }) {
   const [state, action, pending] = useActionState<ZonesState, FormData>(saveZones, null);
   // The phone's number pad has no colon: type 635 and it shows 6:35.
   const [pace, setPace] = useState(thresholdPace ?? "");
+  // CSS shown per 100 yd for mile users (stored per 100 m).
+  const cssUnit = units === "mi" ? "yd" : "m";
+  const cssShown = css ? Math.round(units === "mi" ? css * 0.9144 : css) : null;
+  const [cssText, setCssText] = useState(cssShown ? `${Math.floor(cssShown / 60)}:${String(cssShown % 60).padStart(2, "0")}` : "");
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="athlete_id" value={athleteId} />
       <input type="hidden" name="units" value={units} />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="block min-w-0 text-sm text-white/65">
           Max heart rate
           <input name="max_hr" inputMode="numeric" defaultValue={maxHr ?? ""} placeholder={estimatedMaxHr ? `~${estimatedMaxHr} estimated` : "e.g. 195"} className={`mt-1.5 ${input}`} />
@@ -63,6 +69,19 @@ export default function ZonesForm({
         <label className="block min-w-0 text-sm text-white/65">
           Threshold heart rate
           <input name="threshold_hr" inputMode="numeric" defaultValue={thresholdHr ?? ""} placeholder="e.g. 172" className={`mt-1.5 ${input}`} />
+        </label>
+        <label className="block min-w-0 text-sm text-white/65">
+          Swim CSS (per 100 {cssUnit})
+          <input
+            name="css"
+            inputMode="numeric"
+            autoComplete="off"
+            value={cssText}
+            onChange={(e) => setCssText(formatPaceTyping(e.target.value))}
+            placeholder={cssUnit === "yd" ? "e.g. 1:35" : "e.g. 1:45"}
+            className={`mt-1.5 ${input}`}
+          />
+          <span className="mt-1 block text-xs text-white/40">Critical swim speed: the pace you could hold for about 30 minutes.</span>
         </label>
       </div>
       <p className="text-xs text-white/45">Leave a field blank to use an estimate (max HR) or skip that zone chart.</p>

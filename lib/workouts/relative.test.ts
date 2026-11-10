@@ -46,3 +46,16 @@ assert.equal(p.slowSecPerKm, Math.round(260 * 4 / 4.5));
 assert.ok(describe(a, "mi", null, false, true).some((l) => l.includes("90–95% FTP")));
 assert.equal(hasRelative(stripRel(a)), false);
 console.log("relative targets: all passed");
+
+// Swim pace as % of CSS: 1:40/100yd with CSS 1:45/100m, then for an athlete with CSS 1:30/100m.
+{
+  const yd = { length: 25, unit: "YARD" } as const;
+  const sw = annotate([{ kind: "step", intensity: "MAIN", duration: { type: "distance", meters: 91.44 }, target: { type: "swim_pace", secPer100: 100 } }] as never, { css_sec_per_100m: 105 }, yd);
+  const t = (sw as Any)[0].target;
+  assert.equal(t.rel.of, "css");
+  assert.equal(relText(t), "96% CSS"); // 100 s/100yd = 91.44 m/100 s vs CSS 100 m/105 s
+  const fast = resolve(sw, { css_sec_per_100m: 90 }, yd);
+  assert.equal((fast.steps as Any)[0].target.secPer100, Math.round(100 * 90 / 105));
+  assert.deepEqual(resolve(sw, { ftp_w: 200 }, yd).missing, ["CSS"]);
+  console.log("relative CSS: passed");
+}

@@ -2,14 +2,18 @@
 // alongside them, the same target as a percentage of the athlete's zones:
 //   power_range → pct of FTP          pace_range → pct of threshold speed (100 = threshold pace)
 //   hr_range    → pct of threshold HR (or of max HR when threshold isn't set)
+//   swim_pace   → pct of CSS speed (swim threshold; 100 = CSS pace)
 // Saving to the Library records the percentages; assigning re-works the numbers from each
 // athlete's own zones. Pure module (type imports only), testable with `node`.
 
-import type { Step, Target } from "./garmin-format.ts";
+import type { Pool, Step, Target } from "./garmin-format.ts";
 
-export type RelZones = { ftp_w?: number | null; threshold_speed_mps?: number | null; threshold_hr?: number | null; max_hr?: number | null } | null;
-export type Rel = { pct: [number, number]; of?: "thr" | "max" };
-export type Missing = "FTP" | "threshold pace" | "heart rate";
+export type RelZones = { ftp_w?: number | null; threshold_speed_mps?: number | null; threshold_hr?: number | null; max_hr?: number | null; css_sec_per_100m?: number | null } | null;
+export type Rel = { pct: [number, number]; of?: "thr" | "max" | "css" };
+export type Missing = "FTP" | "threshold pace" | "heart rate" | "CSS";
+
+const YARD = 0.9144;
+const per100 = (pool: Pool) => (pool?.unit === "YARD" ? 100 * YARD : 100); // metres in "100" of the pool's unit
 
 type WithRel = Target & { rel?: Rel };
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -18,7 +22,7 @@ const mapTargets = (steps: Step[], fn: (t: WithRel) => WithRel): Step[] =>
   steps.map((s) => (s.kind === "repeat" ? { ...s, steps: mapTargets(s.steps, fn) } : s.target ? { ...s, target: fn(s.target as WithRel) } : s));
 
 /** Record each target's percentage of these zones (targets that already have one keep it). */
-export function annotate(steps: Step[], z: RelZones): Step[] {
+export function annotate(steps: Step[], z: RelZones, pool: Pool = null): Step[] {
   if (!z) return steps;
   return mapTargets(steps, (t) => {
     if (t.rel) return t;
@@ -32,6 +36,10 @@ export function annotate(steps: Step[], z: RelZones): Step[] {
       const base = z.threshold_hr ? { v: Number(z.threshold_hr), of: "thr" as const } : z.max_hr ? { v: Number(z.max_hr), of: "max" as const } : null;
       if (base) return { ...t, rel: { pct: [round1((t.low / base.v) * 100), round1((t.high / base.v) * 100)], of: base.of } };
     }
+    if (t.type === "swim_pace" && z.css_sec_per_100m) {
+      const pct = round1(((per100(pool) / t.secPer100) / (100 / Number(z.css_sec_per_100m))) * 100);
+      return { ...t, rel: { pct: [pct, pct], of: "css" } };
+    }
     return t;
   });
 }
@@ -40,7 +48,7 @@ export function annotate(steps: Step[], z: RelZones): Step[] {
  * Re-work targets from their percentages for these zones. Targets without a percentage, or whose
  * zone this athlete doesn't have, keep their written numbers (and the zone is listed in `missing`).
  */
-export function resolve(steps: Step[], z: RelZones): { steps: Step[]; missing: Missing[]; changed: boolean } {
+export function resolve(steps: Step[], z: RelZones, pool: Pool = null): { steps: Step[]; missing: Missing[]; changed: boolean } {
   const missing = new Set<Missing>();
   let changed = false;
   const out = mapTargets(steps, (t) => {
@@ -63,6 +71,12 @@ export function resolve(steps: Step[], z: RelZones): { steps: Step[]; missing: M
       const v = base ? Number(base) : alt;
       if (!v) missing.add("heart rate");
       else next = { ...t, low: Math.round((v * lo) / 100), high: Math.round((v * hi) / 100) };
+    } else if (t.type === "swim_pace") {
+      if (!z?.css_sec_per_100m) missing.add("CSS");
+      else {
+        const speed = (100 / Number(z.css_sec_per_100m)) * (lo / 100);
+        next = { ...t, secPer100: Math.round(per100(pool) / speed) };
+      }
     }
     if (JSON.stringify(next) !== JSON.stringify(t)) changed = true;
     return next;
@@ -79,6 +93,7 @@ export function relText(t: Target | undefined): string | null {
   if (t.type === "power_range") return `${range} FTP`;
   if (t.type === "pace_range") return `${range} threshold pace`;
   if (t.type === "hr_range") return `${range} ${r.of === "max" ? "max" : "threshold"} HR`;
+  if (t.type === "swim_pace") return `${range} CSS`;
   return null;
 }
 
@@ -95,4 +110,4 @@ export const stripRel = (steps: Step[]): Step[] =>
     return rest as WithRel;
   });
 
-export const ZONE_COLUMNS = "ftp_w, threshold_speed_mps, threshold_hr, max_hr";
+export const ZONE_COLUMNS = "ftp_w, threshold_speed_mps, threshold_hr, max_hr, css_sec_per_100m";

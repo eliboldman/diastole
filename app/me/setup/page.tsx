@@ -23,7 +23,7 @@ export default async function MySetupPage() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
   const [{ data: gearRow }, { data: zones }, { data: week }] = await Promise.all([
     supabase.from("athlete_gear").select("gear").eq("athlete_id", me.id).maybeSingle(),
-    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("athlete_week").select("days").eq("athlete_id", me.id).maybeSingle(),
   ]);
   const closet = cleanCloset(gearRow?.gear);
@@ -64,6 +64,7 @@ export default async function MySetupPage() {
           units={units}
           ftp={zones?.ftp_w ?? null}
           thresholdHr={zones?.threshold_hr ?? null}
+            css={zones?.css_sec_per_100m ? Number(zones.css_sec_per_100m) : null}
           estimatedMaxHr={null}
           saveLabel="Save my numbers"
         />

@@ -8,6 +8,7 @@ import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } fr
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { draftWhyForBuilder } from "@/lib/ai/why";
 import { requestWorkout, saveMyWorkout } from "@/lib/workouts/athlete-actions";
+import { saveTemplateWorkout } from "@/lib/plans/actions";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { describe } from "@/lib/workouts/describe";
 import {
@@ -520,9 +521,12 @@ export default function WorkoutBuilder({
   units = "mi",
   mode = "coach",
   hasCoach = true,
+  template,
 }: {
   // athlete: their own builder. No AI; saves to My workouts and asks the coach to add it.
-  mode?: "coach" | "athlete";
+  // template: a session in a plan template (week and day, no date, nothing is sent).
+  mode?: "coach" | "athlete" | "template";
+  template?: { id: string; week: number; day: number; weeks: number };
   hasCoach?: boolean;
   startSport?: Sport;
   units?: "mi" | "km";
@@ -567,6 +571,9 @@ export default function WorkoutBuilder({
   const [pending, start] = useTransition();
 
   const athleteMode = mode === "athlete";
+  const templateMode = mode === "template";
+  const [tWeek, setTWeek] = useState(template?.week ?? 1);
+  const [tDay, setTDay] = useState(template?.day ?? 0);
   const editable = athleteMode || !initial || initial.status === "draft";
 
   // Describe it: Claude turns the coach's words into steps that fill this builder for review.
@@ -621,7 +628,7 @@ export default function WorkoutBuilder({
 
   return (
     <div className="grid gap-5">
-      {editable && !athleteMode && (
+      {editable && !athleteMode && !templateMode && (
         <section className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.04] p-3">
           <label className="block">
             <span className="mb-1.5 flex items-center gap-2 text-sm font-medium">
@@ -693,7 +700,26 @@ export default function WorkoutBuilder({
           <option value="bike">Bike</option>
           <option value="swim">Swim</option>
         </select>
-        <input className={field} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!editable} />
+        {templateMode ? (
+          <div className="grid grid-cols-2 gap-2">
+            <select className={sel} value={tWeek} onChange={(e) => setTWeek(Number(e.target.value))} aria-label="Week">
+              {Array.from({ length: Math.min(52, (template?.weeks ?? 1) + 1) }, (_, i) => (
+                <option key={i} value={i + 1}>
+                  Week {i + 1}
+                </option>
+              ))}
+            </select>
+            <select className={sel} value={tDay} onChange={(e) => setTDay(Number(e.target.value))} aria-label="Day">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <input className={field} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!editable} />
+        )}
       </div>
       <textarea
         className={`${field} min-h-20`}
@@ -707,6 +733,7 @@ export default function WorkoutBuilder({
         <div>
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Why this workout</span>
+            {!templateMode && (
             <button
               type="button"
               onClick={draftTheWhy}
@@ -716,6 +743,7 @@ export default function WorkoutBuilder({
               <Sparkles size={14} className={drafting ? "animate-pulse text-amber-200" : "text-amber-200"} />
               {drafting ? "Drafting…" : why.trim() ? "Redraft with AI" : "Draft with AI"}
             </button>
+            )}
           </div>
           <textarea
             className={`${field} min-h-16 w-full`}
@@ -800,7 +828,37 @@ export default function WorkoutBuilder({
         </p>
       )}
 
-      {athleteMode ? (
+      {templateMode && template ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            disabled={pending}
+            onClick={() =>
+              run(async () => {
+                const r = await saveTemplateWorkout({
+                  templateId: template.id,
+                  id,
+                  week: tWeek,
+                  day: tDay,
+                  title,
+                  sport,
+                  description,
+                  why,
+                  steps: stripIds(steps),
+                  pool: swim ? pool : null,
+                  brick: brickOut(),
+                });
+                return r.ok ? { ok: true, id: r.id, message: "Saved to the plan." } : r;
+              })
+            }
+            className="min-h-12 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
+          >
+            Save to plan
+          </button>
+          <a href={`/library/plans/${template.id}`} className="min-h-11 content-center text-sm text-white/55 hover:text-white">
+            Back to the plan
+          </a>
+        </div>
+      ) : athleteMode ? (
         <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
           <button
             disabled={pending}

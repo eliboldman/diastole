@@ -390,7 +390,8 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
 
   const ids: string[] = [];
   for (const athleteId of athleteIds) {
-    const scaled = resolve((item.steps ?? []) as Step[], zonesOf.get(athleteId) ?? null);
+    const itemPool: Pool = item.pool_length && item.pool_unit ? { length: Number(item.pool_length), unit: item.pool_unit as PoolUnit } : null;
+    const scaled = resolve((item.steps ?? []) as Step[], zonesOf.get(athleteId) ?? null, itemPool);
     const run = (item.brick as Brick)?.steps?.length ? resolve((item.brick as NonNullable<Brick>).steps, zonesOf.get(athleteId) ?? null) : null;
     if (run) scaled.missing = [...new Set([...scaled.missing, ...run.missing])];
     if (scaled.missing.length) kept.push(`${nameOf.get(athleteId)} (no ${scaled.missing.join(" or ")})`);

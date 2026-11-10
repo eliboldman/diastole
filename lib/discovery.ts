@@ -9,6 +9,7 @@ export const TIPS = {
   gear: { id: "tip:gear", title: "Keep your shoe miles right", body: "One tap tells Diastole which pair (or bike) you used, so you know when they're worn." },
   changeOfPlans: { id: "tip:change-of-plans", title: "Plans changed? Just say it.", body: "Type something like “easy long run instead of the bike today” and approve the swap in one tap." },
   myWorkouts: { id: "tip:my-workouts", title: "Build your own sessions", body: "Make workouts or import a set, then ask your coach to add one to your calendar." },
+  plans: { id: "tip:plans", title: "Save a block once, reuse it for anyone", body: "On an athlete's page, Save as plan turns their weeks into a template. Apply it to anyone with a race date: targets fit their zones and days fit their week." },
 } satisfies Record<string, Tip>;
 
 export type Release = { id: string; athlete: Highlight[]; coach: Highlight[] };
