@@ -1,4 +1,5 @@
 // Plain-language lines for a workout's steps (used in send confirmations, adjust previews and version history).
+import { relText } from "./relative.ts";
 import { DRILLS, EQUIPMENT, STROKES, SWIM_EFFORTS, YARD, type Duration, type Pool, type Step, type Target } from "./garmin-format.ts";
 
 const MI = 1609.344;
@@ -10,7 +11,8 @@ export function swimDistance(meters: number, pool: Pool) {
   return `${Math.round(meters)} m`;
 }
 
-export function describe(steps: Step[], paceUnit: "mi" | "km" = "mi", pool: Pool = null, swim = false): string[] {
+/** `relative`: show targets as % of zones when they have one (Library templates). */
+export function describe(steps: Step[], paceUnit: "mi" | "km" = "mi", pool: Pool = null, swim = false, relative = false): string[] {
   const dur = (d: Duration) =>
     d.type === "time"
       ? clock(d.seconds)
@@ -25,6 +27,8 @@ export function describe(steps: Step[], paceUnit: "mi" | "km" = "mi", pool: Pool
           : "until lap";
   const tgt = (t?: Target) => {
     if (!t) return "";
+    const rel = relative ? relText(t) : null;
+    if (rel) return ` @ ${rel}`;
     switch (t.type) {
       case "hr_zone":
         return ` @ HR zone ${t.zone}`;

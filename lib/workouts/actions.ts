@@ -8,6 +8,7 @@ import { createClient, requireCoach } from "@/lib/supabase/server";
 import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts/adjust";
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
 import { validateSteps, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { annotate, hasRelative, resolve, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
 
@@ -356,13 +357,36 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("workout_library")
-    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit")
+    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit, source_workout_id")
     .eq("id", libraryId)
     .maybeSingle();
   if (!item) return { ok: false, error: "Library workout not found." };
+  // Templates saved before targets scaled: work the percentages out from the athlete it was built for.
+  if (!hasRelative((item.steps ?? []) as Step[]) && item.source_workout_id) {
+    const { data: src } = await supabase.from("planned_workouts").select("athlete_id").eq("id", item.source_workout_id).maybeSingle();
+    if (src) {
+      const { data: z } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", src.athlete_id).maybeSingle();
+      const steps = annotate((item.steps ?? []) as Step[], z as RelZones);
+      if (hasRelative(steps)) {
+        item.steps = steps;
+        await supabase.from("workout_library").update({ steps }).eq("id", item.id);
+      }
+    }
+  }
+
+  // Each athlete gets targets worked out from their own zones (when the template has percentages).
+  const [{ data: zoneRows }, { data: people }] = await Promise.all([
+    supabase.from("athlete_zones").select(`athlete_id, ${ZONE_COLUMNS}`).in("athlete_id", athleteIds),
+    supabase.from("profiles").select("id, full_name").in("id", athleteIds),
+  ]);
+  const zonesOf = new Map((zoneRows ?? []).map((z) => [z.athlete_id as string, z as RelZones]));
+  const nameOf = new Map((people ?? []).map((p) => [p.id as string, ((p.full_name as string | null) ?? "").split(" ")[0] || "an athlete"]));
+  const kept: string[] = [];
 
   const ids: string[] = [];
   for (const athleteId of athleteIds) {
+    const scaled = resolve((item.steps ?? []) as Step[], zonesOf.get(athleteId) ?? null);
+    if (scaled.missing.length) kept.push(`${nameOf.get(athleteId)} (no ${scaled.missing.join(" or ")})`);
     const { data, error } = await supabase
       .from("planned_workouts")
       .insert({
@@ -372,7 +396,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
         sport: item.sport,
         scheduled_date: date,
         description: item.description,
-        steps: item.steps,
+        steps: scaled.steps,
         pool_length: item.pool_length,
         pool_unit: item.pool_unit,
         status: "draft",
@@ -393,7 +417,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   return {
     ok: true,
     ids,
-    message: `Added as a draft for ${athleteIds.length} athlete${athleteIds.length === 1 ? "" : "s"}. Review and send from each athlete's page.`,
+    message: `Added as a draft for ${athleteIds.length} athlete${athleteIds.length === 1 ? "" : "s"}${hasRelative((item.steps ?? []) as Step[]) ? ", with targets from each athlete's zones" : ""}. Review and send from each athlete's page.${kept.length ? ` Kept the written targets for ${kept.join(", ")}.` : ""}`,
   };
 }
 

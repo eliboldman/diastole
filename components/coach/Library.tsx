@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { assignFromLibrary, deleteLibraryItem, updateLibraryItem } from "@/lib/workouts/actions";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
+import { hasRelative } from "@/lib/workouts/relative";
 import { describe } from "@/lib/workouts/describe";
 import type { PoolUnit, Step } from "@/lib/workouts/garmin-format";
 
@@ -132,8 +133,9 @@ export default function Library({
               {open === i.id && (
                 <div className="mt-4 grid gap-3 border-t border-white/[0.09] pt-4 text-sm">
                   <WorkoutSummary steps={i.steps} sport={i.sport} pool={i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null} units={units} />
+                  {hasRelative(i.steps) && <p className="text-xs text-emerald-100/70">Targets scale to each athlete&apos;s zones when assigned.</p>}
                   <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
-                    {describe(i.steps, units, i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim").map((l, k) => (
+                    {describe(i.steps, units, i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim", true).map((l, k) => (
                       <li key={k}>{l}</li>
                     ))}
                   </ol>

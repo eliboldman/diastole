@@ -1,11 +1,13 @@
 "use server";
 
+import { annotate, resolve, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import type { Step } from "@/lib/workouts/garmin-format";
 import { revalidatePath } from "next/cache";
 
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { parsePace, wholeNumber } from "@/lib/activity/pace-input";
 
-export type ZonesState = { ok?: boolean; error?: string } | null;
+export type ZonesState = { ok?: boolean; error?: string; note?: string } | null;
 
 /** A typed pace ("6:35", "635", "6.35"…) per mile or km -> metres per second. */
 function paceToSpeed(text: string, units: "mi" | "km"): number | null {
@@ -34,6 +36,7 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   if (thrText && (threshold_hr === null || threshold_hr < 100 || threshold_hr > 220)) return { error: "Threshold heart rate should be a number between 100 and 220." };
 
   const supabase = await createClient();
+  const { data: before } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", athleteId).maybeSingle();
   const { error } = await supabase
     .from("athlete_zones")
     .upsert({ athlete_id: athleteId, max_hr, threshold_speed_mps, ftp_w, threshold_hr, updated_at: new Date().toISOString() }, { onConflict: "athlete_id" });
@@ -41,13 +44,52 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
     console.error("saveZones failed", error.code, error.message);
     return { error: "Couldn't save those numbers. Try again." };
   }
+  const note = await rescaleUpcoming(supabase, athleteId, before as RelZones, { max_hr, threshold_speed_mps, ftp_w, threshold_hr });
   revalidatePath(`/athlete/${athleteId}`);
   revalidatePath(`/profile/${athleteId}`);
   revalidatePath("/account");
   revalidatePath("/activity/[id]", "page");
-  return { ok: true };
+  return { ok: true, note };
 }
 
+
+/**
+ * New zones: upcoming workouts not yet on a watch get their targets re-worked, keeping the same
+ * percentage of the athlete's zones (e.g. 90% of FTP stays 90% of the new FTP). Ones already sent
+ * keep their numbers until re-sent.
+ */
+async function rescaleUpcoming(supabase: Awaited<ReturnType<typeof createClient>>, athleteId: string, before: RelZones, after: RelZones): Promise<string | undefined> {
+  if (!before) return undefined;
+  const changedZone = (["ftp_w", "threshold_speed_mps", "threshold_hr", "max_hr"] as const).some((k) => Number(before[k] ?? 0) !== Number(after?.[k] ?? 0));
+  if (!changedZone) return undefined;
+  const today = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const { data: rows } = await supabase
+    .from("planned_workouts")
+    .select("id, steps, status, external_id")
+    .eq("athlete_id", athleteId)
+    .is("deleted_at", null)
+    .in("status", ["draft", "approved", "sent"])
+    .gte("scheduled_date", today);
+  let updated = 0;
+  let onWatch = 0;
+  for (const r of rows ?? []) {
+    // Percentages from the current numbers and the old zones, then numbers from the new zones.
+    const scaled = resolve(annotate(stripRel((r.steps ?? []) as Step[]), before), after);
+    if (!scaled.changed) continue;
+    if (r.status === "sent" || r.external_id) {
+      onWatch++;
+      continue;
+    }
+    const steps = annotate(stripRel(scaled.steps), after);
+    const { error } = await supabase.from("planned_workouts").update({ steps }).eq("id", r.id).in("status", ["draft", "approved"]);
+    if (!error) updated++;
+  }
+  const parts = [
+    updated ? `Updated targets on ${updated} upcoming ${updated === 1 ? "workout" : "workouts"}.` : null,
+    onWatch ? `${onWatch} already on the watch ${onWatch === 1 ? "keeps its" : "keep their"} old targets until re-sent.` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" ") : undefined;
+}
 
 export type PodSharing = { level: 0 | 1 | 2; details: boolean; hrv: boolean; sleep: boolean; stress: boolean };
 

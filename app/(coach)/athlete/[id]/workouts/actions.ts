@@ -8,6 +8,7 @@ import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
 import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 
 export type WorkoutInput = {
   id?: string;
@@ -40,6 +41,9 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
   if (problem) return { ok: false, error: problem };
 
   const supabase = await createClient();
+  // Remember each target as a % of this athlete's zones too, so the Library can scale it to others.
+  const { data: zones } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle();
+  const steps = annotate(stripRel(input.steps), zones as RelZones);
   const row = {
     athlete_id: input.athleteId,
     coach_id: coach.id,
@@ -47,7 +51,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     sport: input.sport,
     scheduled_date: input.scheduledDate,
     description: input.description.trim() || null,
-    steps: input.steps,
+    steps,
     pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
     pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,
     ...(input.why !== undefined
