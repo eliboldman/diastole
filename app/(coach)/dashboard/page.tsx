@@ -26,6 +26,8 @@ import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import MorningBriefs from "@/components/coach/MorningBriefs";
 import MorningReview from "@/components/coach/MorningReview";
 import { getMorningStatus } from "@/lib/ai/morning-status";
+import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
+import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import SafetyNotes from "@/components/coach/SafetyNotes";
 import WeeklyProgress from "@/components/WeeklyProgress";
 import { WatchCard } from "@/components/coach/WatchStatus";
@@ -59,7 +61,7 @@ export default async function TodayPage() {
   const supabase = await createClient();
   const since = isoDaysAgo(2);
   const watchIds = roster.map((r) => r.id);
-  const [{ data: rawSuggestions }, { data: settingsRow }, spent, watches, morning] = await Promise.all([
+  const [{ data: rawSuggestions }, { data: settingsRow }, spent, watches, morning, zoneSugg] = await Promise.all([
     supabase
       .from("ai_suggestions")
       .select("id, athlete_id, date, overall, concern, summary, action, rationale, proposed_workout, status, planned_workouts!ai_suggestions_target_workout_id_fkey(title, scheduled_date)")
@@ -70,6 +72,7 @@ export default async function TodayPage() {
     monthToDateSpend(coach.id),
     getWatchStatuses(supabase, watchIds),
     getMorningStatus(coach.id),
+    getZoneSuggestions(supabase, watchIds),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(settingsRow ?? {}) };
   const latestByAthlete = new Map<string, NonNullable<typeof rawSuggestions>[number]>();
@@ -127,6 +130,7 @@ export default async function TodayPage() {
       <SafetyNotes />
       {ai.ai_enabled && <MorningReview status={morning} />}
       <MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} />
+      <ZoneSuggestions units={coach.units === "km" ? "km" : "mi"} rows={roster.filter((r) => zoneSugg.has(r.id)).map((r) => ({ athleteId: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", suggestions: zoneSugg.get(r.id)! }))} />
       <WatchCard rows={roster.map((r) => ({ id: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", status: watches.get(r.id)! })).filter((r) => r.status)} />
       <QuickLinks
         links={[

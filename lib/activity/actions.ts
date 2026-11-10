@@ -1,7 +1,7 @@
 "use server";
 
-import { annotate, resolve, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
-import type { Step } from "@/lib/workouts/garmin-format";
+import { ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { rescaleUpcoming } from "@/lib/workouts/rescale";
 import { revalidatePath } from "next/cache";
 
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -52,44 +52,6 @@ export async function saveZones(_prev: ZonesState, form: FormData): Promise<Zone
   return { ok: true, note };
 }
 
-
-/**
- * New zones: upcoming workouts not yet on a watch get their targets re-worked, keeping the same
- * percentage of the athlete's zones (e.g. 90% of FTP stays 90% of the new FTP). Ones already sent
- * keep their numbers until re-sent.
- */
-async function rescaleUpcoming(supabase: Awaited<ReturnType<typeof createClient>>, athleteId: string, before: RelZones, after: RelZones): Promise<string | undefined> {
-  if (!before) return undefined;
-  const changedZone = (["ftp_w", "threshold_speed_mps", "threshold_hr", "max_hr"] as const).some((k) => Number(before[k] ?? 0) !== Number(after?.[k] ?? 0));
-  if (!changedZone) return undefined;
-  const today = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const { data: rows } = await supabase
-    .from("planned_workouts")
-    .select("id, steps, status, external_id")
-    .eq("athlete_id", athleteId)
-    .is("deleted_at", null)
-    .in("status", ["draft", "approved", "sent"])
-    .gte("scheduled_date", today);
-  let updated = 0;
-  let onWatch = 0;
-  for (const r of rows ?? []) {
-    // Percentages from the current numbers and the old zones, then numbers from the new zones.
-    const scaled = resolve(annotate(stripRel((r.steps ?? []) as Step[]), before), after);
-    if (!scaled.changed) continue;
-    if (r.status === "sent" || r.external_id) {
-      onWatch++;
-      continue;
-    }
-    const steps = annotate(stripRel(scaled.steps), after);
-    const { error } = await supabase.from("planned_workouts").update({ steps }).eq("id", r.id).in("status", ["draft", "approved"]);
-    if (!error) updated++;
-  }
-  const parts = [
-    updated ? `Updated targets on ${updated} upcoming ${updated === 1 ? "workout" : "workouts"}.` : null,
-    onWatch ? `${onWatch} already on the watch ${onWatch === 1 ? "keeps its" : "keep their"} old targets until re-sent.` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" ") : undefined;
-}
 
 export type PodSharing = { level: 0 | 1 | 2; details: boolean; hrv: boolean; sleep: boolean; stress: boolean };
 

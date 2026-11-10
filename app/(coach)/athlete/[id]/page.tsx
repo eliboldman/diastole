@@ -26,6 +26,8 @@ import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
 import WeekReview from "@/components/training/WeekReview";
 import FitnessSection from "@/components/training/FitnessSection";
+import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
+import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import ClosetEditor from "@/components/ClosetEditor";
@@ -67,11 +69,12 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
   const closet = cleanCloset(gearRow?.gear);
   const [shoeMiles, bikeMiles] = await Promise.all([getShoeMileage(supabase, id, closet, athleteTz), getBikeMileage(supabase, id, closet, athleteTz)]);
   const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
-  const [mealDay, races, week, load] = await Promise.all([
+  const [mealDay, races, week, load, zoneSugg] = await Promise.all([
     getMealDay(id, athleteToday, athleteTz, fuelToday.level),
     getRaces(id, { from: athleteToday, limit: 10 }),
     getWeek(supabase, id, athleteTz, weekStartFrom(weekParam, athleteToday)),
     getLoad(supabase, id, athleteTz),
+    getZoneSuggestions(supabase, [id]),
   ]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
@@ -183,6 +186,11 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
         <section id="zones" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
           <h2 className="text-lg font-medium">Training zones</h2>
           <p className="mb-4 mt-1 text-sm text-white/55">Used for time in zones and to judge zone targets on the workout view.</p>
+          {zoneSugg.get(id) && (
+            <div className="mb-4 [&>section]:mt-0">
+              <ZoneSuggestions units={me.units === "km" ? "km" : "mi"} rows={[{ athleteId: id, suggestions: zoneSugg.get(id)! }]} title={false} />
+            </div>
+          )}
           <ZonesForm
             athleteId={profile.id}
             maxHr={zones?.max_hr ?? null}

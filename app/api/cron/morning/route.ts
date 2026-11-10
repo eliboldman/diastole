@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { runFormInsights } from "@/lib/ai/form-insights";
+import { runCoachAlerts } from "@/lib/training/alerts-run";
 import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
 import { pullRides, syncAthlete } from "@/lib/intervals/sync";
@@ -22,13 +23,15 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) return new NextResponse("Unauthorized", { status: 401 });
 
   const admin = createAdminClient();
-  const { data: coaches } = await admin.from("profiles").select("id, timezone").eq("role", "coach");
+  const { data: coaches } = await admin.from("profiles").select("id, timezone, units").eq("role", "coach");
   const results: Record<string, unknown> = {};
   for (const c of coaches ?? []) {
     // The coaching assistant and morning briefs run when the coach presses "Review" on Today
     // (athletes wake and sync at different times), not here.
     // Form insights only call Claude when a new pattern shows up across several runs.
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // Yesterday's missed key sessions and new zone suggestions: rules only.
+    results[`${c.id}:alerts`] = await runCoachAlerts(admin, c).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Private fueling safety net: rules only, coach-only notes.
     results[`${c.id}:safety`] = await runSafetyNet(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Mondays (coach's time): the weekly digest for last week.
