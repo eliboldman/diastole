@@ -6,6 +6,8 @@ import { CalendarRange, Orbit } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import QuickLinks from "@/components/layout/QuickLinks";
+import { WatchLine } from "@/components/coach/WatchStatus";
+import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
@@ -21,6 +23,7 @@ export default async function AthletesPage() {
   ]);
 
   const deviceFor = (id: string) => connections?.find((c) => c.athlete_id === id);
+  const watches = await getWatchStatuses(supabase, (athletes ?? []).map((a) => a.id));
 
   return (
     <DashboardShell>
@@ -58,12 +61,7 @@ export default async function AthletesPage() {
                   <p className="text-sm text-white/55">{a.email}</p>
                 </Link>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span
-                    className={`h-2 w-2 rounded-full ${device ? "bg-emerald-300 glow-green" : "bg-white/25"}`}
-                  />
-                  <span className={device ? "text-emerald-200" : "text-white/60"}>
-                    {device ? `${device.source === "garmin" ? "Garmin" : "Apple Watch"} connected` : "No device yet"}
-                  </span>
+                  {watches.get(a.id) && <WatchLine status={watches.get(a.id)!} />}
                   {isMe && !device && (
                     <Link href="/connect" className="ml-3 inline-flex min-h-11 items-center text-emerald-200/80 hover:underline">
                       Connect yours →

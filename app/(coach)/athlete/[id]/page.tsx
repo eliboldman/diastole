@@ -155,7 +155,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           )}
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+        <section id="workouts" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium">Planned workouts</h2>
             <Link
