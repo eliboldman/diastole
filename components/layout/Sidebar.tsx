@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import HeartbeatLogo from "@/components/secrets/HeartbeatLogo";
-import SecretSparkle from "@/components/secrets/SecretSparkle";
 import SecretToast from "@/components/secrets/SecretToast";
 import { TAB_ICON } from "@/components/layout/tab-icons";
 import { DEFAULT_TABS, TAB_OPTIONS } from "@/lib/tabs";
@@ -96,7 +95,7 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
       <aside className="group fixed left-6 top-6 z-50 hidden h-[calc(100vh-3rem)] w-16 overflow-hidden rounded-[32px] border border-white/10 bg-panel/60 backdrop-blur-3xl transition-all duration-700 hover:w-60 hover:shadow-[0_0_80px_rgba(255,255,255,0.06)] md:block">
         <div className="relative z-10 flex h-full flex-col p-4">
           <Link href={home} className="flex items-center gap-3">
-            <HeartbeatLogo size={32} sparkle />
+            <HeartbeatLogo size={32} />
             <span className="whitespace-nowrap text-sm font-semibold opacity-0 transition-opacity duration-500 group-hover:opacity-100">Diastole</span>
           </Link>
 
@@ -114,7 +113,6 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
         <span className="relative inline-flex">
           <SearchButton />
-          <SecretSparkle id="icarus" className="right-1.5 top-1.5" />
         </span>
         <NotificationButton />
       </div>
@@ -129,7 +127,6 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
           <div className="flex items-center">
             <span className="relative inline-flex">
               <SearchButton />
-              <SecretSparkle id="icarus" className="right-1.5 top-1.5" />
             </span>
             {!tabs.includes("messages") && (
               <Link href="/messages" aria-label="Messages" className={`flex h-11 w-11 items-center justify-center rounded-xl ${pathname.startsWith("/messages") ? "text-emerald-200" : "text-white/70"}`}>
@@ -315,7 +312,7 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
         aria-controls="mobile-menu"
         aria-label="Open menu"
       >
-        <HeartbeatLogo size={26} sparkle />
+        <HeartbeatLogo size={26} />
         <span className="text-sm font-semibold">Diastole</span>
         <ChevronDown size={14} className={`text-white/45 transition-transform ${open ? "-rotate-90" : ""}`} aria-hidden />
       </button>

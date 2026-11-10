@@ -3,14 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import Logo from "@/components/Logo";
-import SecretSparkle from "@/components/secrets/SecretSparkle";
 import { eggState, findSecret } from "@/lib/secrets-client";
 
 /**
  * The logo, beating at today's resting heart rate (styles in globals.css). Long-press it: a bubble
  * says how fast, and the Heartbeat secret is found. A normal tap still does what it always did.
  */
-export default function HeartbeatLogo({ size = 32, sparkle = false }: { size?: number; sparkle?: boolean }) {
+export default function HeartbeatLogo({ size = 32 }: { size?: number }) {
   const [bubble, setBubble] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
@@ -59,7 +58,6 @@ export default function HeartbeatLogo({ size = 32, sparkle = false }: { size?: n
       <span className="logo-beat inline-flex">
         <Logo size={size} />
       </span>
-      {sparkle && <SecretSparkle id="heartbeat" />}
       {bubble && (
         <span role="status" className="spotlight-in absolute left-0 top-full z-50 mt-2 whitespace-nowrap rounded-xl border border-white/10 bg-panel px-3 py-2 text-xs text-white/85 shadow-xl">
           🫀 {bubble}

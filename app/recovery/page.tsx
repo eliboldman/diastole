@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
+import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { minutesLabel, routineSeconds, suggestRoutine } from "@/lib/recovery/catalog";
 import { routinesFor } from "@/lib/recovery/data";
@@ -40,7 +41,7 @@ export default async function RecoveryPage() {
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <p className="text-sm uppercase tracking-[0.25em] text-white/50">Training</p>
+      <BackLink href={me.role === "coach" ? "/me" : "/training"} label={me.role === "coach" ? "My day" : "Training"} />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Recovery</h1>
       <p className="mt-2 text-white/55">Rolling, stretching and breathing, with your coach&apos;s demos. General recovery guidance, not medical treatment.</p>
 

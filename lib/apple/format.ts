@@ -7,7 +7,11 @@
 
 import type { Duration, Pool, Step, Target } from "../workouts/garmin-format.ts";
 
-export type AppleGoal = { type: "time"; seconds: number } | { type: "distance"; meters: number } | { type: "open" };
+const YARD = 0.9144; // garmin-format's YARD (kept local: this module only imports types)
+
+// yards: set for swims in a yard pool, so the watch shows "100 yd" rather than "91.4 m" (meters
+// stays for app builds that don't read it).
+export type AppleGoal = { type: "time"; seconds: number } | { type: "distance"; meters: number; yards?: number } | { type: "open" };
 export type AppleAlert =
   | { type: "hrZone"; zone: number }
   | { type: "hr"; low: number; high: number }
@@ -112,6 +116,14 @@ export function toAppleWorkout(w: { id: string; date: string; title: string; spo
     kept.push({ ...b, steps: take });
   }
   if (!warmup && !cooldown && !kept.length) return null;
+
+  if (activity === "swimming" && w.pool?.unit === "YARD") {
+    const yd = (st: AppleStep) => {
+      if (st.goal.type === "distance") st.goal = { ...st.goal, yards: Math.round(st.goal.meters / YARD) };
+    };
+    [warmup, cooldown].forEach((st) => st && yd(st));
+    kept.forEach((b) => b.steps.forEach(yd));
+  }
 
   return {
     id: w.id,

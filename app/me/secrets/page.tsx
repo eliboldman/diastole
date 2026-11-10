@@ -65,7 +65,7 @@ export default async function SecretsPage() {
           );
         })}
       </ul>
-      <p className="mt-6 text-xs text-white/40">Turn all Easter eggs, sparkles or pod posts on or off in Settings → Easter eggs.</p>
+      <p className="mt-6 text-xs text-white/40">Turn all Easter eggs or pod posts on or off in Settings → Easter eggs.</p>
     </DashboardShell>
   );
 }

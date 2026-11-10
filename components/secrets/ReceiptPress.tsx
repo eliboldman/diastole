@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import SecretSparkle from "@/components/secrets/SecretSparkle";
 import StoryShare from "@/components/StoryShare";
 import { eggState, findSecret } from "@/lib/secrets-client";
 
@@ -57,7 +56,6 @@ export default function ReceiptPress({ activityId, children }: { activityId: str
       onPointerLeave={cancel}
     >
       {children}
-      <SecretSparkle id="receipt" className="right-2 top-2" />
       {open &&
         createPortal(
           <div role="dialog" aria-modal="true" aria-label="Workout receipt" className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center" onClick={() => setOpen(false)}>

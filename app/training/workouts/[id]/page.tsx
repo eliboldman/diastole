@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import SessionFuel from "@/components/fuel/SessionFuel";
 import RideButtons from "@/components/RideButtons";
 import BackLink from "@/components/layout/BackLink";
+import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { sportLabel } from "@/lib/activity/format";
@@ -72,6 +73,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
+      <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} className="mt-4" />
       {w.sport === "bike" && w.athlete_id === me.id && !done && <RideButtons workoutId={w.id} />}
 
       {w.why && (

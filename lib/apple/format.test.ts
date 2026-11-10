@@ -53,7 +53,7 @@ const swim = toAppleWorkout({
 });
 assert.ok(swim);
 assert.deepEqual(swim.pool, { length: 25, unit: "yd" });
-assert.deepEqual(swim.blocks[0].steps[0], { purpose: "work", goal: { type: "distance", meters: 91.4 }, name: "Kick" });
+assert.deepEqual(swim.blocks[0].steps[0], { purpose: "work", goal: { type: "distance", meters: 91.4, yards: 100 }, name: "Kick" });
 
 // Unsupported sports and empty workouts aren't scheduled.
 assert.equal(toAppleWorkout({ ...base, sport: "strength", steps: [] }), null);

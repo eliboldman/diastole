@@ -435,7 +435,10 @@ final class HealthSync {
         let goal: WorkoutGoal
         switch g["type"] as? String {
         case "time": goal = .time((g["seconds"] as? Double) ?? 0, .seconds)
-        case "distance": goal = .distance((g["meters"] as? Double) ?? 0, .meters)
+        case "distance":
+            // Yard pools come with whole yards, so the watch shows "100 yd", not "91.4 m".
+            if let yards = (g["yards"] as? NSNumber)?.doubleValue, yards > 0 { goal = .distance(yards, .yards) }
+            else { goal = .distance((g["meters"] as? Double) ?? 0, .meters) }
         default: goal = .open
         }
         let location: HKWorkoutSessionLocationType = activity == .swimming ? .indoor : .outdoor

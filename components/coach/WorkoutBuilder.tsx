@@ -8,6 +8,7 @@ import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } fr
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { draftWhyForBuilder } from "@/lib/ai/why";
 import { requestWorkout, saveMyWorkout } from "@/lib/workouts/athlete-actions";
+import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { describe } from "@/lib/workouts/describe";
 import {
   DRILLS,
@@ -709,6 +710,11 @@ export default function WorkoutBuilder({
         </div>
       )}
 
+      {/* Live totals: stays in view while the steps below are edited. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 md:top-2">
+        <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} className="bg-canvas/90 backdrop-blur-xl" />
+      </div>
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Steps</h2>
         {swim && (
@@ -901,6 +907,7 @@ export default function WorkoutBuilder({
               <strong className="text-white">{title || "Untitled"}</strong> ({sport}) on{" "}
               {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} → {destination}
             </p>
+            <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} className="mt-4" />
             <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-white/70">
               {describe(stripIds(steps), paceUnit, swim ? pool : null, swim).map((l, i) => (
                 <li key={i}>{l}</li>

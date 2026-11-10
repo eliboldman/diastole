@@ -18,14 +18,13 @@ export const tierOf = (s: Secret, count: number) => (s.tiers ?? [1]).filter((t) 
 
 // ---------------------------------------------------------------- settings
 
-export type Eggs = { on: boolean; sparkle: boolean; podPosts: boolean; heartbeat: "soft" | "sharp" | "pixel" | "off"; night: "day" | "keep" };
-export const DEFAULT_EGGS: Eggs = { on: true, sparkle: true, podPosts: false, heartbeat: "soft", night: "day" };
+export type Eggs = { on: boolean; podPosts: boolean; heartbeat: "soft" | "sharp" | "pixel" | "off"; night: "day" | "keep" };
+export const DEFAULT_EGGS: Eggs = { on: true, podPosts: false, heartbeat: "soft", night: "day" };
 export function cleanEggs(raw: unknown): Eggs {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
   return {
     on: typeof r.on === "boolean" ? r.on : DEFAULT_EGGS.on,
-    sparkle: typeof r.sparkle === "boolean" ? r.sparkle : DEFAULT_EGGS.sparkle,
     podPosts: typeof r.podPosts === "boolean" ? r.podPosts : DEFAULT_EGGS.podPosts,
     heartbeat: pick(r.heartbeat, ["soft", "sharp", "pixel", "off"] as const, DEFAULT_EGGS.heartbeat),
     night: pick(r.night, ["day", "keep"] as const, DEFAULT_EGGS.night),

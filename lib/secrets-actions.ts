@@ -48,7 +48,7 @@ export async function setSecretEnabled(id: string, on: boolean) {
   return { ok: true as const };
 }
 
-/** Easter-egg settings (all on/off, sparkles, pod posts, heartbeat style, starry sky). */
+/** Easter-egg settings (all on/off, pod posts, heartbeat style, starry sky). */
 export async function saveEggs(eggs: Partial<Eggs>) {
   const me = await requireUser();
   const supabase = await createClient();

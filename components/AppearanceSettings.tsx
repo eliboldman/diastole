@@ -7,7 +7,6 @@ import { applyLook, BACKGROUNDS, CORNERS, DEFAULT_LOOK, DENSITIES, LOOK_COOKIE, 
 import { eggState, findSecret } from "@/lib/secrets-client";
 import { addSecret, hasSecret } from "@/lib/secrets-local";
 import { saveAppearance } from "@/lib/theme-actions";
-import SecretSparkle from "@/components/secrets/SecretSparkle";
 import { THEME_COOKIE, THEMES, type ThemeId } from "@/lib/themes";
 
 const SECRET_TAPS = 5;
@@ -146,7 +145,6 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
           <div className="flex items-center gap-3">
             <button type="button" onClick={tap} aria-label="Diastole" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200">
               <HeartPulse size={20} aria-hidden />
-              <SecretSparkle id="blocks" />
             </button>
             <div className="min-w-0">
               <p className="font-medium">Tempo 3×10 min</p>

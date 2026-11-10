@@ -927,15 +927,6 @@ body {
 :root[data-motion="off"] .spotlight-in { animation: none; }
 @media (prefers-reduced-motion: reduce) { .spotlight-in { animation: none; } }
 
-/* Secrets: a faint twinkle near an unfound secret. */
-@keyframes secret-twinkle {
-  0%, 100% { opacity: 0; transform: scale(0.4); }
-  50% { opacity: 0.85; transform: scale(1); box-shadow: 0 0 8px rgba(253, 230, 138, 0.8); }
-}
-.secret-sparkle { animation: secret-twinkle 3.2s ease-in-out infinite; }
-:root[data-motion="off"] .secret-sparkle { animation: none; opacity: 0.5; }
-@media (prefers-reduced-motion: reduce) { .secret-sparkle { animation: none; opacity: 0.5; } }
-
 /* Heartbeat: the logo beats at today's resting heart rate (--beat, set from the cookie). */
 @keyframes beat-soft { 0%, 100% { filter: drop-shadow(0 0 0 transparent); transform: scale(1); } 14% { transform: scale(1.06); filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-emerald-300) 60%, transparent)); } 28% { transform: scale(1); } }
 @keyframes beat-sharp { 0%, 100% { transform: scale(1); } 10% { transform: scale(1.14); } 20% { transform: scale(0.98); } 30% { transform: scale(1.08); } 42% { transform: scale(1); } }

@@ -46,7 +46,6 @@ export default function EggsSettings({ initial, found }: { initial: Eggs; found:
       <Switch on={e.on} onChange={(on) => set({ on })} label="Easter eggs" hint="Secrets, surprises and little celebrations. Never during a workout." />
       {e.on && (
         <>
-          <Switch on={e.sparkle} onChange={(sparkle) => set({ sparkle })} label="Sparkles" hint="A faint twinkle near secrets you haven't found" />
           <Switch on={e.podPosts} onChange={(podPosts) => set({ podPosts })} label="Tell my pods" hint="Post “found a secret” in your pods (only from now on)" />
           {found.includes("heartbeat") && (
             <div className="py-2">
