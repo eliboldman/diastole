@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { BackButton } from "@/components/layout/BackLink";
 import HeartbeatLogo from "@/components/secrets/HeartbeatLogo";
 import SecretToast from "@/components/secrets/SecretToast";
 import { TAB_ICON } from "@/components/layout/tab-icons";
@@ -112,6 +113,7 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
 
       {/* Desktop: search and notifications top right */}
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
+        <BackButton />
         <span className="relative inline-flex">
           <SearchButton />
         </span>
@@ -123,8 +125,11 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
 
       {/* Mobile: slim top bar. Tapping the logo slides out every page from the left. */}
       <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-canvas/80 pt-[env(safe-area-inset-top)] backdrop-blur-2xl md:hidden">
-        <div className="flex h-12 items-center justify-between pl-2 pr-1">
-          <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
+        <div className="flex h-12 items-center justify-between pl-1 pr-1">
+          <div className="flex min-w-0 items-center">
+            <BackButton compact className="h-11 w-11 justify-center px-0" />
+            <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
+          </div>
           <div className="flex items-center">
             <span className="relative inline-flex">
               <SearchButton />
@@ -167,13 +172,10 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
-  const router = useRouter();
-  const [inApp, setInApp] = useState(false);
 
   // In the iPhone app (not Safari, where this swipe means "back"): swiping right from the left edge opens the menu.
   useEffect(() => {
     if (document.documentElement.dataset.app !== "ios") return;
-    const t = setTimeout(() => setInApp(true), 0);
     let start: { x: number; y: number } | null = null;
     const down = (e: TouchEvent) => {
       const p = e.touches[0];
@@ -194,7 +196,6 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
     document.addEventListener("touchmove", move, { passive: true });
     document.addEventListener("touchend", up, { passive: true });
     return () => {
-      clearTimeout(t);
       document.removeEventListener("touchstart", down);
       document.removeEventListener("touchmove", move);
       document.removeEventListener("touchend", up);
@@ -274,19 +275,6 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
           <HeartbeatLogo size={30} />
           <span className="font-semibold">Diastole</span>
         </Link>
-        {/* The app uses the edge swipe for this menu, so going back lives here instead. */}
-        {inApp && (
-          <button
-            tabIndex={open ? 0 : -1}
-            onClick={() => {
-              setOpen(false);
-              router.back();
-            }}
-            className="mb-2 flex min-h-12 w-full items-center gap-4 rounded-2xl border border-white/10 px-4 text-[15px] text-white/80 transition active:scale-[0.98]"
-          >
-            <ArrowLeft size={19} /> Back
-          </button>
-        )}
         <div className="space-y-1">{items.map((item) => link(item, isActive(pathname, item)))}</div>
         {shortcuts.length > 0 && (
           <>

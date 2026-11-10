@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 
 import NavHistory from "@/components/layout/NavHistory";
+import ScrollKeeper from "@/components/layout/ScrollKeeper";
 import NavProgress from "@/components/layout/NavProgress";
 import { asLook, LOOK_COOKIE, lookAttrs } from "@/lib/appearance";
 import { eggsFromCookie, EGGS_COOKIE } from "@/lib/secrets";
@@ -73,6 +74,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <Suspense fallback={null}>
           <NavHistory />
+          <ScrollKeeper />
         <NavProgress />
         </Suspense>
         {children}

@@ -3,38 +3,48 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+import { useInShell } from "@/components/layout/ShellBack";
+import { setFallback, snapshot, serverSnapshot, subscribe } from "@/lib/nav-stack";
 
 /**
- * The one back button: top-left of every detail page, a full 44px tap target. It returns to
- * whatever page you came from in the app; opened directly (a notification, a shared link), it goes
- * to `href` instead.
+ * Where Back goes from this page when it was opened directly (a notification, a shared link):
+ * `href`, shown as `label`. Inside the app shell the top bar draws the one back button (and goes
+ * to the previous page when there is one), so this only registers the fallback. Outside the
+ * shell it draws a back button itself.
  */
 export default function BackLink({ href, label }: { href: string; label: string }) {
-  const router = useRouter();
-  const [canGoBack, setCanGoBack] = useState(false);
+  const inShell = useInShell();
   useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        setCanGoBack(window.history.length > 1 && Number(sessionStorage.getItem("d_nav") ?? "0") > 0);
-      } catch {
-        setCanGoBack(false);
-      }
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
+    setFallback({ href, label });
+    return () => setFallback(null);
+  }, [href, label]);
+  if (inShell) return null;
+  return <BackButton className="-ml-2" />;
+}
+
+/** The back button: previous in-app page when there is one, else this page's fallback, else nothing. */
+export function BackButton({ className = "", compact = false }: { className?: string; compact?: boolean }) {
+  const router = useRouter();
+  const snap = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const [back, href, label] = snap.split("|");
+  const canGoBack = back === "1";
+  if (!canGoBack && !href) return null;
+  const text = canGoBack ? "Back" : label || "Back";
   return (
     <Link
-      href={href}
+      href={href || "/"}
+      aria-label={compact ? (canGoBack ? "Back" : `Back to ${text}`) : undefined}
       onClick={(e) => {
         if (!canGoBack || e.metaKey || e.ctrlKey || e.shiftKey) return;
         e.preventDefault();
         router.back();
       }}
-      className="-ml-2 inline-flex min-h-11 max-w-full items-center gap-1 rounded-xl px-2 text-sm text-white/60 transition hover:bg-white/[0.05] hover:text-white"
+      className={`inline-flex min-h-11 max-w-full items-center gap-1 rounded-xl px-2 text-sm text-white/65 transition hover:bg-white/[0.05] hover:text-white ${className}`}
     >
-      <ChevronLeft size={16} className="shrink-0" aria-hidden />
-      <span className="truncate">{canGoBack ? "Back" : label}</span>
+      <ChevronLeft size={compact ? 20 : 16} className="shrink-0" aria-hidden />
+      {!compact && <span className="truncate">{text}</span>}
     </Link>
   );
 }

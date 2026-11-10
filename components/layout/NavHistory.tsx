@@ -1,22 +1,15 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-/** Counts in-app page changes this tab has made, so back buttons know there's somewhere to go back to. */
+import { recordPage } from "@/lib/nav-stack";
+
+/** Records each in-app page this tab visits, so back buttons know where there is to go back to. */
 export default function NavHistory() {
   const path = usePathname();
-  const first = useRef(true);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    try {
-      sessionStorage.setItem("d_nav", String(Number(sessionStorage.getItem("d_nav") ?? "0") + 1));
-    } catch {
-      /* storage unavailable */
-    }
+    recordPage(location.pathname + location.search);
   }, [path]);
   return null;
 }
