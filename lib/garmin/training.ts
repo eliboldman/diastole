@@ -2,7 +2,7 @@ import "server-only";
 
 import { garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
-import { toGarminWorkout, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { toGarminWorkout, type Brick, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 
 /**
  * Sends one planned workout to the athlete's Garmin calendar (Training API V2).
@@ -12,7 +12,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
   const admin = createAdminClient();
   const { data: w, error } = await admin
     .from("planned_workouts")
-    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit")
+    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit, brick")
     .eq("id", workoutId)
     .single();
   if (error || !w) throw new Error("Workout not found.");
@@ -30,6 +30,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     sport: w.sport as Sport,
     steps: w.steps as Step[],
     pool: w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null,
+    brick: (w.brick ?? null) as Brick,
   });
 
   const created = await garminFetch(w.athlete_id, "/workoutportal/workout/v2", {

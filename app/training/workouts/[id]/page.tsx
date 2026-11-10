@@ -19,7 +19,7 @@ import { getFuelMode } from "@/lib/fuel/data";
 import { estimateSession, FUEL_DISCLAIMER } from "@/lib/fuel/plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
-import { inferPool, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
+import { inferPool, type Brick, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -32,7 +32,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const [{ data: w }, { data: done }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why")
+      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -51,6 +51,8 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const saved: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
   const pool: Pool = w.sport === "swim" ? inferPool(w.steps as Step[], saved) : saved;
   const lines = describe(w.steps as Step[], me.units, pool, w.sport === "swim");
+  const brick = (w.sport === "bike" && (w.brick as Brick)?.steps?.length ? w.brick : null) as Brick;
+  const runLines = brick ? describe(brick.steps, me.units) : [];
   const session = estimateSession(w.steps as Step[], w.sport, zones, pool);
   const closet = cleanCloset(gearRow?.gear);
   const own = me.id === w.athlete_id;
@@ -74,7 +76,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
-      <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} className="mt-4" />
+      <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} brick={brick} className="mt-4" />
       {w.sport === "bike" && w.athlete_id === me.id && !done && <RideButtons workoutId={w.id} />}
 
       {w.why && (
@@ -171,7 +173,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
       )}
 
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
-        <h2 className="text-lg font-medium">Steps</h2>
+        <h2 className="text-lg font-medium">{brick ? "Bike" : "Steps"}</h2>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-white/80">
           {lines.map((l, i) => (
             <li key={i} className="break-words">
@@ -179,6 +181,18 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
             </li>
           ))}
         </ol>
+        {brick && (
+          <>
+            <h2 className="mt-5 text-lg font-medium">Then run off the bike</h2>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-white/80">
+              {runLines.map((l, i) => (
+                <li key={i} className="break-words">
+                  {l}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
         <p className="mt-4 text-xs text-white/45">On your watch after it syncs. Training guidance from your coach, not medical advice.</p>
       </section>
 

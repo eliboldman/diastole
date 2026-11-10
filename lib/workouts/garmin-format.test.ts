@@ -108,3 +108,24 @@ console.log("garmin-format: all checks passed");
   assert.equal(g.poolLengthUnit, "YARD");
   console.log("inferPool: passed");
 }
+
+// Brick: bike + run as one multisport workout, step numbers continuing across segments.
+{
+  const bike = [{ kind: "step", intensity: "ACTIVE", duration: { type: "time", seconds: 3600 }, target: { type: "power_range", low: 180, high: 200 } }] as Step[];
+  const run = [
+    { kind: "step", intensity: "ACTIVE", duration: { type: "distance", meters: 3000 }, target: { type: "pace_range", slowSecPerKm: 300, fastSecPerKm: 285 } },
+    { kind: "repeat", times: 2, steps: [{ kind: "step", intensity: "INTERVAL", duration: { type: "time", seconds: 60 } }] },
+  ] as Step[];
+  const b = toGarminWorkout({ title: "Brick", sport: "bike", steps: bike, brick: { sport: "run", steps: run } }) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  assert.equal(b.sport, "MULTI_SPORT");
+  assert.equal(b.isSessionTransitionEnabled, true);
+  assert.deepEqual(b.segments.map((s: { sport: string }) => s.sport), ["CYCLING", "RUNNING"]);
+  assert.equal(b.segments[0].steps[0].stepOrder, 1);
+  assert.equal(b.segments[1].steps[0].stepOrder, 2);
+  assert.equal(b.segments[1].steps[1].stepOrder, 3);
+  assert.equal(b.segments[1].steps[1].steps[0].stepOrder, 4);
+  assert.throws(() => toGarminWorkout({ title: "x", sport: "bike", steps: bike, brick: { sport: "run", steps: [{ kind: "step", intensity: "MAIN", duration: { type: "time", seconds: 60 } }] as Step[] } }), /Run off the bike/);
+  // A brick on a run workout is ignored.
+  assert.equal((toGarminWorkout({ title: "x", sport: "run", steps: run, brick: { sport: "run", steps: run } }) as { sport: string }).sport, "RUNNING");
+  console.log("brick: passed");
+}

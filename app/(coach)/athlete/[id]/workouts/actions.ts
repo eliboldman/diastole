@@ -7,7 +7,7 @@ import { sendWorkoutToGarmin } from "@/lib/garmin/training";
 import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
 import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
-import { validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { validateSteps, type Brick, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 
 export type WorkoutInput = {
@@ -20,6 +20,7 @@ export type WorkoutInput = {
   steps: Step[];
   pool?: Pool; // swims only; null = any pool
   why?: string; // what the athlete sees about the session's purpose (the coach wrote or approved it)
+  brick?: Brick; // bike workouts only: a run off the bike
 };
 
 export type ActionResult = { ok: true; id: string; message?: string } | { ok: false; error: string };
@@ -31,6 +32,7 @@ function check(input: WorkoutInput): string | null {
   const pool = input.sport === "swim" ? (input.pool ?? null) : null;
   if (pool && (!(pool.length >= 10 && pool.length <= 100) || !["METER", "YARD"].includes(pool.unit))) return "Pick a pool length.";
   const errors = validateSteps(input.steps, 0, input.sport, pool);
+  if (input.sport === "bike" && input.brick?.steps?.length) errors.push(...validateSteps(input.brick.steps, 0, "run", null).map((e) => `Run off the bike: ${e}`));
   return errors.length ? [...new Set(errors)].join(" ") : null;
 }
 
@@ -44,6 +46,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
   // Remember each target as a % of this athlete's zones too, so the Library can scale it to others.
   const { data: zones } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle();
   const steps = annotate(stripRel(input.steps), zones as RelZones);
+  const brick = input.sport === "bike" && input.brick?.steps?.length ? { sport: "run" as const, steps: annotate(stripRel(input.brick.steps), zones as RelZones) } : null;
   const row = {
     athlete_id: input.athleteId,
     coach_id: coach.id,
@@ -52,6 +55,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     scheduled_date: input.scheduledDate,
     description: input.description.trim() || null,
     steps,
+    brick,
     pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
     pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,
     ...(input.why !== undefined

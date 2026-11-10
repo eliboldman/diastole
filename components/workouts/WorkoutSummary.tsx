@@ -1,4 +1,4 @@
-import type { Pool, Sport, Step } from "@/lib/workouts/garmin-format";
+import type { Brick, Pool, Sport, Step } from "@/lib/workouts/garmin-format";
 import { summarize, type Zones } from "@/lib/workouts/totals";
 
 /**
@@ -11,6 +11,7 @@ export default function WorkoutSummary({
   pool,
   units,
   zones = null,
+  brick = null,
   className = "",
 }: {
   steps: Step[];
@@ -18,9 +19,10 @@ export default function WorkoutSummary({
   pool: Pool;
   units: "mi" | "km";
   zones?: Zones;
+  brick?: Brick;
   className?: string;
 }) {
-  const s = summarize(steps, sport, pool, units, zones);
+  const s = summarize(steps, sport, pool, units, zones, brick);
   const tiles = [
     ["Time", s.time],
     ["Distance", s.distance],

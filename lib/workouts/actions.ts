@@ -7,7 +7,7 @@ import { removeFromDevice, retireWorkout } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts/adjust";
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
-import { validateSteps, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, hasRelative, resolve, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
@@ -28,9 +28,10 @@ type WorkoutRow = {
   library_id: string | null;
   pool_length: number | null;
   pool_unit: PoolUnit | null;
+  brick: Brick;
 };
 
-const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id, pool_length, pool_unit";
+const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id, pool_length, pool_unit, brick";
 const poolOf = (w: { pool_length: number | null; pool_unit: PoolUnit | null }): Pool =>
   w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit } : null;
 
@@ -70,6 +71,7 @@ async function snapshot(supabase: Supa, w: WorkoutRow, change: string, by: strin
     scheduled_date: w.scheduled_date,
     description: w.description,
     steps: w.steps,
+    brick: w.brick ?? null,
     pool_length: w.pool_length,
     pool_unit: w.pool_unit,
     created_by: by,
@@ -86,7 +88,7 @@ export async function recordVersion(workoutId: string, change: string): Promise<
     // Only record an edit when something actually changed since the last version.
     const { data: last } = await supabase
       .from("workout_versions")
-      .select("title, sport, scheduled_date, description, steps, pool_length, pool_unit")
+      .select("title, sport, scheduled_date, description, steps, pool_length, pool_unit, brick")
       .eq("workout_id", w.id)
       .order("version", { ascending: false })
       .limit(1)
@@ -99,7 +101,8 @@ export async function recordVersion(workoutId: string, change: string): Promise<
       Number(last.pool_length ?? 0) === Number(w.pool_length ?? 0) &&
       (last.pool_unit ?? null) === (w.pool_unit ?? null) &&
       (last.description ?? null) === (w.description ?? null) &&
-      JSON.stringify(last.steps) === JSON.stringify(w.steps)
+      JSON.stringify(last.steps) === JSON.stringify(w.steps) &&
+      JSON.stringify(last.brick ?? null) === JSON.stringify(w.brick ?? null)
     )
       return;
   }
@@ -112,7 +115,7 @@ export async function syncToLibrary(workoutId: string): Promise<void> {
   const supabase = await createClient();
   const w = await load(supabase, workoutId);
   if (!w) return;
-  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps, pool_length: w.pool_length, pool_unit: w.pool_unit };
+  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps, brick: w.brick ?? null, pool_length: w.pool_length, pool_unit: w.pool_unit };
 
   const { data: existing } = await supabase
     .from("workout_library")
@@ -303,6 +306,7 @@ export async function duplicateWorkout(id: string, date?: string): Promise<Resul
       scheduled_date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : w.scheduled_date,
       description: w.description,
       steps: w.steps,
+      brick: w.brick,
       pool_length: w.pool_length,
       pool_unit: w.pool_unit,
       status: "draft",
@@ -357,7 +361,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("workout_library")
-    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit, source_workout_id")
+    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit, source_workout_id, brick")
     .eq("id", libraryId)
     .maybeSingle();
   if (!item) return { ok: false, error: "Library workout not found." };
@@ -386,6 +390,8 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   const ids: string[] = [];
   for (const athleteId of athleteIds) {
     const scaled = resolve((item.steps ?? []) as Step[], zonesOf.get(athleteId) ?? null);
+    const run = (item.brick as Brick)?.steps?.length ? resolve((item.brick as NonNullable<Brick>).steps, zonesOf.get(athleteId) ?? null) : null;
+    if (run) scaled.missing = [...new Set([...scaled.missing, ...run.missing])];
     if (scaled.missing.length) kept.push(`${nameOf.get(athleteId)} (no ${scaled.missing.join(" or ")})`);
     const { data, error } = await supabase
       .from("planned_workouts")
@@ -397,6 +403,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
         scheduled_date: date,
         description: item.description,
         steps: scaled.steps,
+        brick: run ? { sport: "run", steps: run.steps } : null,
         pool_length: item.pool_length,
         pool_unit: item.pool_unit,
         status: "draft",

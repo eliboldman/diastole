@@ -32,3 +32,23 @@ assert.equal(run.plannedSec, 3 * 2700);
 assert.equal(run.doneSec, 4000);
 assert.equal(w.sports.find((s) => s.family === "bike")!.plannedM, 0); // no guessed bike distance
 console.log("week review: all passed");
+
+// Brick: bike + separate run the same day count as one session; run time goes to Run.
+{
+  const bikeHr = [{ kind: "step", intensity: "ACTIVE", duration: { type: "time", seconds: 3600 } }] as never;
+  const run15 = [{ kind: "step", intensity: "ACTIVE", duration: { type: "time", seconds: 900 } }] as never;
+  const b = weekReview({
+    start: "2026-11-09", today: "2026-11-11", tz: "UTC",
+    plans: [{ id: "b1", date: "2026-11-10", sport: "bike", title: "Brick", steps: bikeHr, pool: null, brick: { sport: "run", steps: run15 } }],
+    activities: [
+      { id: "x1", start_time: "2026-11-10T14:00:00Z", sport: "cycling", duration_s: 3500, distance_m: 30000, planned_workout_id: null },
+      { id: "x2", start_time: "2026-11-10T15:00:00Z", sport: "running", duration_s: 950, distance_m: 3000, planned_workout_id: null },
+    ],
+  });
+  assert.equal(b.sessions[0].status, "done");
+  assert.equal(b.sessions[0].brickRun?.id, "x2");
+  assert.equal(b.extras.length, 0);
+  assert.equal(b.sessions[0].plannedSec, 4500);
+  assert.equal(b.sports.find((s) => s.family === "run")!.plannedSec, 900);
+  console.log("brick week: passed");
+}

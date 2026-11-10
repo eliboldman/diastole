@@ -38,6 +38,8 @@ export type Step =
   | { kind: "repeat"; times: number; steps: Step[] };
 
 export type Sport = "run" | "bike" | "swim";
+/** A run off the bike, carried by a bike workout (a brick). */
+export type Brick = { sport: "run"; steps: Step[] } | null;
 export type PoolUnit = "METER" | "YARD";
 /** Null means "any pool": distances show on the watch as written, without conversion. */
 export type Pool = { length: number; unit: PoolUnit } | null;
@@ -211,11 +213,15 @@ export function countSteps(steps: Step[]): number {
   return steps.reduce((n, s) => n + 1 + (s.kind === "repeat" ? countSteps(s.steps) : 0), 0);
 }
 
-export function toGarminWorkout(w: { title: string; description?: string | null; sport: Sport; steps: Step[]; pool?: Pool }) {
+export function toGarminWorkout(w: { title: string; description?: string | null; sport: Sport; steps: Step[]; pool?: Pool; brick?: Brick }) {
   const pool = w.sport === "swim" ? inferPool(w.steps, w.pool ?? null) : null;
+  const brick = w.sport === "bike" && w.brick?.steps?.length ? w.brick : null;
   const errors = validateSteps(w.steps, 0, w.sport, pool);
+  if (brick) errors.push(...validateSteps(brick.steps, 0, "run", null).map((e) => `Run off the bike: ${e}`));
   if (!SPORTS[w.sport]) errors.push(`Unsupported sport for Garmin: ${w.sport}`);
-  if (countSteps(w.steps) > 100) errors.push("Garmin allows at most 100 steps in a single-sport workout.");
+  if (brick) {
+    if (countSteps(w.steps) + countSteps(brick.steps) > 250) errors.push("Garmin allows at most 250 steps in a multisport workout.");
+  } else if (countSteps(w.steps) > 100) errors.push("Garmin allows at most 100 steps in a single-sport workout.");
   if (errors.length) throw new Error([...new Set(errors)].join(" "));
 
   const swim = w.sport === "swim";
@@ -250,6 +256,26 @@ export function toGarminWorkout(w: { title: string; description?: string | null;
         : {}),
     };
   };
+
+  if (brick) {
+    // Multisport: one segment per sport, step numbers running on across segments, transitions on.
+    const bikeSteps = w.steps.map(convert);
+    const runSteps = brick.steps.map(convert);
+    return {
+      workoutName: w.title.slice(0, 100),
+      description: w.description?.slice(0, 1024) ?? null,
+      sport: "MULTI_SPORT",
+      workoutProvider: "Diastole",
+      workoutSourceId: "Diastole",
+      isSessionTransitionEnabled: true,
+      poolLength: null,
+      poolLengthUnit: null,
+      segments: [
+        { segmentOrder: 1, sport: SPORTS.bike, poolLength: null, poolLengthUnit: null, steps: bikeSteps },
+        { segmentOrder: 2, sport: SPORTS.run, poolLength: null, poolLengthUnit: null, steps: runSteps },
+      ],
+    };
+  }
 
   const sport = SPORTS[w.sport];
   return {

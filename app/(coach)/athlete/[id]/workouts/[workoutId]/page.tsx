@@ -8,7 +8,7 @@ import WhyEditor from "@/components/coach/WhyEditor";
 import WorkoutTools from "@/components/coach/WorkoutTools";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
-import type { Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
+import type { Brick, Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 
@@ -17,6 +17,7 @@ export const metadata: Metadata = { title: "Workout · Diastole" };
 type Row = {
   id: string;
   why: string | null;
+  brick: Brick | null;
   title: string;
   sport: string;
   scheduled_date: string;
@@ -57,7 +58,7 @@ export default async function WorkoutPage({
     const [{ data }, { data: v }] = await Promise.all([
       supabase
         .from("planned_workouts")
-        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why")
+        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why, brick")
         .eq("id", workoutId)
         .eq("athlete_id", id)
         .maybeSingle(),
@@ -85,6 +86,7 @@ export default async function WorkoutPage({
         status: w.status,
         pool,
         why: w.why,
+        brick: (w.brick ?? null) as Brick,
       }
     : undefined;
 

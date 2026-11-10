@@ -18,6 +18,7 @@ import {
   STROKES,
   SWIM_EFFORTS,
   YARD,
+  type Brick,
   type Drill,
   type Duration,
   type Equipment,
@@ -60,6 +61,11 @@ const newStep = (intensity: Intensity = "ACTIVE"): UiStep => ({
   intensity,
   duration: { type: "time", seconds: 600 },
 });
+
+const updateAt = (list: UiStep[], i: number, s: UiStep) => list.map((x, j) => (j === i ? s : x));
+
+// A run off the bike: 15 minutes steady, legs finding their rhythm.
+const DEFAULT_BRICK: Step[] = [{ kind: "step", intensity: "ACTIVE", duration: { type: "time", seconds: 900 }, target: { type: "hr_zone", zone: 2 } }];
 
 const DEFAULT_STEPS: Step[] = [
   { kind: "step", intensity: "WARMUP", duration: { type: "time", seconds: 600 } },
@@ -523,7 +529,7 @@ export default function WorkoutBuilder({
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
-  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null };
+  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null; brick?: Brick };
 }) {
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
@@ -538,6 +544,7 @@ export default function WorkoutBuilder({
   const [steps, setSteps] = useState<UiStep[]>(() =>
     withIds(initial?.steps ?? (startSport === "swim" ? swimDefault({ length: 25, unit: "YARD" }) : DEFAULT_STEPS)),
   );
+  const [brick, setBrick] = useState<UiStep[] | null>(() => (initial?.brick?.steps?.length ? withIds(initial.brick.steps) : null));
   const [paceUnit, setPaceUnit] = useState<"mi" | "km">(units);
   const [pool, setPool] = useState<Pool>(initial ? inferPool(initial.steps, initial.pool ?? null) : { length: 25, unit: "YARD" });
   const swim = sport === "swim";
@@ -580,7 +587,8 @@ export default function WorkoutBuilder({
       navigator.vibrate?.([8, 30, 8]);
     });
   const mine = () => ({ id, title, sport, description, steps: stripIds(steps), pool: swim ? pool : null });
-  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why });
+  const brickOut = (): Brick => (sport === "bike" && brick?.length ? { sport: "run", steps: stripIds(brick) } : null);
+  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why, brick: brickOut() });
   const draftTheWhy = () =>
     startDraft(async () => {
       setWhyNote(null);
@@ -598,7 +606,6 @@ export default function WorkoutBuilder({
     if (untouched) setSteps(withIds(next === "swim" ? swimDefault(pool) : DEFAULT_STEPS));
   };
 
-  const updateAt = (list: UiStep[], i: number, s: UiStep) => list.map((x, j) => (j === i ? s : x));
 
   const run = (fn: () => Promise<{ ok: boolean; id?: string; message?: string; error?: string }>, after?: () => void) =>
     start(async () => {
@@ -749,7 +756,7 @@ export default function WorkoutBuilder({
 
       {/* Live totals: stays in view while the steps below are edited. */}
       <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 md:top-2">
-        <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} className="bg-canvas/90 backdrop-blur-xl" />
+        <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} brick={brickOut()} className="bg-canvas/90 backdrop-blur-xl" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -765,77 +772,27 @@ export default function WorkoutBuilder({
         )}
       </div>
 
-      <fieldset disabled={!editable} className="grid gap-3">
-        {steps.map((s, i) =>
-          s.kind === "step" ? (
-            <StepEditor key={s.uid} step={s} paceUnit={paceUnit} swim={swim} pool={pool} onChange={(n) => setSteps(updateAt(steps, i, n))} onRemove={() => setSteps(steps.filter((_, j) => j !== i))} />
-          ) : (
-            <div key={s.uid} className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.03] p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-sm">
-                  Repeat
-                  <input
-                    className={`${field} w-16`}
-                    type="number"
-                    min={2}
-                    max={99}
-                    value={s.times}
-                    onChange={(e) => setSteps(updateAt(steps, i, { ...s, times: Number(e.target.value) }))}
-                  />
-                  times
-                </label>
-                <button type="button" className="min-h-11 px-2 text-sm text-white/50 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
-                  Remove repeat
-                </button>
-              </div>
-              <div className="grid gap-2 sm:pl-4">
-                {s.steps.map((c, k) =>
-                  c.kind === "step" ? (
-                    <StepEditor
-                      key={c.uid}
-                      step={c}
-                      paceUnit={paceUnit}
-                      swim={swim}
-                      pool={pool}
-                      onChange={(n) => setSteps(updateAt(steps, i, { ...s, steps: updateAt(s.steps, k, n) }))}
-                      onRemove={() => setSteps(updateAt(steps, i, { ...s, steps: s.steps.filter((_, j) => j !== k) }))}
-                    />
-                  ) : null,
-                )}
-                <button
-                  type="button"
-                  className="min-h-11 justify-self-start text-sm text-emerald-200/80 hover:underline"
-                  onClick={() => setSteps(updateAt(steps, i, { ...s, steps: [...s.steps, swim ? newSwimStep("REST", pool) : newStep("RECOVERY")] }))}
-                >
-                  + Step inside repeat
-                </button>
-              </div>
+      <StepsList steps={steps} setSteps={setSteps} paceUnit={paceUnit} swim={swim} pool={pool} editable={editable} />
+
+      {sport === "bike" && !athleteMode && (
+        <div className="grid gap-3 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-medium">Run off the bike</h3>
+              <p className="text-xs text-white/50">Makes this a brick. Garmin gets one multisport workout: bike, then run, with the transition. Apple Watch gets the bike only.</p>
             </div>
-          ),
-        )}
-        <div className="flex gap-4">
-          <button type="button" className="min-h-11 text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, swim ? newSwimStep("MAIN", pool) : newStep()])}>
-            + Step
-          </button>
-          <button
-            type="button"
-            className="min-h-11 text-sm text-emerald-200/80 hover:underline"
-            onClick={() =>
-              setSteps([
-                ...steps,
-                {
-                  uid: uid(),
-                  kind: "repeat",
-                  times: 4,
-                  steps: swim ? [newSwimStep("MAIN", pool), newSwimStep("REST", pool)] : [newStep("INTERVAL"), newStep("RECOVERY")],
-                },
-              ])
-            }
-          >
-            + Repeat
-          </button>
+            <button
+              type="button"
+              disabled={!editable}
+              onClick={() => setBrick(brick ? null : withIds(DEFAULT_BRICK))}
+              className="min-h-11 rounded-xl border border-white/10 px-3 text-sm text-white/80 hover:bg-white/[0.05] disabled:opacity-50"
+            >
+              {brick ? "Remove run" : "+ Add a run"}
+            </button>
+          </div>
+          {brick && <StepsList steps={brick} setSteps={setBrick as (s: UiStep[]) => void} paceUnit={paceUnit} swim={false} pool={null} editable={editable} />}
         </div>
-      </fieldset>
+      )}
 
       {message && (
         <p className={`rounded-2xl border p-3 text-sm ${message.ok ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100" : "border-red-300/20 bg-red-300/[0.06] text-red-200"}`}>
@@ -913,12 +870,22 @@ export default function WorkoutBuilder({
               <strong className="text-white">{title || "Untitled"}</strong> ({sport}) on{" "}
               {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} → {destination}
             </p>
-            <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} className="mt-4" />
+            <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} brick={brickOut()} className="mt-4" />
             <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-white/70">
               {describe(stripIds(steps), paceUnit, swim ? pool : null, swim).map((l, i) => (
                 <li key={i}>{l}</li>
               ))}
             </ol>
+            {brickOut() && (
+              <>
+                <p className="mt-3 text-sm font-medium text-white/80">Then run off the bike</p>
+                <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-white/70">
+                  {describe(brickOut()!.steps, paceUnit).map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ol>
+              </>
+            )}
             {swim && steps.some((s) => s.kind === "repeat" && s.steps.some((c) => c.kind === "step" && c.intensity === "REST")) && (
               <p className="mt-3 text-xs text-white/50">On the watch, the rest after the last rep of each repeat is skipped (Garmin&apos;s swim default).</p>
             )}
@@ -938,5 +905,96 @@ export default function WorkoutBuilder({
         </div>
       )}
     </div>
+  );
+}
+
+/** The editable list of steps and repeats (the main workout, or a brick's run). */
+function StepsList({
+  steps,
+  setSteps,
+  paceUnit,
+  swim,
+  pool,
+  editable,
+}: {
+  steps: UiStep[];
+  setSteps: (s: UiStep[]) => void;
+  paceUnit: "mi" | "km";
+  swim: boolean;
+  pool: Pool;
+  editable: boolean;
+}) {
+  return (
+  <fieldset disabled={!editable} className="grid gap-3">
+      {steps.map((s, i) =>
+        s.kind === "step" ? (
+          <StepEditor key={s.uid} step={s} paceUnit={paceUnit} swim={swim} pool={pool} onChange={(n) => setSteps(updateAt(steps, i, n))} onRemove={() => setSteps(steps.filter((_, j) => j !== i))} />
+        ) : (
+          <div key={s.uid} className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.03] p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                Repeat
+                <input
+                  className={`${field} w-16`}
+                  type="number"
+                  min={2}
+                  max={99}
+                  value={s.times}
+                  onChange={(e) => setSteps(updateAt(steps, i, { ...s, times: Number(e.target.value) }))}
+                />
+                times
+              </label>
+              <button type="button" className="min-h-11 px-2 text-sm text-white/50 hover:text-red-300" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
+                Remove repeat
+              </button>
+            </div>
+            <div className="grid gap-2 sm:pl-4">
+              {s.steps.map((c, k) =>
+                c.kind === "step" ? (
+                  <StepEditor
+                    key={c.uid}
+                    step={c}
+                    paceUnit={paceUnit}
+                    swim={swim}
+                    pool={pool}
+                    onChange={(n) => setSteps(updateAt(steps, i, { ...s, steps: updateAt(s.steps, k, n) }))}
+                    onRemove={() => setSteps(updateAt(steps, i, { ...s, steps: s.steps.filter((_, j) => j !== k) }))}
+                  />
+                ) : null,
+              )}
+              <button
+                type="button"
+                className="min-h-11 justify-self-start text-sm text-emerald-200/80 hover:underline"
+                onClick={() => setSteps(updateAt(steps, i, { ...s, steps: [...s.steps, swim ? newSwimStep("REST", pool) : newStep("RECOVERY")] }))}
+              >
+                + Step inside repeat
+              </button>
+            </div>
+          </div>
+        ),
+      )}
+      <div className="flex gap-4">
+        <button type="button" className="min-h-11 text-sm text-emerald-200/80 hover:underline" onClick={() => setSteps([...steps, swim ? newSwimStep("MAIN", pool) : newStep()])}>
+          + Step
+        </button>
+        <button
+          type="button"
+          className="min-h-11 text-sm text-emerald-200/80 hover:underline"
+          onClick={() =>
+            setSteps([
+              ...steps,
+              {
+                uid: uid(),
+                kind: "repeat",
+                times: 4,
+                steps: swim ? [newSwimStep("MAIN", pool), newSwimStep("REST", pool)] : [newStep("INTERVAL"), newStep("RECOVERY")],
+              },
+            ])
+          }
+        >
+          + Repeat
+        </button>
+      </div>
+    </fieldset>
   );
 }

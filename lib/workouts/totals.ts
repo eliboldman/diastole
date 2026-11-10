@@ -6,7 +6,7 @@
 // is estimated from the step's pace target, then the athlete's threshold, then an easy default,
 // and marked "~". "Until lap" steps can't be counted and are reported separately.
 
-import { inferPool, type Pool, type Sport, type Step, type Target } from "./garmin-format.ts";
+import { inferPool, type Brick, type Pool, type Sport, type Step, type Target } from "./garmin-format.ts";
 
 const YARD = 0.9144;
 const MILE = 1609.344;
@@ -113,7 +113,8 @@ export function formatDistance(meters: number, sport: Sport | string, pool: Pool
 export type Summary = { time: string | null; distance: string | null; hard: string | null; structure: string; note: string | null };
 
 /** Everything the summary card shows, as text. */
-export function summarize(steps: Step[], sport: Sport | string, pool: Pool, units: "mi" | "km", zones: Zones = null): Summary {
+export function summarize(steps: Step[], sport: Sport | string, pool: Pool, units: "mi" | "km", zones: Zones = null, brick: Brick = null): Summary {
+  if (sport === "bike" && brick?.steps?.length) return summarizeBrick(steps, brick.steps, units, zones);
   if (sport === "swim") pool = inferPool(steps, pool);
   const t = workoutTotals(steps, sport, pool, zones);
   // Bike distance from time is a guess at best (wind, hills, trainer); only show it when the steps set it.
@@ -126,6 +127,23 @@ export function summarize(steps: Step[], sport: Sport | string, pool: Pool, unit
     hard: t.hardSeconds >= 60 ? formatDuration(t.hardSeconds) : null,
     structure: structure(steps, sport, pool, units),
     note: t.openSteps ? `Plus ${t.openSteps === 1 ? "1 step" : `${t.openSteps} steps`} until you press lap, not counted.` : null,
+  };
+}
+
+/** Bike then run: times add up; distance counts what the steps set (no guessed bike miles). */
+function summarizeBrick(bike: Step[], run: Step[], units: "mi" | "km", zones: Zones): Summary {
+  const b = workoutTotals(bike, "bike", null, zones);
+  const r = workoutTotals(run, "run", null, zones);
+  const seconds = b.seconds + r.seconds;
+  const meters = (b.distanceEstimated ? 0 : b.meters) + r.meters;
+  const est = b.timeEstimated || r.timeEstimated;
+  const open = b.openSteps + r.openSteps;
+  return {
+    time: seconds > 0 ? `${est ? "~" : ""}${formatDuration(seconds)}` : null,
+    distance: meters > 0 ? `${r.distanceEstimated ? "~" : ""}${formatDistance(meters, "run", null, units)}${b.distanceEstimated ? " run" : ""}` : null,
+    hard: b.hardSeconds + r.hardSeconds >= 60 ? formatDuration(b.hardSeconds + r.hardSeconds) : null,
+    structure: `Bike: ${structure(bike, "bike", null, units)} → Run: ${structure(run, "run", null, units)}`,
+    note: open ? `Plus ${open === 1 ? "1 step" : `${open} steps`} until you press lap, not counted.` : null,
   };
 }
 

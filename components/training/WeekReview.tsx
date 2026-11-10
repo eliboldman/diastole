@@ -123,7 +123,7 @@ export default function WeekReview({
                         <span className="block truncate text-xs text-white/50">
                           {s.activity
                             ? [
-                                s.activity.duration_s ? formatDuration(s.activity.duration_s) : null,
+                                s.activity.duration_s ? formatDuration(s.activity.duration_s + (s.brickRun?.duration_s ?? 0)) : null,
                                 s.activity.distance_m ? dist(s.activity.distance_m, familyOf(s.activity.sport)) : null,
                                 planned ? `plan ${planned.replace(" · ", ", ")}` : null,
                               ]

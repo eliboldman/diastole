@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { estimateMaxHr } from "@/lib/activity/zones";
-import type { Step } from "@/lib/workouts/garmin-format";
+import type { Brick, Step } from "@/lib/workouts/garmin-format";
 
 import { formBand, loadSeries, plannedLoad, rampRate, sessionLoad, type FormBand, type LoadDay, type LoadSource } from "./load";
 
@@ -39,7 +39,7 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
     supabase.from("daily_wellness").select("resting_hr").eq("athlete_id", athleteId).gte("date", addDays(today, -60)).not("resting_hr", "is", null).limit(60),
     supabase
       .from("planned_workouts")
-      .select("scheduled_date, sport, steps")
+      .select("scheduled_date, sport, steps, brick")
       .eq("athlete_id", athleteId)
       .neq("status", "draft")
       .is("deleted_at", null)
@@ -76,7 +76,8 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
   const planned = new Map<string, number>();
   for (const p of plans ?? []) {
     if (p.scheduled_date === today && doneToday) continue;
-    planned.set(p.scheduled_date, (planned.get(p.scheduled_date) ?? 0) + plannedLoad((p.steps ?? []) as Step[], p.sport));
+    const run = (p.brick as Brick)?.steps?.length ? plannedLoad((p.brick as NonNullable<Brick>).steps, "run") : 0;
+    planned.set(p.scheduled_date, (planned.get(p.scheduled_date) ?? 0) + plannedLoad((p.steps ?? []) as Step[], p.sport) + run);
   }
 
   const all = loadSeries({ from, to, today, done, planned });
