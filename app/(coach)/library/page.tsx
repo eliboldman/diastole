@@ -28,7 +28,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       <p className="mt-2 text-sm text-white/55">
         Every workout you build is saved here. Assign one to any athlete as a draft, then approve and send as usual.
       </p>
-      <ConnectImport />
+      <ConnectImport athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.id === coach.id ? `${a.full_name || "You"} (you)` : a.full_name || a.email || "Athlete" }))} />
       <Library
         items={(items ?? []).map((i) => ({ ...i, steps: i.steps as Step[] }))}
         athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.full_name || a.email || "Athlete" }))}

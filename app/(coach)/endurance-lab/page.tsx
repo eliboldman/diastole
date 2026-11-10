@@ -94,7 +94,7 @@ export default async function EnduranceLabPage() {
             <Link href="/library" className={`${linkRow} mt-4`}>
               Open the library <ChevronRight size={16} className="text-white/45" aria-hidden />
             </Link>
-            <ConnectImport />
+            <ConnectImport athletes={roster} />
             <Link href="/lab/recovery" className={`${linkRow} mt-3`}>
               Recovery routines and demos <ChevronRight size={16} className="text-white/45" aria-hidden />
             </Link>

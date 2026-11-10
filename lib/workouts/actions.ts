@@ -9,6 +9,7 @@ import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
 import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, hasRelative, resolve, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { planSchedule, type ImportedRef, type ScheduleRow, type ScheduleSkip } from "@/lib/workouts/schedule-import";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
 
@@ -430,7 +431,22 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
 
 // ---------------------------------------------------------------- import from Garmin Connect
 
-export type ImportedItem = { file: string; ok: boolean; title?: string; notes?: string[]; error?: string };
+export type ImportedItem = {
+  file: string;
+  ok: boolean;
+  title?: string;
+  notes?: string[];
+  error?: string;
+  /** Library row it landed in (new, or an identical earlier import). */
+  id?: string;
+  /** Garmin Connect workoutId from the file, used to match a schedule.csv. */
+  garminId?: string | null;
+  reused?: boolean;
+};
+
+/** JSON with object keys sorted, so jsonb read back from Postgres compares equal to what was written. */
+const canon = (v: unknown): string =>
+  JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 
 /** Adds workouts exported from Garmin Connect (.json) to the coach's library. */
 export async function importConnectWorkouts(files: { name: string; text: string }[]): Promise<{ results: ImportedItem[] }> {
@@ -444,8 +460,26 @@ export async function importConnectWorkouts(files: { name: string; text: string 
       continue;
     }
     try {
-      const w = fromConnectWorkout(JSON.parse(f.text));
-      const { error } = await supabase.from("workout_library").insert({
+      const raw = JSON.parse(f.text);
+      const garminId = raw && (typeof raw.workoutId === "number" || typeof raw.workoutId === "string") ? String(raw.workoutId) : null;
+      const w = fromConnectWorkout(raw);
+      // Uploading the same export twice reuses the earlier import instead of doubling the library.
+      const { data: same } = await supabase
+        .from("workout_library")
+        .select("id, steps, pool_length, pool_unit")
+        .eq("coach_id", coach.id)
+        .eq("title", w.title)
+        .eq("sport", w.sport)
+        .contains("tags", ["imported"])
+        .limit(10);
+      const twin = (same ?? []).find(
+        (s) => canon(s.steps) === canon(w.steps) && (s.pool_length ?? null) === (w.pool?.length ?? null) && (s.pool_unit ?? null) === (w.pool?.unit ?? null),
+      );
+      if (twin) {
+        results.push({ file: name, ok: true, title: w.title, notes: w.skipped, id: twin.id, garminId, reused: true });
+        continue;
+      }
+      const { data: row, error } = await supabase.from("workout_library").insert({
         coach_id: coach.id,
         title: w.title,
         sport: w.sport,
@@ -455,13 +489,68 @@ export async function importConnectWorkouts(files: { name: string; text: string 
         pool_unit: w.pool?.unit ?? null,
         workout_type: guessType(w.title),
         tags: ["imported"],
-      });
-      if (error) throw new Error(error.message);
-      results.push({ file: name, ok: true, title: w.title, notes: w.skipped });
+      }).select("id").single();
+      if (error || !row) throw new Error(error?.message ?? "Couldn't save the workout.");
+      results.push({ file: name, ok: true, title: w.title, notes: w.skipped, id: row.id, garminId });
     } catch (e) {
       results.push({ file: name, ok: false, error: e instanceof SyntaxError ? "Not a valid JSON file." : (e as Error).message });
     }
   }
   revalidatePath("/library");
   return { results };
+}
+
+/**
+ * One time only: puts a Connect export's schedule.csv on one athlete's calendar as drafts.
+ * Nothing repeats and nothing is sent; past dates and workouts already on those days are skipped.
+ */
+export async function scheduleImportedWorkouts(
+  athleteId: string,
+  rows: ScheduleRow[],
+  imported: ImportedRef[],
+): Promise<Result & { added?: number; skipped?: ScheduleSkip[] }> {
+  const coach = await requireCoach();
+  const supabase = await createClient();
+  const { data: athlete } = await supabase.from("profiles").select("id, timezone").eq("id", athleteId).eq("coach_id", coach.id).maybeSingle();
+  if (!athlete) return { ok: false, error: "Pick one of your athletes." };
+  const clean = (Array.isArray(rows) ? rows : [])
+    .slice(0, 200)
+    .filter((r) => r && /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) && typeof r.title === "string")
+    .map((r) => ({ date: String(r.date), title: r.title.slice(0, 200), workoutId: r.workoutId ? String(r.workoutId) : null }));
+  if (!clean.length) return { ok: false, error: "The schedule had no dated workouts." };
+
+  // Only library rows this coach owns can be scheduled.
+  const ids = [...new Set((Array.isArray(imported) ? imported : []).map((i) => String(i?.libraryId)))].slice(0, 200);
+  const { data: owned } = await supabase.from("workout_library").select("id").eq("coach_id", coach.id).in("id", ids);
+  const ok = new Set((owned ?? []).map((o) => o.id as string));
+  const refs = imported.filter((i) => ok.has(String(i.libraryId))).map((i) => ({ libraryId: String(i.libraryId), title: String(i.title), garminId: i.garminId ? String(i.garminId) : null }));
+
+  const dates = clean.map((r) => r.date).sort();
+  const { data: existing } = await supabase
+    .from("planned_workouts")
+    .select("scheduled_date, title")
+    .eq("athlete_id", athleteId)
+    .is("deleted_at", null)
+    .gte("scheduled_date", dates[0])
+    .lte("scheduled_date", dates[dates.length - 1]);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: athlete.timezone || coach.timezone || "UTC" });
+  const { add, skipped } = planSchedule(
+    clean,
+    refs,
+    (existing ?? []).map((e) => ({ date: e.scheduled_date as string, title: e.title as string })),
+    today,
+  );
+
+  let added = 0;
+  for (const a of add) {
+    const r = await assignFromLibrary(a.libraryId, [athleteId], a.date);
+    if (r.ok) added++;
+    else skipped.push({ date: a.date, title: a.title, reason: r.error });
+  }
+  return {
+    ok: true,
+    added,
+    skipped,
+    message: added ? `Added ${added} draft${added === 1 ? "" : "s"}. Review and send from the athlete's page.` : "Nothing new to add.",
+  };
 }
