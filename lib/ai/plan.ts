@@ -12,6 +12,7 @@ import { cleanCloset, closetForPrompt } from "@/lib/closet";
 import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { bikeStepsToPower } from "@/lib/workouts/bike-power";
+import { getLoad } from "@/lib/training/load-data";
 import { inferPool, validateSteps, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { apiErrorText } from "@/lib/ai/api-error";
 
@@ -37,6 +38,7 @@ How to plan:
 - Apply the coach's guidance for this request (events, travel, constraints) to volume and intensity around those dates: build into key events, freshen up before them, recover after, keep travel days short or adapted to what's available.
 - Races: build toward A races and taper the last 10-14 days before one; treat B races as hard days with a short freshen-up; C races are training.
 - Recovery: if recent readiness is yellow or red, or check-ins mention pain or bad sessions, start the block conservatively and say so in the summary.
+- Training load: if form is below -30, or fitness rose more than 8 in the last week, start with easier days before adding load; if form is above +15 outside a taper, the athlete has room to build.
 - Progress volume gradually from the athlete's recent weeks, with a lighter week every third or fourth week, consistent with the guide.
 - Plan around workouts already scheduled; don't duplicate them. At most two workouts a day and one per sport.
 - Only run, bike and swim sessions become workouts (the watch formats). Strength, rest, travel and race days go in other_days with a short note.
@@ -92,6 +94,7 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
     w.longest_min = Math.max(w.longest_min, Math.round((a.duration_s ?? 0) / 60));
     weeks.set(k, w);
   }
+  const load = await getLoad(supabase, athleteId, profile.data?.timezone || "America/Chicago").catch(() => null);
   const fortnight = Date.now() - 14 * DAY;
   const wl = wellness.data ?? [];
   const recent = wl.filter((w) => Date.parse(w.date) >= Date.now() - 7 * DAY);
@@ -124,6 +127,16 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
         notes: r.notes,
       })),
       readiness_last_14_days: (readiness.data ?? []).map((r) => `${r.date}: ${r.overall}`),
+      training_load: load
+        ? {
+            fitness_42d: Math.round(load.now.fitness),
+            fatigue_7d: Math.round(load.now.fatigue),
+            form: load.now.form,
+            form_meaning: `${load.now.band.label}: ${load.now.band.note}`,
+            fitness_change_last_7d: load.now.ramp,
+            note: "Session load where 1 hour at threshold = 100. Fitness = 42-day average daily load, fatigue = 7-day.",
+          }
+        : null,
       recovery_trend: {
         hrv_7d: avg(recent.map((w) => Number(w.hrv_ms)).filter((n) => n > 0)),
         hrv_28d: avg(wl.map((w) => Number(w.hrv_ms)).filter((n) => n > 0)),

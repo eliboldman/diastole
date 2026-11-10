@@ -7,6 +7,8 @@ import RideButtons from "@/components/RideButtons";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import WeekReview from "@/components/training/WeekReview";
+import FitnessSection from "@/components/training/FitnessSection";
+import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import { daysBackIso } from "@/lib/activity/zones";
@@ -24,7 +26,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
   const weekParam = (await searchParams).week;
   const inTwoWeeks = new Date(daysBackIso(-14)).toLocaleDateString("en-CA", { timeZone: me.timezone });
 
-  const [{ data: planned }, { data: done }, week] = await Promise.all([
+  const [{ data: planned }, { data: done }, week, load] = await Promise.all([
     supabase
       .from("planned_workouts")
       .select("id, scheduled_date, title, sport, status")
@@ -42,6 +44,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
       .order("start_time", { ascending: false })
       .limit(20),
     getWeek(supabase, me.id, me.timezone, weekStartFrom(weekParam, today)),
+    getLoad(supabase, me.id, me.timezone),
   ]);
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -71,6 +74,9 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
 
       <div className="mt-8">
         <WeekReview week={week} units={me.units === "km" ? "km" : "mi"} basePath="/training" workoutHref={(id) => `/training/workouts/${id}`} you />
+      </div>
+      <div className="mt-6">
+        <FitnessSection view={load} you />
       </div>
 
       <section className="mt-8">

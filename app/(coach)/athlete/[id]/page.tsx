@@ -25,6 +25,8 @@ import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
 import WeekReview from "@/components/training/WeekReview";
+import FitnessSection from "@/components/training/FitnessSection";
+import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import ClosetEditor from "@/components/ClosetEditor";
 import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
@@ -65,10 +67,11 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
   const closet = cleanCloset(gearRow?.gear);
   const [shoeMiles, bikeMiles] = await Promise.all([getShoeMileage(supabase, id, closet, athleteTz), getBikeMileage(supabase, id, closet, athleteTz)]);
   const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
-  const [mealDay, races, week] = await Promise.all([
+  const [mealDay, races, week, load] = await Promise.all([
     getMealDay(id, athleteToday, athleteTz, fuelToday.level),
     getRaces(id, { from: athleteToday, limit: 10 }),
     getWeek(supabase, id, athleteTz, weekStartFrom(weekParam, athleteToday)),
+    getLoad(supabase, id, athleteTz),
   ]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
@@ -116,6 +119,9 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
 
       <div className="mt-6">
         <WeekReview week={week} units={me.units === "km" ? "km" : "mi"} basePath={`/athlete/${profile.id}`} workoutHref={(w) => `/athlete/${profile.id}/workouts/${w}`} />
+      </div>
+      <div className="mt-6">
+        <FitnessSection view={load} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

@@ -33,6 +33,7 @@
     "test:apple": "node lib/apple/format.test.ts",
     "test:totals": "node lib/workouts/totals.test.ts",
     "test:week": "node lib/training/week.test.ts",
+    "test:load": "node lib/training/load.test.ts",
     "test:story": "node lib/story.test.ts",
     "test:layout": "node lib/layout-prefs.test.ts",
     "test:appearance": "node lib/appearance.test.ts",
