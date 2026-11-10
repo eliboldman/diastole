@@ -120,3 +120,47 @@ export function compareWorkout(steps: Step[], laps: Lap[], maxHr: number | null,
     return { planned: p, actual: a, measured, range: t?.range ?? null, verdict: judge(measured, t?.range ?? null) };
   });
 }
+
+// ---------------------------------------------------------------- how well the plan was followed
+
+export type Compliance = { judged: number; on: number; over: number; under: number; steps: number };
+
+/** Counts across the steps that had a measurable target (warm-ups without one aren't judged). */
+export function complianceOf(c: ComparedStep[] | null): Compliance | null {
+  if (!c) return null;
+  const judged = c.filter((s) => s.verdict);
+  return {
+    steps: c.length,
+    judged: judged.length,
+    on: judged.filter((s) => s.verdict === "on").length,
+    over: judged.filter((s) => s.verdict === "over").length,
+    under: judged.filter((s) => s.verdict === "under").length,
+  };
+}
+
+/** "4 of 5 on target" (null when nothing had a target). */
+export function complianceText(k: Compliance | null): string | null {
+  if (!k || !k.judged) return null;
+  return k.on === k.judged ? `All ${k.judged} on target` : `${k.on} of ${k.judged} on target`;
+}
+
+const MILE = 1609.344;
+
+/**
+ * How far off a step was, from the nearest edge of the target: "8 s/mi slow", "12 W high",
+ * "6 bpm high", "3 s/100yd fast". Null when on target or not measurable.
+ */
+export function missText(c: ComparedStep, units: "mi" | "km", pool: Pool = null, swim = false): string | null {
+  if (!c.verdict || c.verdict === "on" || c.measured === null || !c.range) return null;
+  const [low, high] = c.range;
+  const edge = c.verdict === "over" ? high : low;
+  const t = c.planned.target;
+  if (t?.type === "power_range") return `${Math.round(Math.abs(c.measured - edge))} W ${c.verdict === "over" ? "high" : "low"}`;
+  if (t?.type === "hr_range" || t?.type === "hr_zone") return `${Math.round(Math.abs(c.measured - edge))} bpm ${c.verdict === "over" ? "high" : "low"}`;
+  // Pace: compare seconds per unit distance (faster = over).
+  const per = swim ? hundredMeters(pool) : units === "mi" ? MILE : 1000;
+  const diff = Math.round(Math.abs(per / c.measured - per / edge));
+  if (!diff) return null;
+  const unit = swim ? `/100${pool?.unit === "YARD" ? "yd" : "m"}` : `/${units}`;
+  return `${diff} s${unit} ${c.verdict === "over" ? "fast" : "slow"}`;
+}

@@ -70,3 +70,21 @@ assert.equal(judge(104, [90, 100]), "over");
 assert.equal(judge(null, [90, 100]), null);
 
 console.log("compare: all passed");
+
+// Compliance and how far off a step was
+{
+  const { complianceOf, complianceText, missText } = await import("./compare.ts");
+  const step = (verdict: "on" | "over" | "under" | null, measured: number | null, range: [number, number] | null, target: unknown) =>
+    ({ planned: { label: "Interval", intensity: "INTERVAL", duration: { type: "time", seconds: 180 }, target }, actual: {}, verdict, measured, range }) as never;
+  const pace = { type: "pace_range", fastSecPerKm: 240, slowSecPerKm: 250 };
+  // 1000/250 = 4 m/s is the slow edge. 3.9 m/s → 256.4 s/km → 6 s/km slow.
+  const slow = step("under", 3.9, [4, 1000 / 240], pace);
+  assert.equal(missText(slow, "km"), "6 s/km slow");
+  assert.equal(missText(step("over", 230, [180, 200], { type: "power_range", low: 180, high: 200 }), "mi"), "30 W high");
+  assert.equal(missText(step("on", 190, [180, 200], { type: "power_range", low: 180, high: 200 }), "mi"), null);
+  const k = complianceOf([slow, step("on", 4.1, [4, 4.17], pace), step(null, null, null, undefined)]);
+  assert.deepEqual(k, { steps: 3, judged: 2, on: 1, over: 0, under: 1 });
+  assert.equal(complianceText(k), "1 of 2 on target");
+  assert.equal(complianceText(complianceOf([step(null, null, null, undefined)])), null);
+  console.log("compliance: passed");
+}

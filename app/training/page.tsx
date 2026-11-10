@@ -6,6 +6,8 @@ import EmptyState from "@/components/EmptyState";
 import RideButtons from "@/components/RideButtons";
 
 import DashboardShell from "@/components/layout/DashboardShell";
+import WeekReview from "@/components/training/WeekReview";
+import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
 import { daysBackIso } from "@/lib/activity/zones";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -15,13 +17,14 @@ export const metadata: Metadata = { title: "Training · Diastole" };
 const row = "lift flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2";
 
 /** The athlete's Training tab: what's planned, what's done, and the full calendar. */
-export default async function TrainingPage() {
+export default async function TrainingPage({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
   const me = await requireUser();
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  const weekParam = (await searchParams).week;
   const inTwoWeeks = new Date(daysBackIso(-14)).toLocaleDateString("en-CA", { timeZone: me.timezone });
 
-  const [{ data: planned }, { data: done }] = await Promise.all([
+  const [{ data: planned }, { data: done }, week] = await Promise.all([
     supabase
       .from("planned_workouts")
       .select("id, scheduled_date, title, sport, status")
@@ -38,6 +41,7 @@ export default async function TrainingPage() {
       .eq("athlete_id", me.id)
       .order("start_time", { ascending: false })
       .limit(20),
+    getWeek(supabase, me.id, me.timezone, weekStartFrom(weekParam, today)),
   ]);
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -64,6 +68,10 @@ export default async function TrainingPage() {
       </div>
 
       <RideButtons hub quietOnWeb />
+
+      <div className="mt-8">
+        <WeekReview week={week} units={me.units === "km" ? "km" : "mi"} basePath="/training" workoutHref={(id) => `/training/workouts/${id}`} you />
+      </div>
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Next two weeks</h2>

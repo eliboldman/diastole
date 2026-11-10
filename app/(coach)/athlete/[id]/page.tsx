@@ -24,13 +24,16 @@ import { getAthleteDetail } from "@/lib/coach-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
+import WeekReview from "@/components/training/WeekReview";
+import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import ClosetEditor from "@/components/ClosetEditor";
 import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
 import { getBikeMileage, getShoeMileage } from "@/lib/shoes";
 
-export default async function AthletePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AthletePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ week?: string }> }) {
   const { id } = await params;
+  const weekParam = (await searchParams).week;
   const data = await getAthleteDetail(id);
   if (!data) notFound();
 
@@ -62,7 +65,11 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const closet = cleanCloset(gearRow?.gear);
   const [shoeMiles, bikeMiles] = await Promise.all([getShoeMileage(supabase, id, closet, athleteTz), getBikeMileage(supabase, id, closet, athleteTz)]);
   const [[fuelToday], mealWeek] = await Promise.all([getFuelDays(id, athleteToday, 1), getMealWeek(id, athleteToday)]);
-  const [mealDay, races] = await Promise.all([getMealDay(id, athleteToday, athleteTz, fuelToday.level), getRaces(id, { from: athleteToday, limit: 10 })]);
+  const [mealDay, races, week] = await Promise.all([
+    getMealDay(id, athleteToday, athleteTz, fuelToday.level),
+    getRaces(id, { from: athleteToday, limit: 10 }),
+    getWeek(supabase, id, athleteTz, weekStartFrom(weekParam, athleteToday)),
+  ]);
   const insights: InsightView[] = (insightRows ?? []).map((r) => {
     const [metric, kind] = r.issue_key.split(":");
     return {
@@ -106,6 +113,10 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
 
       <ReadinessAreas today={today} />
       <ReadinessTrend trend={trend} readiness={readiness} />
+
+      <div className="mt-6">
+        <WeekReview week={week} units={me.units === "km" ? "km" : "mi"} basePath={`/athlete/${profile.id}`} workoutHref={(w) => `/athlete/${profile.id}/workouts/${w}`} />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6">

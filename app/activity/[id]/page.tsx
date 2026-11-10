@@ -9,7 +9,8 @@ import ActivityTitle from "@/components/activity/ActivityTitle";
 import FormSection from "@/components/activity/FormSection";
 import RouteMap from "@/components/activity/RouteMap";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { compareWorkout, type ComparedStep } from "@/lib/activity/compare";
+import { compareWorkout, complianceOf, complianceText, missText, type ComparedStep } from "@/lib/activity/compare";
+import { formatDistance, formatDuration, workoutTotals } from "@/lib/workouts/totals";
 import type { Lap, Streams } from "@/lib/activity/fit";
 import type { SwimRep } from "@/lib/activity/swim";
 import { RUN_SPORT, type FormSummary } from "@/lib/activity/form";
@@ -19,7 +20,7 @@ import { isSwim, strokeName, swimClock, swimDist, swimPace, swimPool, swimSummar
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
-import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
+import { inferPool, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import CheckIn from "@/components/avatar/CheckIn";
@@ -218,9 +219,22 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const maxHr = setMax ?? estMax;
   const hrNote = setMax ? `Max HR ${setMax} (set by coach)` : estMax ? `Max HR ~${estMax} (estimated)` : "";
 
-  const planPool: Pool = plan?.pool_length && plan.pool_unit ? { length: Number(plan.pool_length), unit: plan.pool_unit as PoolUnit } : null;
+  const savedPool: Pool = plan?.pool_length && plan.pool_unit ? { length: Number(plan.pool_length), unit: plan.pool_unit as PoolUnit } : null;
+  const planPool: Pool = plan?.sport === "swim" ? inferPool(plan.steps as Step[], savedPool) : savedPool;
   const planSwim = plan?.sport === "swim";
   const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr, planPool) : null;
+  const score = complianceText(complianceOf(comparison));
+  // Planned vs done totals, from the plan's steps (exact where the steps set them).
+  const planTotals = plan ? workoutTotals(plan.steps as Step[], plan.sport, planPool, zonesRow) : null;
+  const planUnits = u === "km" ? "km" : "mi";
+  const totalsLine = planTotals
+    ? [
+        planTotals.seconds && act.duration_s ? `${formatDuration(act.duration_s)} of ${planTotals.timeEstimated ? "~" : ""}${formatDuration(planTotals.seconds)} planned` : null,
+        planTotals.meters && act.distance_m && !(plan?.sport === "bike" && planTotals.distanceEstimated)
+          ? `${formatDistance(act.distance_m, plan!.sport, planPool, planUnits)} of ${planTotals.distanceEstimated ? "~" : ""}${formatDistance(planTotals.meters, plan!.sport, planPool, planUnits)}`
+          : null,
+      ].filter(Boolean)
+    : [];
   const canEditZones = isCoach; // a coach only ever sees their own athletes here
   const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/training", label: "Training" } : { href: "/me/pods", label: "Pods" };
 
@@ -394,6 +408,12 @@ export default async function ActivityPage({ params, searchParams }: { params: P
             )
           }
         >
+          {(score || totalsLine.length > 0) && (
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              {score && <p className="text-base font-medium">{score}</p>}
+              {totalsLine.length > 0 && <p className="text-sm tabular-nums text-white/60">{totalsLine.join(" · ")}</p>}
+            </div>
+          )}
           {!comparison ? (
             <p className="text-sm text-white/55">
               {laps.length
@@ -417,7 +437,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
                     {v ? (
                       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${v.cls}`}>
                         <v.icon className="h-3.5 w-3.5" aria-hidden />
-                        {v.text}
+                        {missText(c, planUnits, planPool, planSwim) ?? v.text}
                       </span>
                     ) : (
                       <span className="w-[5.5rem] shrink-0" aria-hidden />
