@@ -144,7 +144,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <section id="coaching" className={`${card} scroll-mt-6 lg:col-span-2`}>
             <h2 className="mb-1 text-lg font-medium">Coaching assistant</h2>
             <p className="mb-4 text-sm text-white/50">
-              Each morning, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. When a running-form issue shows up across
+              When you press Review on Today, athletes flagged yellow or red are reviewed by Claude, which proposes changes for you to approve. When a running-form issue shows up across
               several runs, Claude also suggests drills or library workouts. Their readiness, wellness, training and running-form data (never routes) is sent to Anthropic for
               this.
             </p>

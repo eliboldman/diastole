@@ -221,7 +221,7 @@ export default function AiSuggestions({
       {hasKey && !enabled && <p className="mt-3 text-sm text-white/60">Turned off in Settings.</p>}
 
       {suggestions.length === 0 ? (
-        <p className="mt-4 text-sm text-white/60">No suggestions today. The assistant only reviews athletes flagged yellow or red, each morning around 5–6 am.</p>
+        <p className="mt-4 text-sm text-white/60">No suggestions today. The assistant reviews athletes flagged yellow or red when you press Review on the Morning review card.</p>
       ) : (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {suggestions.map((s) => (

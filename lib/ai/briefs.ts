@@ -26,8 +26,30 @@ export type BriefRun = { status: "done"; drafted: number; costUsd: number } | { 
 
 const localDate = (tz: string, offsetDays = 0) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(Date.now() + offsetDays * 86_400_000));
 
-/** Draft today's briefs for a coach's athletes that don't have one yet. Coach-only drafts; nothing is sent. */
-export async function draftMorningBriefs(coachId: string): Promise<BriefRun> {
+/**
+ * Who has last night's data in: a wellness row for their today with sleep, HRV or resting HR.
+ * The morning review waits for this, since athletes wake and sync at different times.
+ */
+export async function overnightIn(admin: ReturnType<typeof createAdminClient>, athletes: { id: string; timezone: string | null }[]): Promise<Set<string>> {
+  if (!athletes.length) return new Set();
+  const { data } = await admin
+    .from("daily_wellness")
+    .select("athlete_id, date, hrv_ms, sleep_seconds, resting_hr")
+    .in("athlete_id", athletes.map((a) => a.id))
+    .gte("date", localDate("Pacific/Kiritimati", -2));
+  const ready = new Set<string>();
+  for (const a of athletes) {
+    const today = localDate(a.timezone || "America/Chicago");
+    if ((data ?? []).some((w) => w.athlete_id === a.id && w.date === today && (w.hrv_ms || w.sleep_seconds || w.resting_hr))) ready.add(a.id);
+  }
+  return ready;
+}
+
+/**
+ * Draft today's briefs for a coach's athletes that don't have one yet. Coach-only drafts; nothing
+ * is sent. `onlyReady`: skip athletes whose overnight data hasn't arrived yet (run again later).
+ */
+export async function draftMorningBriefs(coachId: string, opts: { onlyReady?: boolean } = {}): Promise<BriefRun> {
   if (!process.env.ANTHROPIC_API_KEY) return { status: "skipped", reason: "No Anthropic API key configured." };
   const admin = createAdminClient();
   const { data: s } = await admin.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", coachId).maybeSingle();
@@ -47,8 +69,13 @@ export async function draftMorningBriefs(coachId: string): Promise<BriefRun> {
 
   const { data: existing } = await admin.from("morning_briefs").select("athlete_id, date").eq("coach_id", coachId).gte("date", localDate("Pacific/Kiritimati", -2));
   const have = new Set((existing ?? []).map((b) => `${b.athlete_id}|${b.date}`));
-  const due = roster.filter((a) => !have.has(`${a.id}|${localDate(a.timezone)}`));
+  let due = roster.filter((a) => !have.has(`${a.id}|${localDate(a.timezone)}`));
   if (!due.length) return { status: "skipped", reason: "Today's briefs are already drafted." };
+  if (opts.onlyReady) {
+    const ready = await overnightIn(admin, due);
+    due = due.filter((a) => ready.has(a.id));
+    if (!due.length) return { status: "skipped", reason: "No one new has synced last night's data yet." };
+  }
 
   const payload = await Promise.all(
     due.map(async (a) => {

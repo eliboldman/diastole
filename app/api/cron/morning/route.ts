@@ -1,8 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { draftMorningBriefs } from "@/lib/ai/briefs";
-import { runCoachAssistant } from "@/lib/ai/coach";
 import { runFormInsights } from "@/lib/ai/form-insights";
 import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
@@ -27,9 +25,8 @@ export async function GET(request: NextRequest) {
   const { data: coaches } = await admin.from("profiles").select("id, timezone").eq("role", "coach");
   const results: Record<string, unknown> = {};
   for (const c of coaches ?? []) {
-    results[c.id] = await runCoachAssistant(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
-    // Morning briefs: drafted after readiness is fresh; the coach sends or skips each one.
-    results[`${c.id}:briefs`] = await draftMorningBriefs(c.id).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+    // The coaching assistant and morning briefs run when the coach presses "Review" on Today
+    // (athletes wake and sync at different times), not here.
     // Form insights only call Claude when a new pattern shows up across several runs.
     results[`${c.id}:form`] = await runFormInsights(c.id, "cron").catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     // Private fueling safety net: rules only, coach-only notes.

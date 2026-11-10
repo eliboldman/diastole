@@ -104,7 +104,7 @@ export default async function EnduranceLabPage() {
             <p className="text-sm text-white/55">
               {pendingSuggestions
                 ? `${pendingSuggestions} suggestion${pendingSuggestions === 1 ? "" : "s"} waiting for you from this morning's review.`
-                : "No suggestions waiting. Each morning, athletes flagged yellow or red get a proposal for you to approve."}
+                : "No suggestions waiting. Press Review on Today and athletes flagged yellow or red get a proposal for you to approve."}
             </p>
             <Link href="/dashboard" className={`${linkRow} mt-4`}>
               {pendingSuggestions ? "Review on Today" : "Go to Today"} <ChevronRight size={16} className="text-white/45" aria-hidden />

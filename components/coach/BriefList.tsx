@@ -138,7 +138,7 @@ export default function BriefList({ items }: { items: BriefItem[] }) {
             <Sparkles size={15} className={pending ? "animate-pulse text-amber-200" : "text-amber-200"} />
             {pending ? "Drafting…" : items.length ? "Draft any missing briefs" : "Draft today's briefs"}
           </button>
-          <p className="mt-2 text-xs text-white/40">{note ?? "They're also drafted automatically each morning after readiness updates."}</p>
+          <p className="mt-2 text-xs text-white/40">{note ?? "Or use Review on the Morning review card once athletes' overnight data is in."}</p>
         </div>
       )}
     </div>

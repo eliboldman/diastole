@@ -24,8 +24,12 @@ import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, type Units } from "@/lib/activity/format";
 import CheckinPrompt from "@/components/avatar/CheckinPrompt";
 import MorningBriefs from "@/components/coach/MorningBriefs";
+import MorningReview from "@/components/coach/MorningReview";
+import { getMorningStatus } from "@/lib/ai/morning-status";
 import SafetyNotes from "@/components/coach/SafetyNotes";
 import WeeklyProgress from "@/components/WeeklyProgress";
+import { WatchCard } from "@/components/coach/WatchStatus";
+import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Step } from "@/lib/workouts/garmin-format";
 
@@ -54,7 +58,8 @@ export default async function TodayPage() {
   // Coaching assistant: today's suggestions (last 2 days, so an early-morning run still shows), settings and spend.
   const supabase = await createClient();
   const since = isoDaysAgo(2);
-  const [{ data: rawSuggestions }, { data: settingsRow }, spent] = await Promise.all([
+  const watchIds = roster.map((r) => r.id);
+  const [{ data: rawSuggestions }, { data: settingsRow }, spent, watches, morning] = await Promise.all([
     supabase
       .from("ai_suggestions")
       .select("id, athlete_id, date, overall, concern, summary, action, rationale, proposed_workout, status, planned_workouts!ai_suggestions_target_workout_id_fkey(title, scheduled_date)")
@@ -63,6 +68,8 @@ export default async function TodayPage() {
       .order("created_at", { ascending: false }),
     supabase.from("coach_settings").select("ai_enabled, ai_model, ai_monthly_cap_usd").eq("coach_id", coach.id).maybeSingle(),
     monthToDateSpend(coach.id),
+    getWatchStatuses(supabase, watchIds),
+    getMorningStatus(coach.id),
   ]);
   const ai = { ...DEFAULT_SETTINGS, ...(settingsRow ?? {}) };
   const latestByAthlete = new Map<string, NonNullable<typeof rawSuggestions>[number]>();
@@ -118,7 +125,9 @@ export default async function TodayPage() {
       <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
       <CheckinPrompt athleteId={coach.id} />
       <SafetyNotes />
+      {ai.ai_enabled && <MorningReview status={morning} />}
       <MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} />
+      <WatchCard rows={roster.map((r) => ({ id: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", status: watches.get(r.id)! })).filter((r) => r.status)} />
       <QuickLinks
         links={[
           { href: "/endurance-lab", label: "Build a workout", icon: <Plus size={16} aria-hidden /> },
