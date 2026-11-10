@@ -103,3 +103,15 @@ assert.throws(() => fromConnectWorkout({ sportType: k("sportTypeKey", "strength_
 assert.throws(() => fromConnectWorkout({ sportType: k("sportTypeKey", "running"), workoutSegments: [{ workoutSteps: [] }] }), /no steps/);
 
 console.log("connect-import: all passed");
+
+// Runs with a mile display unit: the value is already metres (6 mi = 9656.06 m), never multiplied.
+{
+  const k2 = (k: string, v: string) => ({ [k]: v });
+  const w = fromConnectWorkout({
+    workoutName: "6 mi easy",
+    sportType: k2("sportTypeKey", "running"),
+    workoutSegments: [{ workoutSteps: [{ type: "ExecutableStepDTO", stepType: k2("stepTypeKey", "interval"), endCondition: k2("conditionTypeKey", "distance"), endConditionValue: 9656.06, preferredEndConditionUnit: k2("unitKey", "mile") }] }],
+  });
+  assert.deepEqual(w.steps[0], { kind: "step", intensity: "INTERVAL", duration: { type: "distance", meters: 9656.06 } });
+  console.log("connect import miles: passed");
+}

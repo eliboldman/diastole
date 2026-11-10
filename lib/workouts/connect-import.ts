@@ -71,8 +71,11 @@ export function fromConnectWorkout(raw: unknown): ConnectImport {
   const distance = (s: J): number | null => {
     const v = num(s.endConditionValue);
     if (v === null) return null;
-    // Swims are stored in the step's unit (or the pool's); runs and rides in metres.
-    const unit = key(s.preferredEndConditionUnit, "unitKey") ?? (sport === "swim" ? (poolUnit ?? "meter") : "meter");
+    // Runs and rides: Garmin stores metres; preferredEndConditionUnit (mile, km) is only how it
+    // displays them, so never multiply (a 6 mi run is 9656.06, not 6). Swims: the step's unit
+    // (or the pool's).
+    if (sport !== "swim") return Number(v.toFixed(2));
+    const unit = key(s.preferredEndConditionUnit, "unitKey") ?? poolUnit ?? "meter";
     return Number((v * (UNIT_M[unit] ?? 1)).toFixed(2));
   };
 
