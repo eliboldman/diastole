@@ -109,6 +109,9 @@ export function speedFor(watts: number, massKg: number): number {
   return (lo + hi) / 2;
 }
 
+/** Fraction of FTP for a solo effort of this length: about FTP for an hour, less the longer it goes. */
+export const soloIF = (seconds: number) => clamp(1 - 0.07 * Math.log2(seconds / 3600), 0.7, 1.05);
+
 /** Bike time on a flat course at a fraction of FTP (or a standalone time-trial effort for the distance). */
 export function predictBike(meters: number, ftp: number | null, weightKg: number | null, intensity?: number): Range | null {
   if (!ftp) return null;
@@ -118,7 +121,7 @@ export function predictBike(meters: number, ftp: number | null, weightKg: number
   if (intensity === undefined) {
     // A solo effort: about FTP for an hour, less the longer it goes.
     for (let i = 0; i < 4; i++) {
-      f = clamp(1 - 0.07 * Math.log2(t / 3600), 0.7, 1.05);
+      f = soloIF(t);
       t = meters / speedFor(ftp * f, mass);
     }
   }

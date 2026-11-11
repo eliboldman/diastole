@@ -9,6 +9,10 @@ import RaceEdit from "@/components/race/RaceEdit";
 import { countdown, raceDistance } from "@/components/race/RaceList";
 import RacePlanCard from "@/components/race/RacePlanCard";
 import RaceEstimate from "@/components/predict/RaceEstimate";
+import CourseCard from "@/components/course/CourseCard";
+import { getCourseView } from "@/lib/course/data";
+import Spotlight from "@/components/Spotlight";
+import { seen, TIPS } from "@/lib/discovery";
 import { clock } from "@/lib/activity/format";
 import { daysUntil, RACE_WEEK_DAYS, raceWeekChecklist } from "@/lib/fuel/race";
 import { getRace, getRaceTools, planFor } from "@/lib/fuel/race-data";
@@ -34,7 +38,8 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
   const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
   const days = daysUntil(race.race_date, today);
   const plan = planFor(race, tools);
-  const est = days >= 0 ? await getRacePrediction(await createClient(), race, tz) : null;
+  const supabase = await createClient();
+  const [est, course, { data: tipsRow }] = await Promise.all([days >= 0 ? getRacePrediction(supabase, race, tz) : Promise.resolve(null), getCourseView(supabase, race.id, tz), supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle()]);
   const showEst = est && !(own && est.hidden);
   const phase = days >= 0 && days <= RACE_WEEK_DAYS ? raceWeekChecklist(days, plan) : null;
 
@@ -52,6 +57,11 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
       </p>
       {race.notes && <p className="mt-3 whitespace-pre-wrap text-sm text-white/70">{race.notes}</p>}
 
+      {days >= 0 && !course && (race.sport === "run" || race.sport === "bike" || race.sport === "tri") && (
+        <div className="mt-6">
+          <Spotlight tip={TIPS.course} seen={seen((tipsRow?.seen_tips ?? []) as string[], TIPS.course.id)} />
+        </div>
+      )}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {phase && (
           <section className="rounded-[28px] border border-emerald-300/25 bg-emerald-300/[0.06] p-6">
@@ -62,6 +72,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
           </section>
         )}
         {showEst && <RaceEstimate prediction={est.prediction} goal={race.goal_seconds} note={est.note} own={own} />}
+        {days >= 0 && <CourseCard raceId={race.id} athleteId={race.athlete_id} sport={race.sport} view={course} units={me.units} coach={me.role === "coach" && !own} today={today} raceDate={race.race_date} />}
         {plan ? (
           <RacePlanCard plan={plan} units={me.units} />
         ) : (

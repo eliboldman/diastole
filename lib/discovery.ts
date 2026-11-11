@@ -11,6 +11,7 @@ export const TIPS = {
   myWorkouts: { id: "tip:my-workouts", title: "Build your own sessions", body: "Make workouts or import a set, then ask your coach to add one to your calendar." },
   bedtime: { id: "tip:bedtime", title: "A bedtime that fits tomorrow", body: "Today works back from your next session to the time you'd want lights out. In the iPhone app you can get a gentle nudge or two in the evening; turn them off anytime in My setup." },
   predictions: { id: "tip:predictions", title: "What your training says you could run", body: "Estimates come from your recent best efforts, threshold pace, FTP and CSS, and move as you get fitter. Hide them anytime." },
+  course: { id: "tip:course", title: "Know the course before race day", body: "Add the GPX and Diastole shows the hills, a time for this course, a pacing plan you can edit, and sessions that rehearse it." },
   strength: { id: "tip:strength", title: "Follow along, set by set", body: "Start session walks you through each exercise with a demo and a rest timer. Log what you actually did; your coach uses it to set next time's weights." },
   plans: { id: "tip:plans", title: "Save a block once, reuse it for anyone", body: "On an athlete's page, Save as plan turns their weeks into a template. Apply it to anyone with a race date: targets fit their zones and days fit their week." },
 } satisfies Record<string, Tip>;
