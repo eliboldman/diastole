@@ -117,6 +117,9 @@ export default function CourseCard({ raceId, athleteId, sport, view, units, coac
           <p className="mt-1 text-sm text-white/55">
             The whole course on your smart trainer: every climb and descent changes the resistance, with distance, grade and what&apos;s coming on screen. Your speed comes from your power and weight, so it&apos;s an honest rehearsal.
           </p>
+          {!view.course.track && (
+            <p className="mt-2 text-sm text-amber-100/80">Add the GPX again (Replace or remove the course, below) to see where you are on a map while you ride, and to save the route with the ride.</p>
+          )}
           <RideButtons courseId={raceId} />
         </section>
       )}

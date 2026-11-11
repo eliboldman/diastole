@@ -136,7 +136,7 @@ public final class RideSession {
     if phase != .finished { closeLap() }
     phase = .finished
     send(nil)
-    let data = FitWriter.encode(samples: samples, laps: laps)
+    let data = FitWriter.encode(samples: samples, laps: laps, subSport: isCourse ? 58 : 6)
     fit = data.isEmpty ? nil : data
     return data
   }
@@ -182,7 +182,8 @@ public final class RideSession {
     push()
 
     let speed = course.map(\.speedMps) ?? m.speedKph.map { $0 / 3.6 }
-    samples.append(RideSample(time: now, powerW: m.powerW, cadenceRpm: m.cadenceRpm.map { Int($0.rounded()) }, heartRateBpm: m.heartRateBpm, speedMps: speed, distanceM: distance, altitudeM: course?.elevationM))
+    let here = course.flatMap { $0.course.position(at: $0.distanceM) }
+    samples.append(RideSample(time: now, powerW: m.powerW, cadenceRpm: m.cadenceRpm.map { Int($0.rounded()) }, heartRateBpm: m.heartRateBpm, speedMps: speed, distanceM: distance, altitudeM: course?.elevationM, latitude: here?.lat, longitude: here?.lon))
     if let c = course, c.finished {
       finish()
       onFinish?()

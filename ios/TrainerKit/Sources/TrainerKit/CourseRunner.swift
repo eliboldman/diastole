@@ -22,15 +22,48 @@ public struct RideCourse: Codable, Identifiable, Hashable, Sendable {
   /// [distance m, elevation m], sorted by distance.
   public let profile: [[Double]]
   public let climbs: [Climb]
+  /// The real route, [distance m, lat, lon] (courses added since trainer maps; nil before).
+  public let track: [[Double]]?
 
   enum CodingKeys: String, CodingKey {
-    case id, name, date, profile, climbs
+    case id, name, date, profile, climbs, track
     case courseName = "course_name", distanceM = "distance_m", gainM = "gain_m"
   }
 
-  public init(id: String, name: String, courseName: String? = nil, date: String = "", distanceM: Double, gainM: Double, profile: [[Double]], climbs: [Climb] = []) {
+  public init(id: String, name: String, courseName: String? = nil, date: String = "", distanceM: Double, gainM: Double, profile: [[Double]], climbs: [Climb] = [], track: [[Double]]? = nil) {
     self.id = id; self.name = name; self.courseName = courseName; self.date = date
     self.distanceM = distanceM; self.gainM = gainM; self.profile = profile; self.climbs = climbs
+    self.track = track?.filter { $0.count == 3 && abs($0[1]) <= 90 && abs($0[2]) <= 180 }
+  }
+
+  /// Has a usable real route (map + GPS in the ride file).
+  public var hasTrack: Bool { (track?.count ?? 0) >= 2 }
+
+  /// Where on the real route a distance is (lat, lon), interpolated between track points.
+  public func position(at d: Double) -> (lat: Double, lon: Double)? {
+    guard let t = track, t.count >= 2 else { return nil }
+    if d <= t[0][0] { return (t[0][1], t[0][2]) }
+    var lo = 0, hi = t.count - 1
+    if d >= t[hi][0] { return (t[hi][1], t[hi][2]) }
+    while hi - lo > 1 {
+      let mid = (lo + hi) / 2
+      if t[mid][0] <= d { lo = mid } else { hi = mid }
+    }
+    let a = t[lo], b = t[hi]
+    let f = b[0] > a[0] ? (d - a[0]) / (b[0] - a[0]) : 0
+    return (a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f)
+  }
+
+  /// Index of the last track point at or before a distance (to split ridden / ahead on the map).
+  public func trackIndex(at d: Double) -> Int {
+    guard let t = track, !t.isEmpty else { return 0 }
+    var lo = 0, hi = t.count - 1
+    if d >= t[hi][0] { return hi }
+    while hi - lo > 1 {
+      let mid = (lo + hi) / 2
+      if t[mid][0] <= d { lo = mid } else { hi = mid }
+    }
+    return lo
   }
 
   public var title: String { courseName.map { "\(name) · \($0)" } ?? name }

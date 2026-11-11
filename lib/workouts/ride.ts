@@ -64,6 +64,8 @@ export type RideCourse = {
   gain_m: number;
   profile: [number, number][]; // [distance m, elevation m], ~1,000 points, smoothed
   climbs: { start_m: number; end_m: number; gain_m: number; grade: number }[];
+  /** [distance m, lat, lon]: the real route, for the map and the ride file's GPS (newer courses only). */
+  track?: [number, number, number][];
 };
 
 type CourseRow = { id: string; name: string; race_date: string; course_name: string | null; course_leg: string | null; course: unknown };
@@ -72,7 +74,7 @@ type CourseRow = { id: string; name: string; race_date: string; course_name: str
 export function toRideCourses(rows: CourseRow[]): RideCourse[] {
   const out: RideCourse[] = [];
   for (const r of rows) {
-    const c = r.course as { distance_m?: unknown; gain_m?: unknown; profile?: unknown; climbs?: unknown } | null;
+    const c = r.course as { distance_m?: unknown; gain_m?: unknown; profile?: unknown; climbs?: unknown; track?: unknown } | null;
     if (r.course_leg !== "bike" || !c || !Array.isArray(c.profile) || c.profile.length < 2) continue;
     const profile = (c.profile as unknown[])
       .filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
@@ -80,7 +82,10 @@ export function toRideCourses(rows: CourseRow[]): RideCourse[] {
     const distance = Number(c.distance_m);
     if (profile.length < 2 || !(distance >= 500)) continue;
     const climbs = Array.isArray(c.climbs) ? (c.climbs as RideCourse["climbs"]).filter((k) => Number.isFinite(k?.start_m) && Number.isFinite(k?.end_m)) : [];
-    out.push({ id: r.id, name: r.name, course_name: r.course_name, date: r.race_date, distance_m: Math.round(distance), gain_m: Math.round(Number(c.gain_m) || 0), profile, climbs });
+    const track = Array.isArray(c.track)
+      ? (c.track as unknown[]).filter((t): t is [number, number, number] => Array.isArray(t) && t.length === 3 && t.every((x) => Number.isFinite(x)) && Math.abs(t[1]) <= 90 && Math.abs(t[2]) <= 180)
+      : [];
+    out.push({ id: r.id, name: r.name, course_name: r.course_name, date: r.race_date, distance_m: Math.round(distance), gain_m: Math.round(Number(c.gain_m) || 0), profile, climbs, ...(track.length >= 2 ? { track } : {}) });
   }
   return out;
 }

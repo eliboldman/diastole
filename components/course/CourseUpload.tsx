@@ -9,7 +9,7 @@ import { buildCourse, parseGpx, type Leg } from "@/lib/course/course";
 
 const field = "rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[16px] text-white focus:border-emerald-300/40 focus:outline-none";
 
-/** Add or replace a race's course from a GPX file (read in the browser; only the profile is sent). */
+/** Add or replace a race's course from a GPX file (read in the browser; the profile, climbs and a simplified route are saved). */
 export default function CourseUpload({ raceId, sport, hasCourse }: { raceId: string; sport: string; hasCourse: boolean }) {
   const router = useRouter();
   const [leg, setLeg] = useState<Leg>(sport === "bike" ? "bike" : sport === "tri" ? "bike" : "run");

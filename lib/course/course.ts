@@ -15,6 +15,8 @@ export type Course = {
   profile: [number, number][]; // [distance m, elevation m]
   path: [number, number][]; // route outline, normalized 0..1 (x east, y south)
   climbs: Climb[];
+  /** The real route, [distance m, lat, lon] at the profile's distances (courses added since trainer maps). */
+  track?: [number, number, number][];
 };
 export type Segment = { start_m: number; end_m: number; grade: number; gain_m: number; kind: "climb" | "descent" | "rolling" };
 export type PaceRow = { start_m: number; end_m: number; grade: number; target: number; note: string }; // run: s/km, bike: W
@@ -29,6 +31,7 @@ const hav = (a: Pt, b: Pt) => {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 const round1 = (v: number) => Math.round(v * 10) / 10;
+const round5 = (v: number) => Math.round(v * 1e5) / 1e5; // ~1 m
 
 /** Track or route points from GPX text (trkpt, rtept, or wpt as a last resort). */
 export function parseGpx(text: string): Pt[] {
@@ -150,7 +153,16 @@ export function buildCourse(pts: Pt[]): Course {
   for (let i = 0; i < pts.length; i += pEvery) path.push([Math.round(((xs[i] - minX) / span) * 1000) / 1000, Math.round(((ys[i] - minY) / span) * 1000) / 1000]);
   path.push([Math.round(((xs.at(-1)! - minX) / span) * 1000) / 1000, Math.round(((ys.at(-1)! - minY) / span) * 1000) / 1000]);
   const eles = profile.map((p) => p[1]);
-  return { distance_m: Math.round(total), gain_m: Math.round(gain), loss_m: Math.round(loss), min_ele: Math.round(Math.min(...eles)), max_ele: Math.round(Math.max(...eles)), profile, path, climbs: findClimbs(profile) };
+  // Real coordinates at each profile distance, for the trainer map and the ride file's GPS track.
+  const track: [number, number, number][] = [];
+  let k = 0;
+  for (const [d] of profile) {
+    while (k < ds.length - 2 && ds[k + 1] < d) k++;
+    const span = ds[k + 1] - ds[k];
+    const f = span > 0 ? Math.min(1, Math.max(0, (d - ds[k]) / span)) : 0;
+    track.push([d, round5(pts[k].lat + (pts[k + 1].lat - pts[k].lat) * f), round5(pts[k].lon + (pts[k + 1].lon - pts[k].lon) * f)]);
+  }
+  return { distance_m: Math.round(total), gain_m: Math.round(gain), loss_m: Math.round(loss), min_ele: Math.round(Math.min(...eles)), max_ele: Math.round(Math.max(...eles)), profile, path, climbs: findClimbs(profile), track };
 }
 
 /** Check a course built in the browser before storing it (shape, sizes, sane numbers; climbs recomputed). */
@@ -168,6 +180,17 @@ export function cleanCourse(raw: unknown): Course | null {
   for (const p of c.path) if (!Array.isArray(p) || !num(p[0], 0, 1) || !num(p[1], 0, 1)) return null;
   const profile = c.profile.map((p) => [Math.round(p[0]), round1(p[1])] as [number, number]);
   const eles = profile.map((p) => p[1]);
+  // Optional real route: dropped (not rejected) if it doesn't check out, so the course still saves.
+  let track: [number, number, number][] | undefined;
+  if (Array.isArray(c.track) && c.track.length >= 2 && c.track.length <= 1100) {
+    let last = -1;
+    const ok = c.track.every((t) => {
+      const good = Array.isArray(t) && num(t[0], 0, 400000) && t[0] >= last && num(t[1], -90, 90) && num(t[2], -180, 180);
+      if (good) last = t[0];
+      return good;
+    });
+    if (ok) track = c.track.map((t) => [Math.round(t[0]), round5(t[1]), round5(t[2])] as [number, number, number]);
+  }
   return {
     distance_m: Math.round(c.distance_m),
     gain_m: Math.round(c.gain_m),
@@ -177,6 +200,7 @@ export function cleanCourse(raw: unknown): Course | null {
     profile,
     path: c.path.map((p) => [Math.round(p[0] * 1000) / 1000, Math.round(p[1] * 1000) / 1000] as [number, number]),
     climbs: findClimbs(profile),
+    ...(track ? { track } : {}),
   };
 }
 

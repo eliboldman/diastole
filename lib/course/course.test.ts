@@ -94,4 +94,18 @@ t("cleanCourse round-trips and rejects junk", () => {
   assert.equal(cleanCourse({ ...course, profile: [[0, 1], [10, "x"]] }), null);
   assert.equal(cleanCourse({ ...course, path: [[0, 2], [0, 0]] }), null);
 });
+t("keeps the real route for trainer maps and ride GPS", () => {
+  assert.ok(course.track && course.track.length === course.profile.length, "one point per profile distance");
+  assert.equal(course.track![0][0], 0);
+  assert.equal(course.track!.at(-1)![0], course.distance_m);
+  const pts = parseGpx(gpx());
+  assert.ok(Math.abs(course.track![0][1] - pts[0].lat) < 1e-4 && Math.abs(course.track![0][2] - pts[0].lon) < 1e-4, "starts at the first GPX point");
+  assert.ok(Math.abs(course.track!.at(-1)![1] - pts.at(-1)!.lat) < 1e-4, "ends at the last");
+  const clean = cleanCourse(course)!;
+  assert.equal(clean.track!.length, course.track!.length, "survives cleaning");
+  const bad = cleanCourse({ ...course, track: [[0, 95, 0], [10, 0, 0]] })!;
+  assert.ok(bad && !bad.track, "a bad track is dropped, the course still saves");
+  const old = cleanCourse({ ...course, track: undefined })!;
+  assert.ok(old && !("track" in old), "courses from before maps still work");
+});
 console.log(`${n} passed`);

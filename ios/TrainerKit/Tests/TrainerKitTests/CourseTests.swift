@@ -3,11 +3,12 @@ import Testing
 
 @testable import TrainerKit
 
-/// 2 km flat, then 1 km at 6%, then 1 km down at −6%, then 1 km flat.
-func testCourse() -> RideCourse {
+/// 2 km flat, then 1 km at 6%, then 1 km down at −6%, then 1 km flat; heads due north.
+func testCourse(track: Bool = true) -> RideCourse {
   RideCourse(id: "r1", name: "Test 70.3", courseName: "Bike", distanceM: 5000, gainM: 60,
              profile: [[0, 100], [2000, 100], [3000, 160], [4000, 100], [5000, 100]],
-             climbs: [.init(startM: 2000, endM: 3000, gainM: 60, grade: 6)])
+             climbs: [.init(startM: 2000, endM: 3000, gainM: 60, grade: 6)],
+             track: track ? [[0, 30.0, -85.0], [5000, 30.0 + 5000 / 111_195, -85.0]] : nil)
 }
 
 @Suite struct CourseRunnerTests {
@@ -71,7 +72,33 @@ func testCourse() -> RideCourse {
   }
 }
 
+@Suite struct CourseTrackTests {
+  @Test func positionAlongTheRoute() {
+    let c = testCourse()
+    let mid = c.position(at: 2500)!
+    #expect(abs(mid.lat - (30.0 + 2500 / 111_195)) < 1e-7 && mid.lon == -85.0)
+    #expect(c.position(at: -5)!.lat == 30.0 && c.trackIndex(at: 9999) == 1)
+    #expect(testCourse(track: false).position(at: 100) == nil && !testCourse(track: false).hasTrack)
+    let json = #"{"id":"r","name":"x","course_name":null,"date":"d","distance_m":100,"gain_m":0,"profile":[[0,1],[100,1]],"climbs":[]}"#
+    #expect(try! JSONDecoder().decode(RideCourse.self, from: Data(json.utf8)).track == nil, "older servers: no track")
+  }
+}
+
 @MainActor @Suite struct CourseSessionTests {
+  @Test func recordsGpsAndWritesVirtualRide() throws {
+    let link = FakeLink()
+    let s = RideSession(course: testCourse(), massKg: 80, link: link)
+    link.metrics.powerW = 300; link.metrics.cadenceRpm = 90
+    s.start()
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    var i = 0
+    while s.phase != .finished && i < 3000 { s.tick(now: t0.addingTimeInterval(Double(i))); i += 1 }
+    #expect(s.samples.allSatisfy { $0.latitude != nil && $0.longitude == -85.0 })
+    #expect((s.samples.last?.latitude ?? 0) > 30.04)
+    let fit = try #require(s.fit)
+    if let dir = ProcessInfo.processInfo.environment["COURSE_FIT_OUT"] { try fit.write(to: URL(fileURLWithPath: "\(dir)/course.fit")) }
+  }
+
   @Test func ridesTheCourseSendingGradesAndRecordingAltitude() {
     let link = FakeLink()
     let s = RideSession(course: testCourse(), massKg: 80, link: link, difficulty: 0.5)

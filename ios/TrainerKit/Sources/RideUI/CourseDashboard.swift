@@ -9,6 +9,7 @@ struct CourseDashboard: View {
   var miles = false
   let onEnd: () -> Void
   @State private var confirmEnd = false
+  @State private var showMap = false
 
   private var m: LiveMetrics { link.metrics }
   private var c: CourseRunner? { session.course }
@@ -28,7 +29,7 @@ struct CourseDashboard: View {
       VStack(spacing: wide ? 24 : 14) {
         header
         if let c {
-          profileCard(c, height: wide ? geo.size.height * 0.30 : 150)
+          profileCard(c, height: wide ? geo.size.height * 0.30 : 150, wide: wide)
           if wide {
             HStack(alignment: .top, spacing: 20) {
               roadCard(c, big: big).frame(maxWidth: .infinity)
@@ -69,14 +70,32 @@ struct CourseDashboard: View {
     }
   }
 
-  private func profileCard(_ c: CourseRunner, height: CGFloat) -> some View {
+  private func profileCard(_ c: CourseRunner, height: CGFloat, wide: Bool) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text("\(distanceText(c.distanceM, miles: miles)) of \(distanceText(c.course.distanceM, miles: miles)) \(unit)").font(.headline.monospacedDigit())
         Spacer()
         Text("\(distanceText(c.remainingM, miles: miles)) \(unit) to go").font(.headline.monospacedDigit()).foregroundStyle(RidePalette.accent)
       }
-      CourseProfile(course: c.course, position: c.distanceM).frame(height: height)
+      if c.course.hasTrack && wide {
+        // Big screens: the map beside the profile.
+        HStack(spacing: 16) {
+          CourseProfile(course: c.course, position: c.distanceM).frame(maxWidth: .infinity)
+          CourseMap(course: c.course, position: c.distanceM).frame(width: height * 1.6)
+        }
+        .frame(height: height)
+      } else if c.course.hasTrack && showMap {
+        CourseMap(course: c.course, position: c.distanceM).frame(height: height)
+      } else {
+        CourseProfile(course: c.course, position: c.distanceM).frame(height: height)
+      }
+      if c.course.hasTrack && !wide {
+        Picker("View", selection: $showMap) {
+          Text("Profile").tag(false)
+          Text("Map").tag(true)
+        }
+        .pickerStyle(.segmented)
+      }
       GeometryReader { g in
         ZStack(alignment: .leading) {
           Capsule().fill(Color.white.opacity(0.1))

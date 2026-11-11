@@ -10,8 +10,12 @@ public struct RideSample: Codable, Equatable, Sendable {
   public var distanceM: Double
   /// Course rides: elevation on the course here (metres).
   public var altitudeM: Double?
-  public init(time: Date, powerW: Int? = nil, cadenceRpm: Int? = nil, heartRateBpm: Int? = nil, speedMps: Double? = nil, distanceM: Double = 0, altitudeM: Double? = nil) {
+  /// Course rides with a real route: where on it this second was (degrees).
+  public var latitude: Double?
+  public var longitude: Double?
+  public init(time: Date, powerW: Int? = nil, cadenceRpm: Int? = nil, heartRateBpm: Int? = nil, speedMps: Double? = nil, distanceM: Double = 0, altitudeM: Double? = nil, latitude: Double? = nil, longitude: Double? = nil) {
     self.time = time; self.powerW = powerW; self.cadenceRpm = cadenceRpm; self.heartRateBpm = heartRateBpm; self.speedMps = speedMps; self.distanceM = distanceM; self.altitudeM = altitudeM
+    self.latitude = latitude; self.longitude = longitude
   }
 }
 
@@ -30,11 +34,11 @@ public struct RideLap: Codable, Equatable, Sendable {
 public enum FitWriter {
   private static let fitEpoch: TimeInterval = 631_065_600 // 1989-12-31T00:00:00Z
 
-  private enum Base: UInt8 { case enumT = 0x00, uint8 = 0x02, uint16 = 0x84, uint32 = 0x86, uint32z = 0x8C }
+  private enum Base: UInt8 { case enumT = 0x00, uint8 = 0x02, uint16 = 0x84, sint32 = 0x85, uint32 = 0x86, uint32z = 0x8C }
   private struct Field { let num: UInt8; let base: Base
-    var size: UInt8 { switch base { case .enumT, .uint8: 1; case .uint16: 2; case .uint32, .uint32z: 4 } }
+    var size: UInt8 { switch base { case .enumT, .uint8: 1; case .uint16: 2; case .sint32, .uint32, .uint32z: 4 } }
   }
-  private enum V { case u8(Int?), u16(Int?), u32(Int?) }
+  private enum V { case u8(Int?), u16(Int?), u32(Int?), s32(Int?) }
 
   private struct Encoder {
     var body: [UInt8] = []
@@ -58,6 +62,9 @@ public enum FitWriter {
         case let .u32(x):
           let u = x.map { UInt32(clamping: $0) } ?? 0xFFFF_FFFF
           body += [UInt8(u & 0xFF), UInt8((u >> 8) & 0xFF), UInt8((u >> 16) & 0xFF), UInt8(u >> 24)]
+        case let .s32(x):
+          let u = x.map { UInt32(bitPattern: Int32(clamping: $0)) } ?? 0x7FFF_FFFF // sint32 invalid
+          body += [UInt8(u & 0xFF), UInt8((u >> 8) & 0xFF), UInt8((u >> 16) & 0xFF), UInt8(u >> 24)]
         }
       }
     }
@@ -69,7 +76,12 @@ public enum FitWriter {
     switch s { case "warmup": 2; case "cooldown": 3; case "rest", "recovery": 1; default: 0 }
   }
 
-  public static func encode(samples: [RideSample], laps: [RideLap], serial: UInt32 = 1) -> Data {
+  /// Degrees → FIT semicircles.
+  static func semicircles(_ deg: Double?) -> Int? { deg.map { Int(($0 * 2_147_483_648 / 180).rounded()) } }
+
+  /// `subSport`: 6 = indoor cycling (workouts), 58 = virtual activity (course rides: Strava and
+  /// Garmin show the route but count it as a virtual ride, so no outdoor segments or records).
+  public static func encode(samples: [RideSample], laps: [RideLap], serial: UInt32 = 1, subSport: Int = 6) -> Data {
     guard let first = samples.first, let last = samples.last else { return Data() }
     var e = Encoder()
     let start = ts(first.time), end = ts(last.time)
@@ -85,10 +97,12 @@ public enum FitWriter {
     e.write(local: 1, [.u32(start), .u8(0), .u8(0)])
 
     // record
-    // altitude (field 2): scale 5, offset 500 m; invalid (0xFFFF) when there's no course.
-    e.define(local: 2, global: 20, [Field(num: 253, base: .uint32), Field(num: 3, base: .uint8), Field(num: 4, base: .uint8), Field(num: 5, base: .uint32), Field(num: 6, base: .uint16), Field(num: 7, base: .uint16), Field(num: 2, base: .uint16)])
+    // altitude (field 2): scale 5, offset 500 m; position_lat/long (0/1) in semicircles. All
+    // invalid (no data) on workout rides.
+    e.define(local: 2, global: 20, [Field(num: 253, base: .uint32), Field(num: 3, base: .uint8), Field(num: 4, base: .uint8), Field(num: 5, base: .uint32), Field(num: 6, base: .uint16), Field(num: 7, base: .uint16), Field(num: 2, base: .uint16), Field(num: 0, base: .sint32), Field(num: 1, base: .sint32)])
     for s in samples {
-      e.write(local: 2, [.u32(ts(s.time)), .u8(s.heartRateBpm), .u8(s.cadenceRpm), .u32(Int((s.distanceM * 100).rounded())), .u16(s.speedMps.map { Int(($0 * 1000).rounded()) }), .u16(s.powerW.map { max(0, $0) }), .u16(s.altitudeM.map { Int((($0 + 500) * 5).rounded()) })])
+      e.write(local: 2, [.u32(ts(s.time)), .u8(s.heartRateBpm), .u8(s.cadenceRpm), .u32(Int((s.distanceM * 100).rounded())), .u16(s.speedMps.map { Int(($0 * 1000).rounded()) }), .u16(s.powerW.map { max(0, $0) }), .u16(s.altitudeM.map { Int((($0 + 500) * 5).rounded()) }),
+                         .s32(semicircles(s.latitude)), .s32(semicircles(s.longitude))])
     }
     e.write(local: 1, [.u32(end), .u8(0), .u8(4)])
 
@@ -117,7 +131,7 @@ public enum FitWriter {
     })
     let kj = samples.reduce(0) { $0 + max(0, $1.powerW ?? 0) } // joules at 1 Hz
     let kcal = Int((Double(kj) / 1000).rounded()) // ~24% muscle efficiency makes kcal burned ≈ kJ of work
-    e.write(local: 4, [.u32(end), .u32(start), .u32((end - start + 1) * 1000), .u32(timer * 1000), .u32(Int((distance * 100).rounded())), .u8(2), .u8(6),
+    e.write(local: 4, [.u32(end), .u32(start), .u32((end - start + 1) * 1000), .u32(timer * 1000), .u32(Int((distance * 100).rounded())), .u8(2), .u8(subSport),
                        .u16(st.avgP), .u16(st.maxP), .u8(st.avgHR), .u8(st.maxHR), .u8(st.avgCad), .u16(kj > 0 ? kcal : nil), .u16(0), .u16(lapCount), .u16(normalizedPower(samples)), .u8(8), .u8(1), .u16(st.avgSpeed), .u16(st.maxSpeed)])
 
     // activity

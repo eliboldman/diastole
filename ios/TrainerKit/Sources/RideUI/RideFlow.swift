@@ -21,6 +21,8 @@ public final class RideFlowModel {
   public private(set) var session: RideSession?
   public private(set) var upload: Upload = .idle
   public private(set) var pendingCount = 0
+  /// A copy of the last ride file to share (Strava, Garmin Connect, Files) from the summary.
+  public private(set) var shareURL: URL?
   public var rollers = false
   /// Apple TV: ride through an iPhone hub instead of the TV's own Bluetooth.
   public var useHub = false
@@ -104,7 +106,16 @@ public final class RideFlowModel {
     screen = .summary
     guard s.samples.count >= 60, !data.isEmpty else { upload = .failed("Rides under a minute aren't saved."); return }
     lastFile = PendingRides.save(data)
+    shareURL = Self.shareCopy(data, title: s.title)
     Task { await send(data, file: lastFile) }
+  }
+
+  /// A temporary, nicely named copy (the pending copy is deleted once uploaded).
+  private static func shareCopy(_ data: Data, title: String) -> URL? {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+    let safe = title.replacingOccurrences(of: "[^A-Za-z0-9 ._-]", with: "", options: .regularExpression).prefix(60)
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(f.string(from: Date())) \(safe.isEmpty ? "Diastole ride" : String(safe)).fit")
+    return (try? data.write(to: url)) != nil ? url : nil
   }
 
   public func retryUpload() {
@@ -285,6 +296,7 @@ public struct RideFlowView: View {
     page(model.selectedCourse?.title ?? model.selected?.title ?? "Free ride", back: { model.screen = .choose }) {
       if let c = model.selectedCourse {
         CourseProfile(course: c).frame(height: 110)
+        if c.hasTrack { CourseMap(course: c).frame(height: 200) }
         Text("\(distanceText(c.distanceM, miles: model.miles)) \(model.miles ? "mi" : "km") · \(Int((model.miles ? c.gainM * 3.28084 : c.gainM).rounded())) \(model.miles ? "ft" : "m") of climbing")
           .font(.subheadline.monospacedDigit()).foregroundStyle(RidePalette.dim)
         difficultyPicker
@@ -332,6 +344,13 @@ public struct RideFlowView: View {
         Text(msg).foregroundStyle(RidePalette.amber)
         Button("Try again") { model.retryUpload() }.buttonStyle(.bordered)
       }
+      #if os(iOS)
+      if let url = model.shareURL {
+        ShareLink(item: url) { Label("Share ride file", systemImage: "square.and.arrow.up") }.buttonStyle(.bordered)
+        Text("Send it to Strava, Garmin Connect or Files.\(s?.isCourse == true ? " Course rides are marked virtual, so they don't count toward segments or outdoor records." : "")")
+          .font(.footnote).foregroundStyle(RidePalette.dim)
+      }
+      #endif
       Button("Done") { model.backToList(); onClose() }.buttonStyle(.borderedProminent).tint(RidePalette.accent).foregroundStyle(.black)
     }
   }
