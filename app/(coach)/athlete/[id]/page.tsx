@@ -14,6 +14,8 @@ import FuelWeek from "@/components/fuel/FuelWeek";
 import PlanningPanel from "@/components/coach/PlanningPanel";
 import RaceForm from "@/components/race/RaceForm";
 import RaceList from "@/components/race/RaceList";
+import PredictionsCard from "@/components/predict/PredictionsCard";
+import { getPredictions } from "@/lib/predict/data";
 import { getRaces } from "@/lib/fuel/race-data";
 import { getFuelDays, getFuelMode, getMealDay, getMealWeek } from "@/lib/fuel/data";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -251,6 +253,10 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
             </div>
           </details>
         </section>
+
+        <div className="lg:col-span-2">
+          <PredictionsCard view={await getPredictions(supabase, profile.id, athleteTz)} coach athleteId={profile.id} firstName={(profile.full_name || "The athlete").split(" ")[0]} />
+        </div>
 
         <SafetyNotes athleteId={profile.id} />
         <section id="fuel" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">

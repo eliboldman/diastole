@@ -8,9 +8,11 @@ import RaceChecklist from "@/components/race/RaceChecklist";
 import RaceEdit from "@/components/race/RaceEdit";
 import { countdown, raceDistance } from "@/components/race/RaceList";
 import RacePlanCard from "@/components/race/RacePlanCard";
+import RaceEstimate from "@/components/predict/RaceEstimate";
 import { clock } from "@/lib/activity/format";
 import { daysUntil, RACE_WEEK_DAYS, raceWeekChecklist } from "@/lib/fuel/race";
 import { getRace, getRaceTools, planFor } from "@/lib/fuel/race-data";
+import { getRacePrediction } from "@/lib/predict/data";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Race · Diastole" };
@@ -32,6 +34,8 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
   const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
   const days = daysUntil(race.race_date, today);
   const plan = planFor(race, tools);
+  const est = days >= 0 ? await getRacePrediction(await createClient(), race, tz) : null;
+  const showEst = est && !(own && est.hidden);
   const phase = days >= 0 && days <= RACE_WEEK_DAYS ? raceWeekChecklist(days, plan) : null;
 
   return (
@@ -57,6 +61,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
             </div>
           </section>
         )}
+        {showEst && <RaceEstimate prediction={est.prediction} goal={race.goal_seconds} note={est.note} own={own} />}
         {plan ? (
           <RacePlanCard plan={plan} units={me.units} />
         ) : (

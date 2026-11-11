@@ -5,8 +5,12 @@ import GutTraining from "@/components/race/GutTraining";
 import RaceForm from "@/components/race/RaceForm";
 import RaceList from "@/components/race/RaceList";
 import SweatTest from "@/components/race/SweatTest";
+import PredictionsCard from "@/components/predict/PredictionsCard";
+import Spotlight from "@/components/Spotlight";
+import { seen, TIPS } from "@/lib/discovery";
+import { getPredictions } from "@/lib/predict/data";
 import { getRaces, getRaceTools } from "@/lib/fuel/race-data";
-import { requireUser } from "@/lib/supabase/server";
+import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Races · Diastole" };
 
@@ -16,7 +20,8 @@ const card = "rounded-[28px] border border-white/10 bg-white/[0.055] p-6";
 export default async function RacesPage() {
   const me = await requireUser();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
-  const [races, tools] = await Promise.all([getRaces(me.id), getRaceTools(me.id)]);
+  const supabase = await createClient();
+  const [races, tools, predictions, { data: tipsRow }] = await Promise.all([getRaces(me.id), getRaceTools(me.id), getPredictions(supabase, me.id, me.timezone), supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle()]);
   const upcoming = races.filter((r) => r.race_date >= today);
   const past = races.filter((r) => r.race_date < today).reverse();
   return (
@@ -36,6 +41,10 @@ export default async function RacesPage() {
             </details>
           )}
         </section>
+        <div>
+          <Spotlight tip={TIPS.predictions} seen={seen((tipsRow?.seen_tips ?? []) as string[], TIPS.predictions.id)} />
+          <PredictionsCard view={predictions} />
+        </div>
         <section className={card}>
           <h2 className="mb-4 text-lg font-medium">Add a race</h2>
           <RaceForm units={me.units} />

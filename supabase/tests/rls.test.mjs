@@ -1126,6 +1126,25 @@ check("an FTP change pings", (await db.query(`select count(*)::int as n from net
 await db.query(`select public.delete_intervals_key('${A1}')`);
 check("key can be deleted", (await db.query(`select public.get_intervals_key('${A1}') as k`)).rows[0]?.k === null);
 
+// ---------------------------------------------------------------- race predictor
+await db.query(`insert into public.race_prediction_snapshots (athlete_id, date, key, seconds) values ('${A1}', '2026-11-01', 'run_5k', 1250)`);
+r = await as(A1, "select seconds from public.race_prediction_snapshots");
+check("athlete reads their estimate snapshots", r.rows?.length === 1);
+r = await as(COACH, `select seconds from public.race_prediction_snapshots where athlete_id = '${A1}'`);
+check("coach reads them", r.rows?.length === 1);
+r = await as(A2, "select seconds from public.race_prediction_snapshots");
+check("other athletes don't", r.rows?.length === 0);
+r = await as(A1, `insert into public.race_prediction_snapshots (athlete_id, date, key, seconds) values ('${A1}', '2026-11-02', 'run_5k', 900)`);
+check("athletes can't write snapshots", !!r.error);
+r = await as(COACH, `insert into public.race_prediction_notes (athlete_id, note) values ('${A1}', 'Pace the bike')`);
+check("coach writes a note", !r.error);
+r = await as(A1, "select note from public.race_prediction_notes");
+check("athlete reads it", r.rows?.[0]?.note === "Pace the bike");
+r = await as(A1, `update public.race_prediction_notes set note = 'mine' returning athlete_id`);
+check("athlete can't edit it", !!r.error || (r.rows?.length ?? 0) === 0);
+r = await as(A2, "select note from public.race_prediction_notes");
+check("other athletes can't read it", r.rows?.length === 0);
+
 // ---------------------------------------------------------------- linked activity marks the workout done
 const wid = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, sent_at) values ('${A1}', '${COACH}', '2026-11-10', 'swim', 'Swim CSS', 'sent', now(), now()) returning id`)).rows[0].id;
 const aid = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'done-test-1', 'lap_swimming', now(), 1200) returning id`)).rows[0].id;
