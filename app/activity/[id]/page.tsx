@@ -16,6 +16,7 @@ import type { SwimRep } from "@/lib/activity/swim";
 import { RUN_SPORT, type FormSummary } from "@/lib/activity/form";
 import { formToStore, recentFormRuns } from "@/lib/activity/form-store";
 import { clock, distance, isFootSport, sportLabel, speedText, whole, type Units } from "@/lib/activity/format";
+import { fadeOf, swimMetrics } from "@/lib/swim/insights";
 import { isSwim, strokeName, swimClock, swimDist, swimPace, swimPool, swimSummary, unitLabel } from "@/lib/activity/swim";
 import { daysBackIso, estimateMaxHr, hrZones, paceZones, powerZones, timeInZones, type Zone } from "@/lib/activity/zones";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
@@ -212,6 +213,9 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const pool = swim ? swimPool(streams, laps, act.distance_m, u) : null;
   const swimUnit = pool?.unit ?? null;
   const swimSum = pool ? swimSummary(laps, pool.unit, pool) : null;
+  // Stroke efficiency (freestyle, per 25 m) and whether form held through the swim.
+  const swimEff = swimSum ? swimMetrics(swimSum, { date: "", activity_id: act.id }) : null;
+  const swimFade = swimSum ? fadeOf(swimSum) : null;
 
   // Zones: the coach's numbers, otherwise an estimate for max HR.
   const setMax = zonesRow?.max_hr ?? null;
@@ -249,6 +253,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         ["Rest", swimSum?.rest_s ? clock(swimSum.rest_s) : null],
         ["Best rep pace", swimSum?.best_100 && swimSum.reps.length > 1 ? `${swimClock(swimSum.best_100)} /100${unitLabel(swimUnit)}` : null],
         ["Avg SWOLF", swimSum?.swolf ? String(swimSum.swolf) : null],
+        ["Dist / stroke", swimEff ? `${swimEff.dps.toFixed(2)} m` : null],
         ["Stroke rate", whole(swimSum?.stroke_rate ?? act.avg_cadence, "str/min")],
         ["Pool", pool?.length_m ? `${Math.round(pool.length_m / (swimUnit === "YARD" ? 0.9144 : 1))} ${unitLabel(swimUnit)}` : null],
         ["Avg HR", whole(act.avg_hr, "bpm")],
@@ -350,6 +355,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         </section>
         </ReceiptWrap>
       )}
+      {swimFade && <p className={`mt-3 text-sm ${swimFade.flagged ? "text-amber-100/90" : "text-white/60"}`}>Stroke check: {swimFade.text}</p>}
 
       {isRun && (isOwn || isCoach) && pickable.length > 0 && (
         <section className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-2">

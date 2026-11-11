@@ -1145,6 +1145,16 @@ check("athlete can't edit it", !!r.error || (r.rows?.length ?? 0) === 0);
 r = await as(A2, "select note from public.race_prediction_notes");
 check("other athletes can't read it", r.rows?.length === 0);
 
+// ---------------------------------------------------------------- swim coaching
+r = await as(COACH, `insert into public.swim_coaching (athlete_id, focus) values ('${A1}', '["catch_up"]')`);
+check("coach approves swim drills", !r.error);
+r = await as(A1, "select focus from public.swim_coaching");
+check("athlete sees approved drills", r.rows?.[0]?.focus?.[0] === "catch_up");
+r = await as(A1, `update public.swim_coaching set focus = '[]' returning athlete_id`);
+check("athlete can't change them", !!r.error || (r.rows?.length ?? 0) === 0);
+r = await as(A2, "select focus from public.swim_coaching");
+check("other athletes can't see them", r.rows?.length === 0);
+
 // ---------------------------------------------------------------- linked activity marks the workout done
 const wid = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, sent_at) values ('${A1}', '${COACH}', '2026-11-10', 'swim', 'Swim CSS', 'sent', now(), now()) returning id`)).rows[0].id;
 const aid = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'done-test-1', 'lap_swimming', now(), 1200) returning id`)).rows[0].id;

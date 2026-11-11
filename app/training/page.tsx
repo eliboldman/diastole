@@ -9,6 +9,8 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import WeekReview from "@/components/training/WeekReview";
 import { clock12 } from "@/lib/week-prefs";
 import FitnessSection from "@/components/training/FitnessSection";
+import SwimTechniqueCard from "@/components/swim/SwimTechniqueCard";
+import { getSwimView } from "@/lib/swim/data";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
@@ -27,7 +29,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
   const weekParam = (await searchParams).week;
   const inTwoWeeks = new Date(daysBackIso(-14)).toLocaleDateString("en-CA", { timeZone: me.timezone });
 
-  const [{ data: planned }, { data: done }, week, load] = await Promise.all([
+  const [{ data: planned }, { data: done }, week, load, swim] = await Promise.all([
     supabase
       .from("planned_workouts")
       .select("id, scheduled_date, title, sport, status, start_time")
@@ -46,6 +48,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
       .limit(20),
     getWeek(supabase, me.id, me.timezone, weekStartFrom(weekParam, today)),
     getLoad(supabase, me.id, me.timezone),
+    getSwimView(supabase, me.id),
   ]);
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -79,6 +82,11 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
       <div className="mt-6">
         <FitnessSection view={load} you />
       </div>
+      {swim && (
+        <div className="mt-6">
+          <SwimTechniqueCard view={swim} />
+        </div>
+      )}
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Next two weeks</h2>
