@@ -26,7 +26,8 @@ class RefreshService extends System.ServiceDelegate {
                 var w = data["w"];
                 if (w instanceof Array) {
                     for (var i = 0; i < w.size(); i++) {
-                        if (w[i] instanceof Dictionary) { (w[i] as Dictionary)["l"] = []; }
+                        var wi = w[i];
+                        if (wi instanceof Dictionary) { wi["l"] = []; }
                     }
                 }
                 Background.exit(data);
