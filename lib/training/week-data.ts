@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { compareWorkout, complianceOf, type Compliance } from "@/lib/activity/compare";
-import type { Lap } from "@/lib/activity/fit";
+import type { Lap, Streams } from "@/lib/activity/fit";
 import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { inferPool, type Brick, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
 import type { StrengthItem } from "@/lib/strength/workout";
@@ -73,9 +73,22 @@ export async function getWeek(supabase: SupabaseClient, athleteId: string, tz: s
     ]);
     if (!maxHr && recent.data) maxHr = estimateMaxHr(recent.data.map((r) => r.max_hr));
     const lapsBy = new Map((details ?? []).map((d) => [d.activity_id as string, ((d.laps ?? []) as Lap[]).filter((l) => (l.duration_s ?? 0) > 0)]));
+    const unmatched: typeof matched = [];
     for (const s of matched) {
-      const laps = lapsBy.get(s.activity!.id);
-      compliance[s.plan.id] = laps?.length ? complianceOf(compareWorkout(s.plan.steps, laps, maxHr, s.plan.pool)) : null;
+      const laps = lapsBy.get(s.activity!.id) ?? [];
+      const c = laps.length ? compareWorkout(s.plan.steps, laps, maxHr, s.plan.pool) : null;
+      compliance[s.plan.id] = complianceOf(c);
+      if (!c) unmatched.push(s);
+    }
+    // Laps that don't mark the steps: fall back to cutting the recording at the planned step times.
+    // Streams are only loaded for those sessions, so a normal week stays a light query.
+    if (unmatched.length) {
+      const { data: rec } = await supabase.from("activity_details").select("activity_id, streams").in("activity_id", unmatched.map((s) => s.activity!.id));
+      const streamsBy = new Map((rec ?? []).map((d) => [d.activity_id as string, (d.streams ?? null) as Streams | null]));
+      for (const s of unmatched) {
+        const streams = streamsBy.get(s.activity!.id) ?? null;
+        if (streams) compliance[s.plan.id] = complianceOf(compareWorkout(s.plan.steps, lapsBy.get(s.activity!.id) ?? [], maxHr, s.plan.pool, streams));
+      }
     }
   }
   return { ...review, compliance, today };
