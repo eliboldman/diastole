@@ -81,6 +81,7 @@ export default function ThresholdTests({ athleteId, status, today }: { athleteId
                       disabled={pending}
                       onClick={() => add(k)}
                       title={TESTS[k].description}
+                      aria-label={`Add ${TESTS[k].title} as a draft`}
                       className="min-h-11 rounded-xl border border-white/10 px-3 text-sm text-white/80 hover:bg-white/[0.05] disabled:opacity-50"
                     >
                       + {kinds.length > 1 ? TESTS[k].title : "Add test"}
