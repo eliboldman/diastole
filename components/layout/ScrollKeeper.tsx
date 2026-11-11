@@ -3,11 +3,18 @@
 import { useEffect } from "react";
 
 /**
- * Keeps your place after saving. In this Next.js version, a server action that sets a cookie or
- * revalidates (most of our saves) is applied like a navigation and scrolls the page to the top.
- * This watches for server actions (they POST with a `Next-Action` header), remembers where you
- * were, and if the same page then jumps without you scrolling, puts you back.
- * Actions that move you to another page are left alone.
+ * Keeps your place after saving.
+ *
+ * In this Next.js version a server action that revalidates is applied like a navigation, and the
+ * router's scroll handler can then jump the page to the top (it does `documentElement.scrollTop = 0`
+ * and/or `scrollIntoView()` on the page's first element). That happens while the page you're on is
+ * being refreshed in place, which is never a place we want a jump.
+ *
+ * So while a server action or a refresh of the current URL is in flight (and briefly after it's
+ * applied), those two scroll calls are ignored, as long as you're still on the same URL.
+ * Real navigations to another page (or the same page with different search params) fetch a different
+ * URL and scroll normally. Nothing here moves the page itself, so it never fights your own scrolling
+ * (the old version restored the position afterwards, which yanked iPhone momentum scrolls back).
  */
 export default function ScrollKeeper() {
   useEffect(() => {
@@ -15,58 +22,102 @@ export default function ScrollKeeper() {
     if (w.__dScrollKeeper) return;
     w.__dScrollKeeper = true;
 
-    let saved: { y: number; path: string; until: number } | null = null;
-    let lastInput = 0;
     const here = () => location.pathname + location.search;
-    const input = () => (lastInput = Date.now());
-    for (const ev of ["wheel", "touchstart", "touchmove", "keydown", "pointerdown"]) addEventListener(ev, input, { passive: true, capture: true });
+    let holdPath: string | null = null;
+    let inFlight = 0;
+    let holdUntil = 0;
+    const holding = () => holdPath !== null && holdPath === here() && (inFlight > 0 || Date.now() < holdUntil);
 
-    const isAction = (init?: RequestInit) => {
+    const header = (init: RequestInit | undefined, name: string) => {
       const h = init?.headers;
-      if (!h) return false;
-      if (h instanceof Headers) return h.has("next-action");
-      if (Array.isArray(h)) return h.some(([k]) => k.toLowerCase() === "next-action");
-      return Object.keys(h).some((k) => k.toLowerCase() === "next-action");
+      if (!h) return null;
+      if (h instanceof Headers) return h.get(name);
+      if (Array.isArray(h)) return h.find(([k]) => k.toLowerCase() === name)?.[1] ?? null;
+      const k = Object.keys(h).find((key) => key.toLowerCase() === name);
+      return k ? (h as Record<string, string>)[k] : null;
+    };
+    /** A server action, or a router refresh of the URL we're on (not a prefetch, not another page). */
+    const isInPlace = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method?.toUpperCase() === "POST" && header(init, "next-action")) return true;
+      if (!header(init, "rsc") || header(init, "next-router-prefetch")) return false;
+      try {
+        const u = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        u.searchParams.delete("_rsc");
+        return u.origin === location.origin && u.pathname + u.search === here();
+      } catch {
+        return false;
+      }
     };
 
     const realFetch = window.fetch.bind(window);
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method?.toUpperCase() === "POST" && isAction(init)) {
-        saved = { y: scrollY, path: here(), until: Number.POSITIVE_INFINITY };
-        const p = realFetch(input, init);
-        // The jump comes when the response is applied; watch a little past that.
-        p.finally(() => saved && (saved.until = Date.now() + 2500));
-        return p;
-      }
-      return realFetch(input, init);
+      if (!isInPlace(input, init)) return realFetch(input, init);
+      holdPath = here();
+      inFlight++;
+      return realFetch(input, init).finally(() => {
+        inFlight = Math.max(0, inFlight - 1);
+        // The response is applied (and the router's scroll handler runs) just after this; cover that.
+        holdUntil = Date.now() + 1500;
+      });
     };
 
-    const restore = (y: number) => {
-      // The page may be briefly shorter while it re-renders; retry for a few frames.
-      let tries = 0;
-      const step = () => {
-        if (Math.abs(scrollY - y) < 4 || tries++ > 90) return; // ~1.5 s
-        scrollTo({ top: y, behavior: "instant" as ScrollBehavior });
+    // Ignore the router's jump to the top while holding.
+    const html = document.documentElement;
+    const desc = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop");
+    if (desc?.get && desc.set) {
+      const { get, set } = desc;
+      Object.defineProperty(html, "scrollTop", {
+        configurable: true,
+        get() {
+          return get.call(this);
+        },
+        set(v: number) {
+          if (v === 0 && holding() && get.call(this) > 0) return;
+          set.call(this, v);
+        },
+      });
+    }
+    // Backstop for the browser itself: if the page briefly gets shorter while it re-renders, iOS
+    // clamps the scroll position and you land near the top. Put you back once the page is tall
+    // again, but only if you haven't touched anything since the save started.
+    let savedY = 0;
+    let touched = false;
+    let restoring = false;
+    const onInput = () => {
+      touched = true;
+      savedY = scrollY;
+    };
+    for (const ev of ["touchstart", "wheel", "keydown", "pointerdown"]) addEventListener(ev, onInput, { passive: true, capture: true });
+    const startHold = window.fetch;
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (isInPlace(input, init) && inFlight === 0) {
+        savedY = scrollY;
+        touched = false;
+      }
+      return startHold(input, init);
+    };
+    addEventListener(
+      "scroll",
+      () => {
+        if (restoring || touched || !holding() || savedY < 300 || scrollY > savedY - 300) return;
+        restoring = true;
+        let frames = 0;
+        const step = () => {
+          if (touched || frames++ > 60 || Math.abs(scrollY - savedY) < 4) return void (restoring = false);
+          if (document.documentElement.scrollHeight - innerHeight >= savedY) scrollTo({ top: savedY, behavior: "instant" as ScrollBehavior });
+          requestAnimationFrame(step);
+        };
         requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    };
+      },
+      { passive: true },
+    );
 
-    const onScroll = () => {
-      const s = saved;
-      if (!s) return;
-      if (Date.now() > s.until || here() !== s.path) {
-        saved = null;
-        return;
-      }
-      // The person scrolled themselves: that's their new place.
-      if (Date.now() - lastInput < 400) {
-        s.y = scrollY;
-        return;
-      }
-      if (Math.abs(scrollY - s.y) > 80) restore(s.y);
+    const realIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (arg?: boolean | ScrollIntoViewOptions) {
+      // Called with no arguments by the router; our own code passes options, and hash links still work.
+      if (arg === undefined && holding() && !location.hash) return;
+      return realIntoView.call(this, arg as never);
     };
-    addEventListener("scroll", onScroll, { passive: true });
   }, []);
   return null;
 }
