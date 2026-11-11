@@ -43,7 +43,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workouts</h1>
-          <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, then approve and send or clean up in bulk.</p>
+          <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, then approve and send, assign to other athletes, or clean up in bulk.</p>
         </div>
         <Link
           href="/endurance-lab"
@@ -98,7 +98,10 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
         </div>
       </form>
 
-      <BulkWorkouts workouts={(workouts ?? []).map((w) => ({ ...w, athleteName: names[w.athlete_id] ?? "Athlete" }))} />
+      <BulkWorkouts
+        workouts={(workouts ?? []).map((w) => ({ ...w, athleteName: names[w.athlete_id] ?? "Athlete" }))}
+        athletes={(athletes ?? []).map((a) => ({ id: a.id, name: names[a.id] }))}
+      />
     </DashboardShell>
   );
 }

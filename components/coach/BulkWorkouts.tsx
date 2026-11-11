@@ -5,17 +5,21 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { approveAndSendMany } from "@/app/(coach)/athlete/[id]/workouts/actions";
-import { deleteWorkouts, undoDeletes } from "@/lib/workouts/actions";
+import { copyWorkoutsToAthletes, deleteWorkouts, undoDeletes } from "@/lib/workouts/actions";
 
 import { useToast } from "./Toast";
 
 type Row = { id: string; athlete_id: string; athleteName: string; scheduled_date: string; title: string; sport: string; status: string };
 
-export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
+export default function BulkWorkouts({ workouts, athletes = [] }: { workouts: Row[]; athletes?: { id: string; name: string }[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [to, setTo] = useState<Set<string>>(new Set());
+  const [keepDates, setKeepDates] = useState(true);
+  const [onDate, setOnDate] = useState("");
   const [pending, start] = useTransition();
   const { show, element } = useToast(10000);
 
@@ -33,6 +37,18 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
   const pickedAthletes = new Set(pickedDrafts.map((w) => w.athleteName)).size;
   const today = new Date().toLocaleDateString("en-CA");
   const pastDrafts = pickedDrafts.filter((w) => w.scheduled_date < today).length;
+
+  const picked = workouts.filter((w) => selected.has(w.id));
+  const fromIds = new Set(picked.map((w) => w.athlete_id));
+  const assign = () =>
+    start(async () => {
+      const r = await copyWorkoutsToAthletes([...selected], [...to], keepDates ? undefined : onDate);
+      setAssigning(false);
+      setTo(new Set());
+      setSelected(new Set());
+      router.refresh();
+      show(r.ok ? (r.message ?? "Assigned.") : r.error, { ok: r.ok });
+    });
 
   const approve = () =>
     start(async () => {
@@ -76,7 +92,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
           />
           {selected.size ? `${selected.size} selected` : `${workouts.length} workout${workouts.length === 1 ? "" : "s"}`}
         </label>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             disabled={!pickedDrafts.length || pending}
             onClick={() => setApproving(true)}
@@ -84,6 +100,15 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
           >
             {pickedDrafts.length ? `Approve & send ${pickedDrafts.length}` : "Approve & send"}
           </button>
+          {athletes.length > 0 && (
+            <button
+              disabled={!selected.size || pending}
+              onClick={() => setAssigning(true)}
+              className="min-h-11 rounded-2xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition active:scale-95 disabled:opacity-30"
+            >
+              Assign
+            </button>
+          )}
           <button
             disabled={!selected.size || pending}
             onClick={() => setConfirming(true)}
@@ -128,6 +153,76 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {assigning && (
+        <div role="dialog" aria-modal="true" aria-labelledby="assign-title" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
+          <div className="toast-in flex max-h-[85dvh] w-full max-w-sm flex-col rounded-[28px] border border-white/10 bg-panel p-6">
+            <h3 id="assign-title" className="text-lg font-medium">
+              Assign {selected.size} workout{selected.size === 1 ? "" : "s"} to…
+            </h3>
+            <p className="mt-1 text-sm text-white/55">Each athlete gets a copy as a draft, with targets from their own zones.</p>
+            <ul className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              {athletes.map((a) => {
+                const only = fromIds.size === 1 && fromIds.has(a.id);
+                return (
+                  <li key={a.id}>
+                    <label className={`flex min-h-12 items-center gap-3 text-sm ${only ? "text-white/35" : ""}`}>
+                      <input
+                        type="checkbox"
+                        disabled={only}
+                        checked={to.has(a.id)}
+                        onChange={() =>
+                          setTo((s) => {
+                            const n = new Set(s);
+                            if (n.has(a.id)) n.delete(a.id);
+                            else n.add(a.id);
+                            return n;
+                          })
+                        }
+                        className="h-5 w-5 accent-emerald-300"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                      {only && <span className="text-xs">already theirs</span>}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            <fieldset className="mt-3 grid gap-1 border-t border-white/10 pt-3 text-sm">
+              <label className="flex min-h-11 items-center gap-3">
+                <input type="radio" name="assign-date" checked={keepDates} onChange={() => setKeepDates(true)} className="h-5 w-5 accent-emerald-300" />
+                Same date{selected.size === 1 ? "" : "s"} as now
+              </label>
+              <label className="flex min-h-11 items-center gap-3">
+                <input type="radio" name="assign-date" checked={!keepDates} onChange={() => setKeepDates(false)} className="h-5 w-5 accent-emerald-300" />
+                On
+                <input
+                  type="date"
+                  value={onDate}
+                  onChange={(e) => {
+                    setOnDate(e.target.value);
+                    setKeepDates(false);
+                  }}
+                  aria-label="Date"
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-base text-white"
+                />
+              </label>
+            </fieldset>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setAssigning(false)} className="min-h-12 rounded-2xl px-4 text-sm text-white/60">
+                Cancel
+              </button>
+              <button
+                disabled={pending || !to.size || (!keepDates && !onDate)}
+                onClick={assign}
+                className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black active:scale-95 disabled:opacity-40"
+              >
+                {pending ? "Assigning…" : to.size ? `Assign to ${to.size}` : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {approving && (

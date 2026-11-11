@@ -325,6 +325,93 @@ export async function duplicateWorkout(id: string, date?: string): Promise<Resul
   return { ok: true, id: data.id, message: "Duplicated as a new draft." };
 }
 
+/**
+ * Copy workouts to other athletes as drafts (they still need approve & send). Targets written from
+ * zones are re-worked from each athlete's own zones, as when assigning from the library. Dates stay
+ * the same unless a date is given. A workout isn't copied back onto the athlete it already belongs to.
+ */
+export async function copyWorkoutsToAthletes(workoutIds: string[], athleteIds: string[], date?: string): Promise<Result> {
+  const coach = await requireCoach();
+  const UUID = /^[0-9a-f-]{36}$/i;
+  const wids = [...new Set(workoutIds)].filter((id) => UUID.test(id)).slice(0, 100);
+  const aids = [...new Set(athleteIds)].filter((id) => UUID.test(id)).slice(0, 50);
+  if (!wids.length) return { ok: false, error: "Pick some workouts first." };
+  if (!aids.length) return { ok: false, error: "Pick at least one athlete." };
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "That date doesn't look right." };
+  const supabase = await createClient();
+  // Row-level security: only this coach's own athletes and workouts come back.
+  const [{ data: sources }, { data: people }] = await Promise.all([
+    supabase.from("planned_workouts").select(COLS).in("id", wids).eq("coach_id", coach.id).is("deleted_at", null).order("scheduled_date"),
+    supabase.from("profiles").select("id, full_name").in("id", aids).eq("coach_id", coach.id),
+  ]);
+  const targets = (people ?? []).map((p) => p.id as string);
+  if (!sources?.length) return { ok: false, error: "Workouts not found." };
+  if (!targets.length) return { ok: false, error: "Those athletes aren't on your roster." };
+  const involved = [...new Set([...targets, ...sources.map((w) => w.athlete_id as string)])];
+  const [{ data: zoneRows }, { data: weeks }] = await Promise.all([
+    supabase.from("athlete_zones").select(`athlete_id, ${ZONE_COLUMNS}`).in("athlete_id", involved),
+    supabase.from("athlete_week").select("athlete_id, days").in("athlete_id", targets),
+  ]);
+  const zonesOf = new Map((zoneRows ?? []).map((z) => [z.athlete_id as string, z as RelZones]));
+  const nameOf = new Map((people ?? []).map((p) => [p.id as string, ((p.full_name as string | null) ?? "").split(" ")[0] || "an athlete"]));
+  const kept = new Set<string>();
+  let made = 0;
+  let skipped = 0;
+  for (const w of sources as WorkoutRow[]) {
+    // Express targets as percentages of the original athlete's zones, so they rescale.
+    const own = zonesOf.get(w.athlete_id) ?? null;
+    const relSteps = hasRelative((w.steps ?? []) as Step[]) ? ((w.steps ?? []) as Step[]) : annotate((w.steps ?? []) as Step[], own as RelZones);
+    const brick = w.brick as Brick;
+    const relBrick = brick?.steps?.length ? (hasRelative(brick.steps) ? brick.steps : annotate(brick.steps, own as RelZones)) : null;
+    const pool: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
+    for (const athleteId of targets) {
+      if (athleteId === w.athlete_id) {
+        skipped += 1;
+        continue;
+      }
+      const zones = zonesOf.get(athleteId) ?? null;
+      const scaled = resolve(relSteps, zones, pool);
+      const run = relBrick ? resolve(relBrick, zones) : null;
+      const missing = [...new Set([...scaled.missing, ...(run?.missing ?? [])])];
+      if (missing.length) kept.add(`${nameOf.get(athleteId)} (no ${missing.join(" or ")})`);
+      const day = date ?? w.scheduled_date;
+      const { data, error } = await supabase
+        .from("planned_workouts")
+        .insert({
+          athlete_id: athleteId,
+          coach_id: coach.id,
+          title: w.title,
+          sport: w.sport,
+          scheduled_date: day,
+          description: w.description,
+          steps: scaled.steps,
+          brick: run ? { sport: brick?.sport ?? "run", steps: run.steps } : null,
+          strength: w.strength ?? null,
+          start_time: windowFor(cleanWeek(weeks?.find((x) => x.athlete_id === athleteId)?.days), day)?.start ?? null,
+          pool_length: w.pool_length,
+          pool_unit: w.pool_unit,
+          status: "draft",
+          library_id: w.library_id,
+        })
+        .select(COLS)
+        .single();
+      if (error || !data) return { ok: false, error: `Copied ${made}, then failed: ${error?.message ?? "unknown error"}` };
+      await snapshot(supabase, data as WorkoutRow, "copied from another athlete", coach.id);
+      made += 1;
+    }
+  }
+  for (const id of targets) refresh(id);
+  revalidatePath("/workouts");
+  const n = targets.length;
+  return {
+    ok: true,
+    message:
+      `Added ${made} draft${made === 1 ? "" : "s"} for ${n} athlete${n === 1 ? "" : "s"}, targets from each athlete's zones. Approve & send when ready.` +
+      (skipped ? ` Skipped ${skipped} already on that athlete.` : "") +
+      (kept.size ? ` Kept the written targets for ${[...kept].join(", ")}.` : ""),
+  };
+}
+
 // ---------------------------------------------------------------- library
 
 export async function updateLibraryItem(
