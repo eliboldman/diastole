@@ -1,0 +1,46 @@
+#!/bin/zsh
+# Archive the iPhone app (with the widget) and upload it to TestFlight.
+#
+#   ios/testflight.sh                         archive + upload
+#   ios/testflight.sh setup <AuthKey.p8> <issuer-id>   one-time: install an App Store Connect API key
+#
+# With an API key installed, uploads don't depend on Xcode's Apple ID sign-in. Without one, it falls
+# back to whatever account Xcode has. The key never goes in the repo: it lives in
+# ~/.appstoreconnect/private_keys (Apple's standard spot) with its IDs in ~/.appstoreconnect/diastole.env.
+set -euo pipefail
+
+ASC_DIR="$HOME/.appstoreconnect"
+ENV_FILE="$ASC_DIR/diastole.env"
+HERE="${0:A:h}"
+
+if [[ "${1:-}" == "setup" ]]; then
+  key="${2:?Usage: ios/testflight.sh setup <path to AuthKey_XXXX.p8> <issuer id>}"
+  issuer="${3:?Usage: ios/testflight.sh setup <path to AuthKey_XXXX.p8> <issuer id>}"
+  name="${key:t}"
+  [[ "$name" == AuthKey_*.p8 ]] || { echo "Expected a file named AuthKey_<KEY ID>.p8"; exit 1; }
+  [[ "$issuer" =~ '^[0-9a-f-]{36}$' ]] || { echo "The issuer ID looks like 69a6de70-xxxx-xxxx-xxxx-xxxxxxxxxxxx"; exit 1; }
+  kid="${${name#AuthKey_}%.p8}"
+  mkdir -p "$ASC_DIR/private_keys" && chmod 700 "$ASC_DIR" "$ASC_DIR/private_keys"
+  mv "$key" "$ASC_DIR/private_keys/$name" && chmod 600 "$ASC_DIR/private_keys/$name"
+  printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' "$kid" "$issuer" > "$ENV_FILE" && chmod 600 "$ENV_FILE"
+  echo "Installed key $kid. Uploads no longer need Xcode's sign-in."
+  exit 0
+fi
+
+AUTH=()
+if [[ -f "$ENV_FILE" ]]; then
+  source "$ENV_FILE"
+  AUTH=(-authenticationKeyPath "$ASC_DIR/private_keys/AuthKey_${ASC_KEY_ID}.p8" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+  echo "Using App Store Connect API key $ASC_KEY_ID"
+else
+  echo "No API key installed; using Xcode's signed-in account"
+fi
+
+OUT="${TMPDIR:-/tmp}/diastole-testflight"
+rm -rf "$OUT" && mkdir -p "$OUT"
+xcodebuild -project "$HERE/Diastole.xcodeproj" -scheme Diastole -configuration Release \
+  -destination generic/platform=iOS -archivePath "$OUT/Diastole.xcarchive" \
+  -allowProvisioningUpdates "${AUTH[@]}" archive | grep -E "error:|warning: .*signing|ARCHIVE" || true
+[[ -d "$OUT/Diastole.xcarchive" ]] || { echo "Archive failed"; exit 1; }
+xcodebuild -exportArchive -archivePath "$OUT/Diastole.xcarchive" -exportOptionsPlist "$HERE/ExportOptions.plist" \
+  -exportPath "$OUT/export" -allowProvisioningUpdates "${AUTH[@]}" 2>&1 | grep -E "error|Upload succeeded|EXPORT"

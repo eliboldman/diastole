@@ -51,3 +51,4 @@ recovery-videos/
 
 # Walkthrough recordings (walkthroughs/record.ts output)
 walkthroughs/out/
+*.p8
