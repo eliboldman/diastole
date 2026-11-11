@@ -21,6 +21,7 @@ const Body = z.object({
         hrv_ms: n(400),
         resting_hr: n(220),
         sleep_seconds: n(86_400),
+        sleep_start: z.string().datetime({ offset: true }).nullish(), // when the night's sleep began (newer app builds)
       }),
     )
     .max(120),
@@ -90,6 +91,7 @@ export async function POST(request: NextRequest) {
         hrv_ms: w.hrv_ms ?? null,
         resting_hr: w.resting_hr ?? null,
         sleep_seconds: w.sleep_seconds == null ? null : Math.round(w.sleep_seconds),
+        ...(w.sleep_start ? { sleep_start: w.sleep_start } : {}),
         updated_at: now,
       }));
     if (rows.length) {
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
   until.setUTCDate(until.getUTCDate() + WINDOW_DAYS - 1);
   const { data: plans } = await supabase
     .from("planned_workouts")
-    .select("id, scheduled_date, title, sport, steps, pool_length, pool_unit")
+    .select("id, scheduled_date, title, sport, steps, pool_length, pool_unit, start_time")
     .eq("athlete_id", me.id)
     .eq("status", "sent")
     .is("deleted_at", null)
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest) {
   const workouts: AppleWorkout[] = [];
   for (const p of plans ?? []) {
     const pool: Pool = p.pool_length && p.pool_unit ? { length: Number(p.pool_length), unit: p.pool_unit as PoolUnit } : null;
-    const w = toAppleWorkout({ id: p.id, date: p.scheduled_date, title: p.title, sport: p.sport, steps: (p.steps ?? []) as Step[], pool });
+    const w = toAppleWorkout({ id: p.id, date: p.scheduled_date, title: p.title, sport: p.sport, steps: (p.steps ?? []) as Step[], pool, time: p.start_time });
     if (w) workouts.push(w);
   }
   // Removed workouts the app should confirm it took off the watch.

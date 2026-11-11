@@ -368,6 +368,7 @@ function draftRow(i: PlannedItem, athleteId: string, coachId: string, applicatio
     pool_length: i.tw.pool?.length ?? null,
     pool_unit: i.tw.pool?.unit ?? null,
     status: "draft",
+    start_time: i.startTime,
     plan_application_id: applicationId,
     template_workout_id: i.tw.id ?? null,
   };

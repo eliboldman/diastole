@@ -22,7 +22,9 @@ function wellnessFields(type: string, s: Summary): Record<string, unknown> | nul
       };
     case "sleeps": {
       const score = s.overallSleepScore as { value?: number } | undefined;
-      return { sleep_seconds: num(s.durationInSeconds), sleep_score: num(score?.value) };
+      // startTimeInSeconds is the sleep's start (Unix seconds, UTC): kept for bedtime consistency.
+      const startSec = num(s.startTimeInSeconds);
+      return { sleep_seconds: num(s.durationInSeconds), sleep_score: num(score?.value), ...(startSec ? { sleep_start: new Date(startSec * 1000).toISOString() } : {}) };
     }
     case "hrv":
       return { hrv_ms: num(s.lastNightAvg) };

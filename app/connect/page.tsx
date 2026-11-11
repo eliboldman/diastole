@@ -95,8 +95,19 @@ export default async function ConnectPage({
             </li>
           </ul>
           <Link
+            href="/me/setup#week"
+            className="lift mx-auto mt-6 block max-w-md rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.1] p-4 text-sm"
+          >
+            <span className="font-medium text-white">When do you train and sleep? →</span>
+            <span className="mt-1 block text-white/60">
+              One minute: your usual training times and wake time. Your
+              workouts land at those times, and Today shows a bedtime that
+              gets you the sleep you need.
+            </span>
+          </Link>
+          <Link
             href="/me/import"
-            className="lift mx-auto mt-6 block max-w-md rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.06] p-4 text-sm"
+            className="lift mx-auto mt-3 block max-w-md rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.06] p-4 text-sm"
           >
             <span className="font-medium text-white">
               Optional: import your Garmin history →

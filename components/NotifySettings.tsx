@@ -11,6 +11,7 @@ const GROUPS: { id: keyof NotifyPrefs; label: string; coach?: boolean }[] = [
   { id: "props", label: "Props and kudos" },
   { id: "workouts", label: "New and changed workouts" },
   { id: "pods", label: "Pod invites and replies" },
+  { id: "sleep", label: "Weekly sleep follow-up" },
   { id: "coaching", label: "Coaching alerts (suggestions, form, new athletes)", coach: true },
 ];
 

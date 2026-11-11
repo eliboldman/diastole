@@ -9,6 +9,7 @@ import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
 import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, hasRelative, resolve, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { cleanWeek, windowFor } from "@/lib/week-prefs";
 import { planSchedule, type ImportedRef, type ScheduleRow, type ScheduleSkip } from "@/lib/workouts/schedule-import";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
@@ -380,9 +381,10 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   }
 
   // Each athlete gets targets worked out from their own zones (when the template has percentages).
-  const [{ data: zoneRows }, { data: people }] = await Promise.all([
+  const [{ data: zoneRows }, { data: people }, { data: weeks }] = await Promise.all([
     supabase.from("athlete_zones").select(`athlete_id, ${ZONE_COLUMNS}`).in("athlete_id", athleteIds),
     supabase.from("profiles").select("id, full_name").in("id", athleteIds),
+    supabase.from("athlete_week").select("athlete_id, days").in("athlete_id", athleteIds),
   ]);
   const zonesOf = new Map((zoneRows ?? []).map((z) => [z.athlete_id as string, z as RelZones]));
   const nameOf = new Map((people ?? []).map((p) => [p.id as string, ((p.full_name as string | null) ?? "").split(" ")[0] || "an athlete"]));
@@ -406,6 +408,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
         description: item.description,
         steps: scaled.steps,
         brick: run ? { sport: "run", steps: run.steps } : null,
+        start_time: windowFor(cleanWeek(weeks?.find((x) => x.athlete_id === athleteId)?.days), date)?.start ?? null,
         pool_length: item.pool_length,
         pool_unit: item.pool_unit,
         status: "draft",

@@ -66,12 +66,34 @@ export default function WeekPrefsEditor({ initial, athleteId }: { initial: WeekP
                     />
                     min
                   </label>
+                  <label className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-white/50">
+                    Train
+                    <input
+                      type="time"
+                      value={d.window?.start ?? ""}
+                      onChange={(e) => change(k, { window: e.target.value ? { start: e.target.value, end: d.window?.end && d.window.end > e.target.value ? d.window.end : e.target.value } : null })}
+                      className="w-[8.5rem] rounded-xl border border-white/10 bg-white/[0.05] px-2 py-1.5 text-[16px] text-white focus:border-emerald-300/40 focus:outline-none"
+                      aria-label={`${label} training window start`}
+                    />
+                    {d.window && (
+                      <>
+                        –
+                        <input
+                          type="time"
+                          value={d.window.end}
+                          onChange={(e) => change(k, { window: { start: d.window!.start, end: e.target.value > d.window!.start ? e.target.value : d.window!.start } })}
+                          className="w-[8.5rem] rounded-xl border border-white/10 bg-white/[0.05] px-2 py-1.5 text-[16px] text-white focus:border-emerald-300/40 focus:outline-none"
+                          aria-label={`${label} training window end`}
+                        />
+                      </>
+                    )}
+                  </label>
                   <input
                     value={d.note}
                     maxLength={80}
                     onChange={(e) => change(k, { note: e.target.value })}
                     placeholder="Note (e.g. group ride, pool before 7)"
-                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[16px] focus:border-emerald-300/40 focus:outline-none"
+                    className="min-w-0 flex-1 basis-44 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[16px] focus:border-emerald-300/40 focus:outline-none"
                     aria-label={`${label} note`}
                   />
                 </div>

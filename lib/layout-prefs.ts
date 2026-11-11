@@ -8,6 +8,7 @@ export const LAYOUT_PAGES = {
     { key: "race", label: "Race week" },
     { key: "upcoming", label: "Today and coming up" },
     { key: "readiness", label: "Readiness" },
+    { key: "bedtime", label: "Tonight's bedtime" },
     { key: "fuel", label: "Today's fuel" },
     { key: "checkin", label: "Check-in prompt" },
     { key: "recovery", label: "Recovery" },

@@ -7,6 +7,7 @@ import RideButtons from "@/components/RideButtons";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import WeekReview from "@/components/training/WeekReview";
+import { clock12 } from "@/lib/week-prefs";
 import FitnessSection from "@/components/training/FitnessSection";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
@@ -29,7 +30,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
   const [{ data: planned }, { data: done }, week, load] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, scheduled_date, title, sport, status")
+      .select("id, scheduled_date, title, sport, status, start_time")
       .eq("athlete_id", me.id)
       .is("deleted_at", null)
       .neq("status", "draft")
@@ -91,7 +92,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{w.title}</span>
                     <span className="block text-xs text-white/50">
-                      {day(w.scheduled_date)} · {sportLabel(w.sport)}
+                      {day(w.scheduled_date)}{w.start_time ? ` ${clock12(String(w.start_time).slice(0, 5))}` : ""} · {sportLabel(w.sport)}
                       {w.status === "completed" ? " · done" : ""}
                     </span>
                   </span>

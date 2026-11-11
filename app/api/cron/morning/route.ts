@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { runFormInsights } from "@/lib/ai/form-insights";
 import { runCoachAlerts } from "@/lib/training/alerts-run";
+import { runBedtimeRecaps } from "@/lib/sleep/recap-run";
 import { buildDigest, digestLine, lastWeekStart } from "@/lib/digest";
 import { runSafetyNet } from "@/lib/fuel/safety-run";
 import { pullRides, syncAthlete } from "@/lib/intervals/sync";
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
     const p = await pullRides(c.athlete_id, admin).catch((e) => ({ status: "error", error: String(e).slice(0, 200) }));
     results[`${c.athlete_id}:intervals`] = { sync: s.status, pull: p.status };
   }
+  // Monday mornings: last week's bedtime consistency for athletes who set up sleep times.
+  results.bedtime = await runBedtimeRecaps(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Pod challenges that ended yesterday: final standings to everyone who joined (rules only).
   const { data: wrapped, error: wrapError } = await admin.rpc("finish_pod_challenges");
   results.challenges = wrapError ? { status: "error", reason: wrapError.message.slice(0, 200) } : { sent: wrapped };

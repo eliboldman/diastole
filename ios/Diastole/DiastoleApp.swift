@@ -36,6 +36,7 @@ struct RootView: View {
             if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut {
                 PushCenter.shared.signedInChanged(false)
                 HealthSync.shared.signedOut()
+                BedtimeNudges.shared.signedOut()
             }
         }
         // Opening the app clears the badge; the bell inside shows what's unread.
@@ -43,6 +44,7 @@ struct RootView: View {
             if phase == .active {
                 UNUserNotificationCenter.current().setBadgeCount(0)
                 HealthSync.shared.maybeSync()
+                BedtimeNudges.shared.maybeRefresh()
             }
         }
     }

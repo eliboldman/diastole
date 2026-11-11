@@ -4,7 +4,7 @@
 
 import type { Brick, Pool, Step } from "../workouts/garmin-format.ts";
 import { resolve, stripRel, type Missing, type RelZones } from "../workouts/relative.ts";
-import { cleanWeek, WEEKDAYS, type WeekPrefs } from "../week-prefs.ts";
+import { cleanWeek, WEEKDAYS, windowFor, type WeekPrefs } from "../week-prefs.ts";
 
 const DAY = 86_400_000;
 export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
@@ -72,6 +72,7 @@ export type PlannedItem = {
   brick: Brick;
   missing: Missing[]; // zones this athlete doesn't have (targets kept as written)
   past: boolean; // before today: not created
+  startTime: string | null; // the athlete's training window that day
 };
 
 /** Can this sport go on this day of the athlete's week? Days with no preference take anything. */
@@ -115,6 +116,7 @@ export function applyTo(opts: { workouts: TemplateWorkout[]; start: string; zone
       brick: run ? { sport: "run", steps: run.steps } : null,
       missing: [...new Set([...main.missing, ...(run?.missing ?? [])])],
       past: date < opts.today,
+      startTime: windowFor(prefs, date)?.start ?? null,
     });
   }
   return items;

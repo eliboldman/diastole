@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import SessionFuel from "@/components/fuel/SessionFuel";
 import RideButtons from "@/components/RideButtons";
 import BackLink from "@/components/layout/BackLink";
+import { clock12 } from "@/lib/week-prefs";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -32,7 +33,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const [{ data: w }, { data: done }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick")
+      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick, start_time")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -74,6 +75,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
       <h1 className="mt-2 break-words text-3xl font-bold tracking-tight sm:text-4xl">{w.title}</h1>
       <p className="mt-2 text-sm text-white/55">
         {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        {w.start_time ? ` · ${clock12(String(w.start_time).slice(0, 5))}` : ""}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
       <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} brick={brick} className="mt-4" />

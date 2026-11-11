@@ -256,6 +256,8 @@ final class HealthSync {
             let window = asleep.filter { $0.endDate > at(day, hour: -6) && $0.endDate <= at(day, hour: 14) }
             let seconds = Self.merged(window.map { ($0.startDate, $0.endDate) })
             if seconds > 0 { row["sleep_seconds"] = seconds.rounded() }
+            // When that sleep began (for bedtime consistency).
+            if let first = window.map(\.startDate).min() { row["sleep_start"] = ISO8601DateFormatter().string(from: first) }
             if row.count > 1 { rows.append(row) }
         }
         return rows
@@ -360,7 +362,7 @@ final class HealthSync {
         }
         let still = Set(await WorkoutScheduler.shared.scheduledWorkouts.map { $0.plan.id.uuidString.lowercased() })
         for (id, p) in wanted where !still.contains(id) {
-            guard let uuid = UUID(uuidString: id), let custom = Self.customWorkout(p), let date = Self.when(p["date"] as? String) else { continue }
+            guard let uuid = UUID(uuidString: id), let custom = Self.customWorkout(p), let date = Self.when(p["date"] as? String, time: p["time"] as? String) else { continue }
             await WorkoutScheduler.shared.schedule(WorkoutPlan(.custom(custom), id: uuid), at: date)
             memory[id] = Self.fingerprint(p)
             sent.append(id)
@@ -391,11 +393,12 @@ final class HealthSync {
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Future days: 6 am. Today: a minute from now, so it shows up right away.
-    private static func when(_ date: String?) -> DateComponents? {
+    /// Future days: the coach's planned time (else 6 am). Today: a minute from now if that time has passed, so it shows up right away.
+    private static func when(_ date: String?, time: String? = nil) -> DateComponents? {
         guard let date, case let parts = date.split(separator: "-").compactMap({ Int($0) }), parts.count == 3 else { return nil }
         let cal = Calendar.current
-        var c = DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 6, minute: 0)
+        let hm = (time ?? "").split(separator: ":").compactMap { Int($0) }
+        var c = DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: hm.count == 2 ? hm[0] : 6, minute: hm.count == 2 ? hm[1] : 0)
         guard let target = cal.date(from: c) else { return nil }
         if cal.isDateInToday(target) || target < Date() {
             guard cal.isDateInToday(target) else { return nil } // past days aren't scheduled

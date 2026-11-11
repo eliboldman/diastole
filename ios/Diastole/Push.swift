@@ -81,6 +81,7 @@ final class PushCenter {
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        BedtimeNudges.registerCategory()
         // Background delivery needs its observers set up at every launch, including ones iOS starts
         // in the background for new Health data.
         HealthSync.shared.startBackgroundDelivery()
@@ -110,10 +111,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     /// Tapped: open the page it's about.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let href = response.notification.request.content.userInfo["href"] as? String
+        let bedtimeDate = response.notification.request.content.userInfo["bedtimeDate"] as? String
+        let action = response.actionIdentifier
         nonisolated(unsafe) let done = completionHandler
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                if let href { PushCenter.shared.open(href) }
+                if action == BedtimeNudges.snoozeAction, let bedtimeDate {
+                    BedtimeNudges.shared.snooze(bedtimeDate) // "Not tonight": no app opening
+                } else if let href {
+                    PushCenter.shared.open(href)
+                }
             }
             done()
         }

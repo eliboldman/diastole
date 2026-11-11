@@ -522,6 +522,7 @@ export default function WorkoutBuilder({
   mode = "coach",
   hasCoach = true,
   template,
+  windows,
 }: {
   // athlete: their own builder. No AI; saves to My workouts and asks the coach to add it.
   // template: a session in a plan template (week and day, no date, nothing is sent).
@@ -533,7 +534,9 @@ export default function WorkoutBuilder({
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
-  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null; brick?: Brick };
+  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null; brick?: Brick; startTime?: string | null };
+  // The athlete's training window per weekday (0 = Monday): the default time for a new date.
+  windows?: (string | null)[];
 }) {
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
@@ -542,6 +545,9 @@ export default function WorkoutBuilder({
   // Tomorrow in the coach's local time (en-CA formats as YYYY-MM-DD).
   const [date, setDate] = useState(() => initial?.scheduledDate ?? new Date(Date.now() + 86400_000).toLocaleDateString("en-CA"));
   const [description, setDescription] = useState(initial?.description ?? "");
+  const windowOn = (d: string) => windows?.[(new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7] ?? null;
+  const [startTime, setStartTime] = useState<string>(() => (initial ? (initial.startTime?.slice(0, 5) ?? "") : (windowOn(date) ?? "")));
+  const [timeTouched, setTimeTouched] = useState(Boolean(initial?.startTime));
   const [why, setWhy] = useState(initial?.why ?? "");
   const [drafting, startDraft] = useTransition();
   const [whyNote, setWhyNote] = useState<string | null>(null);
@@ -595,7 +601,7 @@ export default function WorkoutBuilder({
     });
   const mine = () => ({ id, title, sport, description, steps: stripIds(steps), pool: swim ? pool : null });
   const brickOut = (): Brick => (sport === "bike" && brick?.length ? { sport: "run", steps: stripIds(brick) } : null);
-  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why, brick: brickOut() });
+  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why, brick: brickOut(), startTime: startTime || null });
   const draftTheWhy = () =>
     startDraft(async () => {
       setWhyNote(null);
@@ -718,7 +724,33 @@ export default function WorkoutBuilder({
             </select>
           </div>
         ) : (
-          <input className={field} type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!editable} />
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              className={field}
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                // A new day brings that day's training window, unless the coach picked a time.
+                if (!timeTouched && !athleteMode) setStartTime(windowOn(e.target.value) ?? "");
+              }}
+              disabled={!editable}
+            />
+            {!athleteMode && (
+              <input
+                className={`${field} w-28`}
+                type="time"
+                value={startTime}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  setTimeTouched(true);
+                }}
+                disabled={!editable}
+                aria-label="Start time"
+                title="Start time (defaults to the athlete's training window)"
+              />
+            )}
+          </div>
         )}
       </div>
       <textarea

@@ -23,6 +23,7 @@ export type AppleBlock = { iterations: number; steps: AppleInterval[] };
 export type AppleWorkout = {
   id: string;
   date: string; // YYYY-MM-DD, the athlete's day
+  time?: string; // HH:MM local, when the coach planned it (else the app picks 6 am)
   title: string;
   activity: "running" | "cycling" | "swimming";
   location: "outdoor" | "indoor";
@@ -77,7 +78,7 @@ const interval = (s: Flat): AppleInterval => ({
 const single = (s: Flat): AppleStep => ({ goal: goal(s.duration), ...(alert(s.target) ? { alert: alert(s.target) } : {}), ...(name(s) ? { name: name(s) } : {}) });
 
 /** Null when the sport isn't one Apple's Workout app can run as a custom workout. */
-export function toAppleWorkout(w: { id: string; date: string; title: string; sport: string; steps: Step[]; pool?: Pool }): AppleWorkout | null {
+export function toAppleWorkout(w: { id: string; date: string; title: string; sport: string; steps: Step[]; pool?: Pool; time?: string | null }): AppleWorkout | null {
   const activity = ACTIVITY[w.sport];
   if (!activity) return null;
   if (activity === "swimming") w = { ...w, pool: inferPool(w.steps ?? [], w.pool ?? null) };
@@ -129,6 +130,7 @@ export function toAppleWorkout(w: { id: string; date: string; title: string; spo
   return {
     id: w.id,
     date: w.date,
+    ...(w.time && /^\d{2}:\d{2}/.test(w.time) ? { time: w.time.slice(0, 5) } : {}),
     title: w.title.slice(0, 60) || "Workout",
     activity,
     location: "outdoor",

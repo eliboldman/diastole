@@ -9,7 +9,7 @@ import { AI_MODELS, costOf, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } f
 import { FixOut, PlanOut, type PlanWorkout } from "@/lib/ai/step-schema";
 import { createAdminClient, createClient, type Profile } from "@/lib/supabase/server";
 import { cleanCloset, closetForPrompt } from "@/lib/closet";
-import { cleanWeek, weekForPrompt } from "@/lib/week-prefs";
+import { cleanWeek, weekForPrompt, windowFor } from "@/lib/week-prefs";
 import { leafToStep } from "@/lib/workouts/ai-steps";
 import { bikeStepsToPower } from "@/lib/workouts/bike-power";
 import { getLoad } from "@/lib/training/load-data";
@@ -276,6 +276,9 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
       .select("id")
       .single();
     if (bErr || !batch) return { ok: false, error: "Couldn't save the suggestions." };
+    // Each draft starts at the athlete's training window that day.
+    const { data: weekRow } = await supabase.from("athlete_week").select("days").eq("athlete_id", input.athleteId).maybeSingle();
+    const prefs = cleanWeek(weekRow?.days);
     const { error: wErr } = await supabase.from("planned_workouts").insert(
       good.map((r) => ({
         athlete_id: input.athleteId,
@@ -287,6 +290,7 @@ export async function suggestPlan(me: Profile, input: { athleteId: string; start
         why: r.w.why.trim().slice(0, 600) || null,
         steps: r.steps,
         status: "draft",
+        start_time: windowFor(prefs, r.w.date)?.start ?? null,
         pool_length: r.pool?.length ?? null,
         pool_unit: r.pool?.unit ?? null,
         plan_batch: batch.id,

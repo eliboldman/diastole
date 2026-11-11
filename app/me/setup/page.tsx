@@ -6,6 +6,9 @@ import ZonesForm from "@/components/coach/ZonesForm";
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import WeekPrefsEditor from "@/components/WeekPrefsEditor";
+import SleepSettings from "@/components/sleep/SleepSettings";
+import { routinesFor } from "@/lib/recovery/data";
+import { getSleepSetup } from "@/lib/sleep/data";
 import { paceOf } from "@/lib/activity/format";
 import { cleanCloset } from "@/lib/closet";
 import { getBikeMileage, getShoeMileage } from "@/lib/shoes";
@@ -21,10 +24,12 @@ export default async function MySetupPage() {
   const me = await requireUser();
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
-  const [{ data: gearRow }, { data: zones }, { data: week }] = await Promise.all([
+  const [{ data: gearRow }, { data: zones }, { data: week }, sleep, routines] = await Promise.all([
     supabase.from("athlete_gear").select("gear").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("athlete_week").select("days").eq("athlete_id", me.id).maybeSingle(),
+    getSleepSetup(supabase, me.id),
+    routinesFor(supabase, me.role === "coach" ? me.id : me.coach_id),
   ]);
   const closet = cleanCloset(gearRow?.gear);
   const [mileage, bikeMiles] = await Promise.all([getShoeMileage(supabase, me.id, closet, me.timezone), getBikeMileage(supabase, me.id, closet, me.timezone)]);
@@ -33,6 +38,7 @@ export default async function MySetupPage() {
     ["#closet", "Closet and gear"],
     ["#numbers", "My numbers"],
     ["#week", "Training days"],
+    ["#sleep", "Sleep"],
   ] as const;
 
   return (
@@ -72,8 +78,14 @@ export default async function MySetupPage() {
 
       <section id="week" className={card}>
         <h2 className="text-lg font-medium">Training days</h2>
-        <p className="mb-4 mt-1 text-sm text-white/55">Which disciplines you like on which days, and how much time you have.</p>
+        <p className="mb-4 mt-1 text-sm text-white/55">Which disciplines you like on which days, when you like to train, and how much time you have. Workouts default to these times.</p>
         <WeekPrefsEditor initial={cleanWeek(week?.days)} />
+      </section>
+
+      <section id="sleep" className={card}>
+        <h2 className="text-lg font-medium">Sleep</h2>
+        <p className="mb-4 mt-1 text-sm text-white/55">Today shows a bedtime worked back from your next session, so you get the sleep you need.</p>
+        <SleepSettings initial={sleep.prefs} goalFromData={sleep.goalFromData} dataGoalMin={sleep.dataGoalMin} routines={routines.map((r) => ({ id: r.id, title: r.title }))} />
       </section>
 
     </DashboardShell>

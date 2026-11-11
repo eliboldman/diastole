@@ -9,6 +9,7 @@ import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Brick, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { cleanWeek, windowFor } from "@/lib/week-prefs";
 
 export type WorkoutInput = {
   id?: string;
@@ -21,6 +22,7 @@ export type WorkoutInput = {
   pool?: Pool; // swims only; null = any pool
   why?: string; // what the athlete sees about the session's purpose (the coach wrote or approved it)
   brick?: Brick; // bike workouts only: a run off the bike
+  startTime?: string | null; // "HH:MM"; undefined = the athlete's training window that day
 };
 
 export type ActionResult = { ok: true; id: string; message?: string } | { ok: false; error: string };
@@ -44,7 +46,11 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
 
   const supabase = await createClient();
   // Remember each target as a % of this athlete's zones too, so the Library can scale it to others.
-  const { data: zones } = await supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle();
+  const [{ data: zones }, { data: wk }] = await Promise.all([
+    supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle(),
+    supabase.from("athlete_week").select("days").eq("athlete_id", input.athleteId).maybeSingle(),
+  ]);
+  const startTime = input.startTime === undefined ? (windowFor(cleanWeek(wk?.days), input.scheduledDate)?.start ?? null) : input.startTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime) ? input.startTime : null;
   const steps = annotate(stripRel(input.steps), zones as RelZones, input.sport === "swim" ? (input.pool ?? null) : null);
   const brick = input.sport === "bike" && input.brick?.steps?.length ? { sport: "run" as const, steps: annotate(stripRel(input.brick.steps), zones as RelZones) } : null;
   const row = {
@@ -56,6 +62,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     description: input.description.trim() || null,
     steps,
     brick,
+    start_time: startTime,
     pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
     pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,
     ...(input.why !== undefined
