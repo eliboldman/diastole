@@ -1,9 +1,11 @@
-import { Video, Waves } from "lucide-react";
+import { Waves } from "lucide-react";
 
 import type { SwimView } from "@/lib/swim/data";
+import type { SwimVideo } from "@/lib/swim/video";
 import { DRILLS, type Trend } from "@/lib/swim/insights";
 
 import { DrillButtons, SwimNoteForm } from "./SwimCoachControls";
+import SwimVideos from "./SwimVideos";
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
@@ -33,13 +35,13 @@ function Spark({ values, label }: { values: number[]; label: string }) {
 }
 
 /** Freestyle efficiency over the last 12 weeks, the coach's drill focus, and (coach) drill suggestions to approve. */
-export default function SwimTechniqueCard({ view, coach, athleteId }: { view: SwimView; coach?: boolean; athleteId?: string }) {
+export default function SwimTechniqueCard({ view, coach, athleteId, videos }: { view: SwimView; coach?: boolean; athleteId?: string; videos?: SwimVideo[] }) {
   const last = view.metrics.at(-1);
   const recent = view.metrics.slice(-5);
   const avg = (k: "dps" | "spl25" | "swolf25") => (recent.length ? recent.reduce((a, m) => a + m[k], 0) / recent.length : 0);
   const rated = recent.filter((m) => m.rate);
   return (
-    <section className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+    <section id="swim" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
       <h2 className="flex items-center gap-2 text-lg font-medium">
         <Waves size={18} className="text-emerald-200" aria-hidden /> Swim technique
       </h2>
@@ -90,19 +92,7 @@ export default function SwimTechniqueCard({ view, coach, athleteId }: { view: Sw
         </div>
       )}
 
-      {view.videoAsked && !coach && (
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm">
-          <p className="flex items-center gap-2 font-medium">
-            <Video size={16} className="text-emerald-200" aria-hidden /> Your coach would like a stroke video
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-white/65">
-            <li>Side view from the deck, phone at hip height, one easy length of freestyle.</li>
-            <li>Then one from the end of the lane, swimming toward the camera.</li>
-            <li>Landscape, no zoom, and ask a friend to walk alongside if they can.</li>
-          </ul>
-          <p className="mt-2 text-xs text-white/45">Send it to your coach by text or AirDrop for now.</p>
-        </div>
-      )}
+      {athleteId && <SwimVideos athleteId={athleteId} videos={videos ?? []} coach={coach} asked={view.videoAsked} />}
 
       {coach && athleteId && (
         <>

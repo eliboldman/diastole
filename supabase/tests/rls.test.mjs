@@ -1215,5 +1215,18 @@ check("inserting a linked activity marks it completed", (await wStatus()) === "c
 await db.query(`delete from public.activities where external_id = 'done-test-2'`);
 check("deleting the only linked activity reverts it", (await wStatus()) === "sent");
 
+// ---------------------------------------------------------------- swim videos
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+await db.query(`insert into public.swim_videos (athlete_id, path, athlete_note) values ('${A1}', '${A1}/11111111-1111-1111-1111-111111111111.mp4', 'Left arm?')`);
+const svNote = (await db.query(`select title from public.notifications where user_id = '${COACH}' and kind = 'swim_video'`)).rows;
+check("a new stroke video notifies the coach", svNote.length === 1);
+check("athlete sees own stroke videos", (await as(A1, "select id from public.swim_videos")).rows?.length === 1);
+check("coach sees the athlete's stroke videos", (await as(COACH, "select id from public.swim_videos")).rows?.length === 1);
+check("another athlete can't see them", (await as(A2, "select id from public.swim_videos")).rows?.length === 0);
+check("athletes can't write rows directly", Boolean((await as(A1, `insert into public.swim_videos (athlete_id, path) values ('${A1}', 'x')`)).error));
+await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+await db.query(`update public.swim_videos set coach_note = 'Reach longer before the catch.' where athlete_id = '${A1}'`);
+check("a coach reply notifies the athlete", (await db.query(`select id from public.notifications where user_id = '${A1}' and kind = 'swim_video'`)).rows.length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

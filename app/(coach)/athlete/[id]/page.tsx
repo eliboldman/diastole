@@ -16,6 +16,7 @@ import RaceForm from "@/components/race/RaceForm";
 import RaceList from "@/components/race/RaceList";
 import PredictionsCard from "@/components/predict/PredictionsCard";
 import SwimTechniqueCard from "@/components/swim/SwimTechniqueCard";
+import { listSwimVideos } from "@/lib/swim/video";
 import { getSwimView } from "@/lib/swim/data";
 import { getPredictions } from "@/lib/predict/data";
 import { getRaces } from "@/lib/fuel/race-data";
@@ -256,7 +257,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           </details>
         </section>
 
-        {await getSwimView(supabase, profile.id).then((v) => (v ? <div className="lg:col-span-2"><SwimTechniqueCard view={v} coach athleteId={profile.id} /></div> : null))}
+        {await Promise.all([getSwimView(supabase, profile.id), listSwimVideos(profile.id)]).then(([v, videos]) => (v ? <div className="lg:col-span-2"><SwimTechniqueCard view={v} coach athleteId={profile.id} videos={videos} /></div> : null))}
         <div className="lg:col-span-2">
           <PredictionsCard view={await getPredictions(supabase, profile.id, athleteTz)} coach athleteId={profile.id} firstName={(profile.full_name || "The athlete").split(" ")[0]} />
         </div>

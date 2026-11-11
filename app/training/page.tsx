@@ -11,6 +11,7 @@ import { clock12 } from "@/lib/week-prefs";
 import FitnessSection from "@/components/training/FitnessSection";
 import SwimTechniqueCard from "@/components/swim/SwimTechniqueCard";
 import { getSwimView } from "@/lib/swim/data";
+import { listSwimVideos } from "@/lib/swim/video";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
 import { clock, shortDistance, sportLabel } from "@/lib/activity/format";
@@ -84,7 +85,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
       </div>
       {swim && (
         <div className="mt-6">
-          <SwimTechniqueCard view={swim} />
+          <SwimTechniqueCard view={swim} athleteId={me.id} videos={await listSwimVideos(me.id)} />
         </div>
       )}
 

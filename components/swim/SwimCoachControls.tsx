@@ -56,7 +56,7 @@ export function SwimNoteForm({ athleteId, note, videoAsked }: { athleteId: strin
       <textarea id="swim-note" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} rows={2} placeholder="e.g. Drills in every warm-up this week, then we'll look again." className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[16px] text-white placeholder:text-white/30 focus:border-emerald-300/40 focus:outline-none" />
       <label className="flex min-h-11 items-center gap-2 text-sm text-white/75">
         <input type="checkbox" checked={video} onChange={(e) => setVideo(e.target.checked)} className="h-5 w-5 accent-emerald-300" />
-        Ask for a stroke video (shows a short filming guide)
+        Ask for a stroke video (they get a filming guide and an upload button)
       </label>
       <div className="flex items-center gap-3">
         <button disabled={pending || (text === note && video === videoAsked)} className="min-h-11 rounded-xl bg-emerald-300 px-4 text-sm font-medium text-black disabled:opacity-40">
