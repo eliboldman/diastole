@@ -11,6 +11,8 @@ import RacePlanCard from "@/components/race/RacePlanCard";
 import RaceEstimate from "@/components/predict/RaceEstimate";
 import CourseCard from "@/components/course/CourseCard";
 import { getCourseView } from "@/lib/course/data";
+import PackingList from "@/components/pack/PackingList";
+import { getPackView } from "@/lib/pack/data";
 import Spotlight from "@/components/Spotlight";
 import { seen, TIPS } from "@/lib/discovery";
 import { clock } from "@/lib/activity/format";
@@ -39,7 +41,12 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
   const days = daysUntil(race.race_date, today);
   const plan = planFor(race, tools);
   const supabase = await createClient();
-  const [est, course, { data: tipsRow }] = await Promise.all([days >= 0 ? getRacePrediction(supabase, race, tz) : Promise.resolve(null), getCourseView(supabase, race.id, tz), supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle()]);
+  const [est, course, { data: tipsRow }, pack] = await Promise.all([
+    days >= 0 ? getRacePrediction(supabase, race, tz) : Promise.resolve(null),
+    getCourseView(supabase, race.id, tz),
+    supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle(),
+    days >= 0 ? getPackView(supabase, race, me.units) : Promise.resolve(null),
+  ]);
   const showEst = est && !(own && est.hidden);
   const phase = days >= 0 && days <= RACE_WEEK_DAYS ? raceWeekChecklist(days, plan) : null;
 
@@ -73,6 +80,13 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         )}
         {showEst && <RaceEstimate prediction={est.prediction} goal={race.goal_seconds} note={est.note} own={own} />}
         {days >= 0 && <CourseCard raceId={race.id} athleteId={race.athlete_id} sport={race.sport} view={course} units={me.units} coach={me.role === "coach" && !own} today={today} raceDate={race.race_date} />}
+        {pack && (
+          <section id="packing" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2" data-print-show>
+            <h2 className="text-lg font-medium">Packing list</h2>
+            <p className="mb-4 mt-1 text-sm text-white/55 print:hidden">Built from the race, the forecast and your gear. Tick things off as they go in the bag.</p>
+            <PackingList raceId={race.id} sport={race.sport} items={pack.items} checked={pack.checked} travel={pack.travel} waterC={pack.waterC} reminders={pack.reminders} today={today} units={me.units} weatherKnown={pack.weatherKnown} />
+          </section>
+        )}
         {plan ? (
           <RacePlanCard plan={plan} units={me.units} />
         ) : (

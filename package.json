@@ -44,6 +44,7 @@
     "test:predict": "node lib/predict/predict.test.ts",
     "test:course": "node lib/course/course.test.ts",
     "test:swim-insights": "node lib/swim/insights.test.ts",
+    "test:pack": "node lib/pack/pack.test.ts",
     "test:story": "node lib/story.test.ts",
     "test:layout": "node lib/layout-prefs.test.ts",
     "test:appearance": "node lib/appearance.test.ts",

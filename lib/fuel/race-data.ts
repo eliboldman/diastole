@@ -14,11 +14,12 @@ export type RaceRow = {
   priority: "A" | "B" | "C";
   notes: string | null;
   checklist: Record<string, boolean>;
+  pack?: unknown; // packing list state (lib/pack)
 };
 export type SweatRow = { id: string; tested_on: string; sweat_rate_ml_h: number; minutes: number; temp_c: number | null; sport: string | null };
 export type GutRow = { id: string; on_date: string; carbs_g_per_h: number; minutes: number | null; comfort: number; products: string | null; note: string | null };
 
-const RACE_COLS = "id, athlete_id, name, race_date, sport, distance_km, goal_seconds, priority, notes, checklist";
+const RACE_COLS = "id, athlete_id, name, race_date, sport, distance_km, goal_seconds, priority, notes, checklist, pack";
 
 /** An athlete's races (row-level security: themself or their coach), soonest first. */
 export async function getRaces(athleteId: string, opts: { from?: string; limit?: number } = {}): Promise<RaceRow[]> {

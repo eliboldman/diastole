@@ -2,6 +2,7 @@ import "server-only";
 
 import { cleanCloset, packFor, shoeWear, type PackItem } from "@/lib/closet";
 import { raceDayPack } from "@/lib/race-pack";
+import { cleanPackState, timeline } from "@/lib/pack/pack";
 import { getShoeMileage } from "@/lib/shoes";
 import { createAdminClient } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
@@ -35,7 +36,7 @@ export async function runEvening() {
         .is("deleted_at", null)
         .neq("status", "draft"),
       admin.from("athlete_gear").select("gear").eq("athlete_id", p.id).maybeSingle(),
-      admin.from("races").select("id, name, sport").eq("athlete_id", p.id).eq("race_date", tomorrow),
+      admin.from("races").select("id, name, sport, race_date, pack, priority").eq("athlete_id", p.id).gt("race_date", dayIn(tz, 0)).lte("race_date", dayIn(tz, 7)),
       place ? getForecast(place, tz) : Promise.resolve(null),
     ]);
     const weather = forecast?.find((d) => d.date === tomorrow) ?? null;
@@ -57,7 +58,18 @@ export async function runEvening() {
     }
 
     // Race tomorrow: the race-day bag, with the weather.
+    // Packing timeline: tonight's step for races 2–7 days out (the night before has its own message).
+    const today = dayIn(tz, 0);
     for (const r of races ?? []) {
+      if (r.race_date === tomorrow || r.priority === "C") continue;
+      const daysOut = Math.round((Date.parse(`${r.race_date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000);
+      const step = timeline(r.sport, cleanPackState(r.pack).travel).find((t) => t.daysOut === daysOut);
+      if (!step) continue;
+      await admin.rpc("server_notify", { p_user: p.id, p_kind: "workout_pack", p_title: `${r.name}: ${step.title.toLowerCase()}`, p_body: step.body, p_href: `/races/${r.id}#packing`, p_key: `pack_timeline:${r.id}:${daysOut}` });
+      packs++;
+    }
+
+    for (const r of (races ?? []).filter((x) => x.race_date === tomorrow)) {
       const items = raceDayPack(r.sport, closet, mileage, weather, units, r.name);
       await admin.rpc("server_notify", { p_user: p.id, p_kind: "workout_pack", p_title: `Race tomorrow: ${r.name} 🏁`, p_body: `${list(items)}. Early night!`, p_href: `/races/${r.id}`, p_key: `race_eve:${r.id}` });
       packs++;

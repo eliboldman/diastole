@@ -1191,6 +1191,16 @@ check("members read it", r.rows?.[0]?.body === "Day one!");
 r = await as(A1, `insert into public.camp_messages (camp_id, date, body) values ('${CAMP}', '2026-11-17', 'hi')`);
 check("athletes can't post camp messages", !!r.error);
 
+// ---------------------------------------------------------------- packing master list
+r = await as(COACH, `insert into public.coach_pack_lists (coach_id, items) values ('${COACH}', '[{"label":"Spare cleats","bag":"t1"}]')`);
+check("coach saves a packing master list", !r.error);
+r = await as(A1, "select items from public.coach_pack_lists");
+check("athletes don't read it directly", r.rows?.length === 0);
+r = await as(A1, `insert into public.coach_pack_lists (coach_id, items) values ('${A1}', '[]')`);
+check("an athlete can only write their own row", !r.error);
+r = await as(A1, `update public.coach_pack_lists set items = '[]' where coach_id = '${COACH}' returning coach_id`);
+check("and never the coach's", (r.rows?.length ?? 0) === 0);
+
 // ---------------------------------------------------------------- linked activity marks the workout done
 const wid = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, sent_at) values ('${A1}', '${COACH}', '2026-11-10', 'swim', 'Swim CSS', 'sent', now(), now()) returning id`)).rows[0].id;
 const aid = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'done-test-1', 'lap_swimming', now(), 1200) returning id`)).rows[0].id;

@@ -952,3 +952,14 @@ body {
     linear-gradient(180deg, #070b1a 0%, transparent 55%);
   background-size: 360px 360px, 420px 420px, 380px 380px, 460px 460px, 400px 400px, 340px 340px, 300px 300px, 500px 500px, 440px 440px, auto, auto;
 }
+
+/* Printing (packing lists, pacing plans): plain black on white, no app chrome. */
+@media print {
+  .app-canvas { background: #fff !important; color: #000 !important; }
+  .app-canvas *, .app-canvas *::before { color: #000 !important; border-color: #bbb !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+  aside, nav, .fixed, [aria-hidden="true"].fixed { display: none !important; }
+  .app-canvas [data-print-hide] { display: none !important; }
+}
+@media print {
+  body[data-printing="pack"] section:not(#packing):not(#packing section) { display: none !important; }
+}

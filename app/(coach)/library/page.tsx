@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import ConnectImport from "@/components/coach/ConnectImport";
 import Library from "@/components/coach/Library";
 import PlanCards from "@/components/plans/PlanCards";
+import MasterList from "@/components/pack/MasterList";
+import { cleanMaster } from "@/lib/pack/pack";
 import Spotlight from "@/components/Spotlight";
 import { seen, TIPS } from "@/lib/discovery";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -41,6 +43,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       </p>
       <Spotlight tip={TIPS.plans} seen={seen(prof?.seen_tips, TIPS.plans.id)} />
       <PlanCards plans={planCards} />
+      <MasterList initial={cleanMaster((await supabase.from("coach_pack_lists").select("items").eq("coach_id", coach.id).maybeSingle()).data?.items)} />
       <ConnectImport athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.id === coach.id ? `${a.full_name || "You"} (you)` : a.full_name || a.email || "Athlete" }))} />
       <Library
         items={(items ?? []).map((i) => ({ ...i, steps: i.steps as Step[] }))}
