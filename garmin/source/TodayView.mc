@@ -105,7 +105,7 @@ class TodayView extends WatchUi.View {
         dc.setColor(Ui.readinessColor(flag), Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(6);
         dc.drawArc(w / 2, h / 2, w / 2 - 4, Graphics.ARC_COUNTER_CLOCKWISE, 200, 340);
-        dc.drawText(w / 2, h * 0.12, Graphics.FONT_XTINY, Ui.readinessText(flag).toUpper(), Graphics.TEXT_JUSTIFY_CENTER);
+        Ui.drawWrapped(dc, (h * 0.12).toNumber(), Ui.readinessText(flag).toUpper(), Graphics.FONT_XTINY, Ui.readinessColor(flag), 1);
         var y = (h * 0.26).toNumber();
         if (ws.size() == 0) {
             Ui.drawWrapped(dc, y + 20, "Nothing planned today", Graphics.FONT_SMALL, Graphics.COLOR_WHITE, 2);
@@ -127,12 +127,10 @@ class TodayView extends WatchUi.View {
     }
 
     hidden function drawSteps(dc as Graphics.Dc, wk as Dictionary) as Void {
-        var w = dc.getWidth();
         var h = dc.getHeight();
-        dc.setColor(Ui.GREEN, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 0.1, Graphics.FONT_XTINY, (wk["t"] as String).toUpper(), Graphics.TEXT_JUSTIFY_CENTER);
+        var y = Ui.drawWrapped(dc, (h * 0.1).toNumber(), (wk["t"] as String).toUpper(), Graphics.FONT_XTINY, Ui.GREEN, 2) + 4;
+        if (y < h * 0.22) { y = (h * 0.22).toNumber(); }
         var lines = wk["l"];
-        var y = (h * 0.22).toNumber();
         var f = wk["f"];
         if (f instanceof Dictionary && f["first"] instanceof Number && f["every"] instanceof Number) {
             var fuel = "Fuel: " + (f["n"] as String) + " at " + ((f["first"] as Number) / 60).toString() + " min, then every " + ((f["every"] as Number) / 60).toString();

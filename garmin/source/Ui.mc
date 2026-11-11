@@ -1,5 +1,7 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
+import Toybox.System;
 import Toybox.WatchUi;
 
 // Shared drawing helpers: Diastole colors and word-wrapped text that fits round screens.
@@ -33,24 +35,6 @@ module Ui {
         return s;
     }
 
-    // Splits text into lines no wider than `width` pixels.
-    function wrap(dc as Graphics.Dc, text as String, font as Graphics.FontType, width as Number) as Array<String> {
-        var lines = [] as Array<String>;
-        var words = split(text, " ");
-        var line = "";
-        for (var i = 0; i < words.size(); i++) {
-            var next = line.length() == 0 ? words[i] : line + " " + words[i];
-            if (dc.getTextWidthInPixels(next, font) <= width || line.length() == 0) {
-                line = next;
-            } else {
-                lines.add(line);
-                line = words[i];
-            }
-        }
-        if (line.length() > 0) { lines.add(line); }
-        return lines;
-    }
-
     function split(s as String, sep as String) as Array<String> {
         var out = [] as Array<String>;
         var rest = s;
@@ -64,16 +48,55 @@ module Ui {
         return out;
     }
 
-    // Draws wrapped lines centered from y; returns the y after the last line.
-    function drawWrapped(dc as Graphics.Dc, y as Number, text as String, font as Graphics.FontType, color as Number, maxLines as Number) as Number {
+    // Usable text width for a line spanning y..y+lineH. Round screens are narrower near the top
+    // and bottom, so this follows the circle (minus a margin for the bezel and page dots).
+    function widthAt(dc as Graphics.Dc, y as Number, lineH as Number) as Number {
         var w = dc.getWidth();
-        var lines = wrap(dc, text, font, (w * 0.8).toNumber());
+        if (System.getDeviceSettings().screenShape != System.SCREEN_SHAPE_ROUND) {
+            return (w * 0.9).toNumber();
+        }
+        var r = w / 2.0;
+        var cy = dc.getHeight() / 2.0;
+        var d = (y - cy).abs();
+        var d2 = (y + lineH - cy).abs();
+        if (d2 > d) { d = d2; }
+        if (y < cy && y + lineH > cy) { d = 0; }
+        if (d >= r) { return 0; }
+        var chord = 2 * Math.sqrt(r * r - d * d) - 28;
+        var cap = w * 0.86;
+        return (chord < cap ? chord : cap).toNumber();
+    }
+
+    // Cuts s down until s + "…" fits in width.
+    function ellipsize(dc as Graphics.Dc, s as String, font as Graphics.FontType, width as Number) as String {
+        var t = s;
+        while (t.length() > 0 && dc.getTextWidthInPixels(t + "…", font) > width) {
+            t = t.substring(0, t.length() - 1) as String;
+        }
+        return t + "…";
+    }
+
+    // Draws text centered from y, word-wrapped to the screen's width at each line; returns the y
+    // after the last line. Text that doesn't fit in maxLines ends with "…".
+    function drawWrapped(dc as Graphics.Dc, y as Number, text as String, font as Graphics.FontType, color as Number, maxLines as Number) as Number {
+        var cx = dc.getWidth() / 2;
         var h = dc.getFontHeight(font);
+        var words = split(text, " ");
+        var i = 0;
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        for (var i = 0; i < lines.size() && i < maxLines; i++) {
-            var s = lines[i];
-            if (i == maxLines - 1 && lines.size() > maxLines) { s = s + "…"; }
-            dc.drawText(w / 2, y, font, s, Graphics.TEXT_JUSTIFY_CENTER);
+        for (var n = 0; n < maxLines && i < words.size(); n++) {
+            var width = widthAt(dc, y, h);
+            var line = words[i];
+            i++;
+            while (i < words.size() && dc.getTextWidthInPixels(line + " " + words[i], font) <= width) {
+                line = line + " " + words[i];
+                i++;
+            }
+            var last = n == maxLines - 1;
+            if ((last && i < words.size()) || dc.getTextWidthInPixels(line, font) > width) {
+                line = ellipsize(dc, line, font, width);
+            }
+            dc.drawText(cx, y, font, line, Graphics.TEXT_JUSTIFY_CENTER);
             y += h;
         }
         return y;

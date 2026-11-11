@@ -18,6 +18,13 @@ module FieldApi {
         return t instanceof String ? t : null;
     }
 
+    // The pairing code being shown, if it hasn't expired.
+    function livePair() as Dictionary? {
+        var p = Application.Storage.getValue(PAIR_KEY);
+        if (p instanceof Dictionary && p["code"] instanceof String && p["exp"] instanceof Number && (p["exp"] as Number) > Time.now().value()) { return p; }
+        return null;
+    }
+
     function localDay() as String {
         var d = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         return d.year.format("%04d") + "-" + (d.month as Number).format("%02d") + "-" + d.day.format("%02d");

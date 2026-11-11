@@ -35,7 +35,11 @@ export default function DevicePairForm({ initialCode = "" }: { initialCode?: str
       </div>
       {state && (
         <p role="status" className={`mt-3 text-sm ${state.ok ? "text-emerald-200" : "text-red-200"}`}>
-          {state.ok ? `${NAMES[state.kind] ?? "Your device"} will sign in within a few seconds.` : state.error}
+          {state.ok
+            ? state.kind === "garmin_field"
+              ? "Linked. The fuel field checks in every 5 minutes, so it can take up to 5 minutes to show your plan."
+              : `${NAMES[state.kind] ?? "Your device"} will sign in within a few seconds.`
+            : state.error}
         </p>
       )}
     </form>

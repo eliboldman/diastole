@@ -27,7 +27,13 @@ class FieldApp extends Application.AppBase {
     }
 
     // Every 5 minutes while pairing (the code lasts 10) or until today's plan arrives, then hourly.
+    // Signed out with no live code: ask for one right away (Garmin still holds it to 5 minutes
+    // after the last background run) instead of waiting a full period.
     function schedule() as Void {
+        if (FieldApi.token() == null && FieldApi.livePair() == null) {
+            Background.registerForTemporalEvent(Time.now());
+            return;
+        }
         var every = FieldApi.token() == null || FieldApi.today() == null ? 5 * 60 : 60 * 60;
         var current = Background.getTemporalEventRegisteredTime();
         if (current == null || !(current instanceof Time.Duration) || (current as Time.Duration).value() != every) {
@@ -36,11 +42,15 @@ class FieldApp extends Application.AppBase {
     }
 
     function onBackgroundData(data as Application.PersistableType) as Void {
-        if (!(data instanceof Dictionary)) { return; }
+        if (!(data instanceof Dictionary)) {
+            schedule(); // a failed run (no phone) must still leave the next one booked
+            return;
+        }
         if (data.hasKey("pair")) {
             var p = data["pair"];
             if (p == null) { Application.Storage.deleteValue(FieldApi.PAIR_KEY); }
             else { Application.Storage.setValue(FieldApi.PAIR_KEY, p as Application.PropertyValueType); }
+            schedule();
         }
         if (data["token"] instanceof String) {
             Application.Storage.setValue(FieldApi.TOKEN_KEY, data["token"] as String);

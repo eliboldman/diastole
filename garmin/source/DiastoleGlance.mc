@@ -37,6 +37,10 @@ class DiastoleGlance extends WatchUi.GlanceView {
         dc.fillCircle(6, h / 4, 4);
         dc.drawText(16, h / 4, Graphics.FONT_GLANCE, top, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        // One line only in a glance: shorten long workout names instead of running off the edge.
+        if (dc.getTextWidthInPixels(line, Graphics.FONT_GLANCE) > dc.getWidth()) {
+            line = Ui.ellipsize(dc, line, Graphics.FONT_GLANCE, dc.getWidth());
+        }
         dc.drawText(0, (h * 3) / 4, Graphics.FONT_GLANCE, line, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }

@@ -82,10 +82,9 @@ class CheckinView extends WatchUi.View {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var title = step == 0 ? "HOW DID IT FEEL?" : (step == 1 ? "HOW HARD? (RPE)" : "DID THE FUEL GO IN?");
-        dc.setColor(Ui.GREEN, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 0.12, Graphics.FONT_XTINY, title, Graphics.TEXT_JUSTIFY_CENTER);
+        var ty = Ui.drawWrapped(dc, (h * 0.1).toNumber(), title, Graphics.FONT_XTINY, Ui.GREEN, 2);
         if (step == 0) {
-            Ui.drawWrapped(dc, (h * 0.22).toNumber(), ck["t"] as String, Graphics.FONT_XTINY, Ui.DIM, 1);
+            Ui.drawWrapped(dc, ty > h * 0.22 ? ty : (h * 0.22).toNumber(), ck["t"] as String, Graphics.FONT_XTINY, Ui.DIM, 1);
         }
 
         var big = step == 0 ? FEEL[feel - 1] : (step == 1 ? rpe.toString() : FUEL[fuel]);
