@@ -103,8 +103,12 @@ class TodayView extends WatchUi.View {
         var r = t["r"];
         var flag = r instanceof Dictionary ? r["o"] as String? : null;
         dc.setColor(Ui.readinessColor(flag), Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(6);
-        dc.drawArc(w / 2, h / 2, w / 2 - 4, Graphics.ARC_COUNTER_CLOCKWISE, 200, 340);
+        if (Ui.isRound()) {
+            dc.setPenWidth(6);
+            dc.drawArc(w / 2, h / 2, w / 2 - 4, Graphics.ARC_COUNTER_CLOCKWISE, 200, 340);
+        } else {
+            dc.fillRoundedRectangle(w * 0.3, h * 0.06, w * 0.4, 6, 3); // rectangular screens (Edge): a bar, not a ring
+        }
         Ui.drawWrapped(dc, (h * 0.12).toNumber(), Ui.readinessText(flag).toUpper(), Graphics.FONT_XTINY, Ui.readinessColor(flag), 1);
         var y = (h * 0.26).toNumber();
         if (ws.size() == 0) {

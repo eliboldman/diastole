@@ -48,11 +48,15 @@ module Ui {
         return out;
     }
 
+    function isRound() as Boolean {
+        return System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND;
+    }
+
     // Usable text width for a line spanning y..y+lineH. Round screens are narrower near the top
     // and bottom, so this follows the circle (minus a margin for the bezel and page dots).
     function widthAt(dc as Graphics.Dc, y as Number, lineH as Number) as Number {
         var w = dc.getWidth();
-        if (System.getDeviceSettings().screenShape != System.SCREEN_SHAPE_ROUND) {
+        if (!isRound()) {
             return (w * 0.9).toNumber();
         }
         var r = w / 2.0;

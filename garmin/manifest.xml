@@ -4,6 +4,7 @@
 <iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
     <iq:application id="cc4ab2e667f44c54a100fb66e43693d1" type="widget" name="@Strings.AppName" entry="DiastoleApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.3.0">
         <iq:products>
+            <iq:product id="edge1030plus"/>
             <iq:product id="fr965"/>
             <iq:product id="fr955"/>
             <iq:product id="fr265"/>

@@ -266,7 +266,7 @@ class FuelField extends WatchUi.DataField {
         // Big value in the space between, shrinking the font until it fits.
         var fonts = big.find(":") != null
             ? [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD, Graphics.FONT_MEDIUM, Graphics.FONT_SMALL] // number fonts only have digits and ":"
-            : [Graphics.FONT_MEDIUM, Graphics.FONT_SMALL, Graphics.FONT_TINY, Graphics.FONT_XTINY];
+            : [Graphics.FONT_LARGE, Graphics.FONT_MEDIUM, Graphics.FONT_SMALL, Graphics.FONT_TINY, Graphics.FONT_XTINY];
         var cy = (topFree + bottomFree) / 2;
         var bigFont = fonts[fonts.size() - 1];
         for (var i = 0; i < fonts.size(); i++) {
