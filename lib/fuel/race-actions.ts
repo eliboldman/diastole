@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { sweatRate, type RaceSport } from "@/lib/fuel/race";
+import { parseGoalTime, sweatRate, type RaceSport } from "@/lib/fuel/race";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
@@ -14,16 +14,6 @@ function refresh(athleteId?: string) {
   revalidatePath("/races");
   revalidatePath("/me");
   if (athleteId) revalidatePath(`/athlete/${athleteId}`);
-}
-
-/** "1:45:00", "45:00" or "45" (minutes) -> seconds. */
-function parseGoal(text: string): number | null {
-  const t = text.trim();
-  if (!t) return null;
-  const parts = t.split(":").map((p) => Number(p));
-  if (parts.some((p) => !Number.isFinite(p) || p < 0)) return null;
-  const s = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 60;
-  return s >= 60 && s <= 172_800 ? Math.round(s) : null;
 }
 
 /** Add or edit a race. For the athlete themself, or (row-level security) a coach's athlete. */
@@ -48,8 +38,8 @@ export async function saveRace(input: {
   const dist = Number(input.distance);
   const distance_km = input.distance.trim() && Number.isFinite(dist) && dist > 0 ? Math.round(dist * (input.unit === "mi" ? 1.609344 : 1) * 100) / 100 : null;
   if (distance_km != null && distance_km > 1000) return { ok: false, error: "That distance looks too long." };
-  const goal_seconds = parseGoal(input.goal);
-  if (input.goal.trim() && goal_seconds == null) return { ok: false, error: "Goal time like 1:45:00 or 45:00." };
+  const goal_seconds = parseGoalTime(input.goal, { sport: sport as RaceSport, distance_km });
+  if (input.goal.trim() && goal_seconds == null) return { ok: false, error: "Goal time like 4:30:00 (h:mm:ss) or 45:00." };
   const row = {
     athlete_id: athleteId,
     name,

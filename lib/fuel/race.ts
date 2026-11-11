@@ -28,6 +28,35 @@ export function raceMinutes(r: Pick<Race, "sport" | "distance_km" | "goal_second
   }
 }
 
+/**
+ * A typed goal time -> seconds. "1:45:00" is h:mm:ss and "45" is minutes. Two parts ("3:55") are
+ * ambiguous: h:mm for a 70.3, m:ss for a 5K. Pick whichever is closer to a typical time for the
+ * race's sport and distance; with no distance, single-digit hours read as h:mm.
+ */
+export function parseGoalTime(text: string, race?: Pick<Race, "sport" | "distance_km">): number | null {
+  const t = text.trim();
+  if (!t) return null;
+  const parts = t.split(":").map((p) => (p === "" ? NaN : Number(p)));
+  if (parts.length > 3 || parts.some((p) => !Number.isFinite(p) || p < 0)) return null;
+  let s: number;
+  if (parts.length === 3) s = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 1) s = parts[0] * 60;
+  else {
+    const [a, b] = parts;
+    if (b >= 60) return null;
+    const asMinSec = a * 60 + b;
+    const asHourMin = a * 3600 + b * 60;
+    const typical = race ? raceMinutes({ sport: race.sport, distance_km: race.distance_km, goal_seconds: null }) : null;
+    if (typical) {
+      const off = (x: number) => Math.abs(Math.log(x / (typical * 60)));
+      s = asHourMin <= 172_800 && off(asHourMin) < off(asMinSec) ? asHourMin : asMinSec;
+    } else {
+      s = a <= 9 ? asHourMin : asMinSec;
+    }
+  }
+  return s >= 60 && s <= 172_800 ? Math.round(s) : null;
+}
+
 /** Days from today to race day in the athlete's calendar (0 = race day, negative = past). */
 export function daysUntil(raceDate: string, today: string): number {
   return Math.round((Date.parse(`${raceDate}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY);

@@ -1,7 +1,7 @@
 // Run with: node lib/fuel/race.test.ts
 import assert from "node:assert/strict";
 
-import { daysUntil, gutMax, raceMinutes, racePlan, raceWeekChecklist, sweatRate } from "./race.ts";
+import { daysUntil, gutMax, parseGoalTime, raceMinutes, racePlan, raceWeekChecklist, sweatRate } from "./race.ts";
 
 // Durations
 assert.equal(raceMinutes({ sport: "run", distance_km: 21.1, goal_seconds: 5400 }), 90); // goal wins
@@ -55,5 +55,24 @@ assert.equal(raceWeekChecklist(2, half).title, "Carb load");
 assert.ok(raceWeekChecklist(2, half).items[0].label.includes("480–600 g"));
 assert.equal(raceWeekChecklist(1, half).title, "Tomorrow's the day");
 assert.equal(raceWeekChecklist(0, half).title, "Race morning");
+
+// Goal times: "3:55" is h:mm for a 70.3, m:ss is right for a 5K.
+const tri703 = { sport: "tri" as const, distance_km: 113.1 };
+assert.equal(parseGoalTime("3:55", tri703), 3 * 3600 + 55 * 60, "70.3 goal 3:55 is hours");
+assert.equal(parseGoalTime("5:30", { sport: "tri", distance_km: 113 }), 5.5 * 3600);
+assert.equal(parseGoalTime("21:30", { sport: "run", distance_km: 5 }), 21 * 60 + 30, "5K 21:30 is minutes");
+assert.equal(parseGoalTime("45:00", { sport: "run", distance_km: 10 }), 45 * 60);
+assert.equal(parseGoalTime("1:45", { sport: "run", distance_km: 21.1 }), 105 * 60, "half 1:45 is hours");
+assert.equal(parseGoalTime("1:45:00", { sport: "run", distance_km: 21.1 }), 105 * 60);
+assert.equal(parseGoalTime("3:30", { sport: "run", distance_km: 42.2 }), 210 * 60);
+assert.equal(parseGoalTime("2:30", { sport: "bike", distance_km: 80 }), 150 * 60);
+assert.equal(parseGoalTime("25:00", { sport: "swim", distance_km: 1.5 }), 25 * 60);
+assert.equal(parseGoalTime("3:55"), 3 * 3600 + 55 * 60, "no distance: single-digit hours");
+assert.equal(parseGoalTime("25:00"), 25 * 60, "no distance: two digits are minutes");
+assert.equal(parseGoalTime("90"), 90 * 60, "bare number is minutes");
+assert.equal(parseGoalTime("3:75", tri703), null, "seconds/minutes over 59");
+assert.equal(parseGoalTime("::", tri703), null);
+assert.equal(parseGoalTime("", tri703), null);
+assert.equal(raceMinutes({ sport: "tri", distance_km: 113, goal_seconds: parseGoalTime("3:55", tri703) }), 235);
 
 console.log("race: all passed");

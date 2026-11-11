@@ -78,7 +78,7 @@ export default function RaceForm({ athleteId, units, initial, onDone }: { athlet
         <input inputMode="decimal" value={f.distance} onChange={(e) => setF({ ...f, distance: e.target.value.replace(/[^0-9.]/g, "").slice(0, 7) })} placeholder={units === "mi" ? "13.1" : "21.1"} className={`${field} mt-1`} />
       </label>
       <label>
-        <span className="text-sm text-white/60">Goal time (optional)</span>
+        <span className="text-sm text-white/60">Goal time, h:mm:ss (optional)</span>
         <input value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value.replace(/[^0-9:]/g, "").slice(0, 8) })} placeholder="1:45:00" className={`${field} mt-1`} />
       </label>
       <fieldset className="sm:col-span-2">
