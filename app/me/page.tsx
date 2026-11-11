@@ -18,6 +18,8 @@ import Streaks from "@/components/Streaks";
 import Welcome from "@/components/Welcome";
 import FuelToday from "@/components/fuel/FuelToday";
 import RaceWeek from "@/components/race/RaceWeek";
+import CampCard from "@/components/camp/CampCard";
+import { getMyCamps } from "@/lib/camp/data";
 import AthleteShell from "@/components/AthleteShell";
 import LayoutCustomizer from "@/components/LayoutCustomizer";
 import { FlagBadge } from "@/components/coach/Flags";
@@ -82,6 +84,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     race: (
       <>
       <RaceWeek athleteId={me.id} today={today} units={me.units === "km" ? "km" : "mi"} />
+      {(await getMyCamps(supabase, me.id, today)).map((c) => (
+        <div key={c.camp.id} className="mt-6">
+          <CampCard camp={c.camp} status={c.status} board={c.board} todays={c.today} today={today} />
+        </div>
+      ))}
       </>
     ),
     bedtime: (

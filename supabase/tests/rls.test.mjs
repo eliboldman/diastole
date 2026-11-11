@@ -1155,6 +1155,42 @@ check("athlete can't change them", !!r.error || (r.rows?.length ?? 0) === 0);
 r = await as(A2, "select focus from public.swim_coaching");
 check("other athletes can't see them", r.rows?.length === 0);
 
+// ---------------------------------------------------------------- training camps
+await db.exec(`update public.pod_members set status = 'active' where pod_id = '${POD}' and athlete_id in ('${A1}', '${A2}')`);
+const TPL = (await db.query(`insert into public.plan_templates (coach_id, name, weeks) values ('${COACH}', 'Camp block', 2) returning id`)).rows[0].id;
+r = await as(COACH, `insert into public.pod_camps (pod_id, template_id, title, starts_on, ends_on, goal_value) values ('${POD}', '${TPL}', 'Winter camp', '2026-11-16', '2026-11-29', 20) returning id`);
+const CAMP = r.rows?.[0]?.id;
+check("coach creates a camp in their pod", Boolean(CAMP));
+r = await as(A1, `insert into public.pod_camps (pod_id, title, starts_on, ends_on, goal_value, coach_id) values ('${POD}', 'Mine', '2026-11-16', '2026-11-29', 5, '${A1}')`);
+check("athletes can't create camps", !!r.error);
+r = await as(COACH, `insert into public.pod_camps (pod_id, title, starts_on, ends_on, goal_value) values ('${POD}', 'Too long', '2026-11-16', '2026-12-31', 5)`);
+check("camps run at most four weeks", !!r.error);
+r = await as(A1, "select title from public.pod_camps");
+check("pod members see the camp", r.rows?.length === 1);
+r = await as(STRANGER, "select title from public.pod_camps");
+check("others don't", r.rows?.length === 0);
+r = await as(A1, `insert into public.camp_members (camp_id, athlete_id, status) values ('${CAMP}', '${A1}', 'joined')`);
+check("joining goes through the server", !!r.error);
+const APP = (await db.query(`insert into public.plan_applications (template_id, template_version, coach_id, athlete_id, start_date) values ('${TPL}', 1, '${COACH}', '${A1}', '2026-11-16') returning id`)).rows[0].id;
+await db.query(`insert into public.camp_members (camp_id, athlete_id, status, application_id) values ('${CAMP}', '${A1}', 'joined', '${APP}')`);
+await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, plan_application_id) values ('${A1}', '${COACH}', '2026-11-16', 'run', 'Camp run', 'completed', now(), '${APP}'), ('${A1}', '${COACH}', '2026-11-17', 'bike', 'Camp ride', 'approved', now(), '${APP}')`);
+r = await as(A2, `select public.get_camp_board('${CAMP}') as b`);
+const board = r.rows?.[0]?.b;
+check("pod members see camp ticks", board?.members?.length === 1 && board.members[0].days["2026-11-16"].done === 1 && board.members[0].days["2026-11-17"].done === 0);
+check("the team total counts done camp sessions", Number(board?.total) === 1);
+check("ticks show first names only", board?.members?.[0]?.name && !board.members[0].name.includes(" "));
+r = await as(STRANGER, `select public.get_camp_board('${CAMP}') as b`);
+check("outsiders get nothing", r.rows?.[0]?.b === null);
+await db.query(`update public.camp_members set status = 'left' where camp_id = '${CAMP}' and athlete_id = '${A1}'`);
+r = await as(A2, `select public.get_camp_board('${CAMP}') as b`);
+check("stepping out keeps what you did", Number(r.rows?.[0]?.b?.total) === 1 && r.rows[0].b.members[0].in === false);
+r = await as(COACH, `insert into public.camp_messages (camp_id, date, body) values ('${CAMP}', '2026-11-16', 'Day one!')`);
+check("coach posts a camp message", !r.error);
+r = await as(A1, "select body from public.camp_messages");
+check("members read it", r.rows?.[0]?.body === "Day one!");
+r = await as(A1, `insert into public.camp_messages (camp_id, date, body) values ('${CAMP}', '2026-11-17', 'hi')`);
+check("athletes can't post camp messages", !!r.error);
+
 // ---------------------------------------------------------------- linked activity marks the workout done
 const wid = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, sent_at) values ('${A1}', '${COACH}', '2026-11-10', 'swim', 'Swim CSS', 'sent', now(), now()) returning id`)).rows[0].id;
 const aid = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'done-test-1', 'lap_swimming', now(), 1200) returning id`)).rows[0].id;

@@ -9,6 +9,9 @@ import PodTabs, { type PodView } from "@/components/PodTabs";
 import { FEED_PAGE, type FeedItem } from "@/lib/pod-feed-types";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import BackLink from "@/components/layout/BackLink";
+import CampCreator from "@/components/camp/CampCreator";
+import CampList from "@/components/camp/CampList";
+import { getPodCamps } from "@/lib/camp/data";
 
 export default async function CoachPodFeedPage({
   params,
@@ -31,6 +34,9 @@ export default async function CoachPodFeedPage({
   ]);
   if (!data) notFound();
   const feed = data as PodFeedData;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone });
+  const [camps, { data: templates }] =
+    view === "challenges" ? await Promise.all([getPodCamps(supabase, id, coach.id, today), supabase.from("plan_templates").select("id, name, weeks").lte("weeks", 4).order("name")]) : [[], { data: [] }];
   // Avatars the viewer may see (row-level security leaves out anyone else).
   const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) });
 
@@ -44,7 +50,20 @@ export default async function CoachPodFeedPage({
       </div>
       <div className="mt-6">
         {view === "challenges" ? (
-          <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin={false} isCoach today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} units={coach.units} />
+          <>
+            <section className="mb-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+              <h2 className="text-lg font-medium">Training camps</h2>
+              <p className="mb-4 mt-1 text-sm text-white/55">A shared block of training for the pod, scaled to each athlete, with a team goal and your daily message.</p>
+              <CampList camps={camps} base={`/pods/${id}`} today={today} />
+              <details className={camps.length ? "mt-4" : ""} open={!camps.length}>
+                <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-emerald-200">Start a camp</summary>
+                <div className="mt-3">
+                  <CampCreator podId={id} templates={(templates ?? []) as { id: string; name: string; weeks: number }[]} today={today} />
+                </div>
+              </details>
+            </section>
+            <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin={false} isCoach today={today} units={coach.units} />
+          </>
         ) : view === "feed" ? (
           <>
             <RecentDiscoveries podId={id} />

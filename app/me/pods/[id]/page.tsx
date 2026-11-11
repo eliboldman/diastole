@@ -12,6 +12,8 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import RememberPod from "@/components/RememberPod";
+import CampList from "@/components/camp/CampList";
+import { getPodCamps } from "@/lib/camp/data";
 
 export default async function AthletePodPage({
   params,
@@ -35,6 +37,8 @@ export default async function AthletePodPage({
   ]);
   if (!data) notFound();
   const feed = data as PodFeedData;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  const camps = view === "challenges" ? await getPodCamps(supabase, id, me.id, today) : [];
   // Avatars the viewer may see (row-level security leaves out anyone else).
   const [{ data: avatars }, { data: mine }] = await Promise.all([
     supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) }),
@@ -56,7 +60,15 @@ export default async function AthletePodPage({
       </div>
       <div className="mt-6">
         {view === "challenges" ? (
-          <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={me.id} canJoin isCoach={false} today={new Date().toLocaleDateString("en-CA", { timeZone: me.timezone })} units={me.units} />
+          <>
+            {camps.length > 0 && (
+              <section className="mb-6">
+                <h2 className="mb-3 text-lg font-medium">Training camps</h2>
+                <CampList camps={camps} base={`/me/pods/${id}`} today={today} />
+              </section>
+            )}
+            <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={me.id} canJoin isCoach={false} today={today} units={me.units} />
+          </>
         ) : view === "feed" ? (
           <>
             <RecentDiscoveries podId={id} />

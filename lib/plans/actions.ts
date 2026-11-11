@@ -5,40 +5,22 @@ import { revalidatePath } from "next/cache";
 import { deliver } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { resendWorkoutToGarmin } from "@/lib/garmin/training";
 import { createClient, requireCoach } from "@/lib/supabase/server";
-import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { validateSteps, type Brick, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 import { validateStrength, type StrengthItem } from "@/lib/strength/workout";
 import { retireWorkout } from "@/lib/workouts/retire";
 
-import { addDays, applyTo, startMonday, toTemplate, updatesFor, type AppliedRow, type Change, type PlannedItem, type TemplateWorkout } from "./template";
+import { addDays, toTemplate, updatesFor, type AppliedRow, type Change } from "./template";
+import { draftRow, planFor, poolOf } from "./plan-for";
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
-const poolOf = (l: unknown, u: unknown): Pool => (l && u ? { length: Number(l), unit: u as PoolUnit } : null);
 const cleanTags = (tags: unknown) =>
   [...new Set((Array.isArray(tags) ? tags : []).map((t) => String(t).toLowerCase().replace(/[^a-z0-9.+ -]/g, "").trim().slice(0, 24)).filter(Boolean))].slice(0, 12);
 
-const TW_COLS = "id, template_id, week, day, position, title, sport, description, why, steps, brick, pool_length, pool_unit, strength, updated_at";
-function rowToTw(r: Record<string, unknown>): TemplateWorkout {
-  return {
-    id: r.id as string,
-    week: r.week as number,
-    day: r.day as number,
-    position: r.position as number,
-    title: r.title as string,
-    sport: r.sport as TemplateWorkout["sport"],
-    description: (r.description as string | null) ?? null,
-    why: (r.why as string | null) ?? null,
-    steps: (r.steps ?? []) as Step[],
-    brick: (r.brick ?? null) as Brick,
-    pool: poolOf(r.pool_length, r.pool_unit),
-    strength: (r.strength ?? null) as StrengthItem[] | null,
-    updated_at: r.updated_at as string,
-  };
-}
 
 async function bump(supabase: Supa, templateId: string) {
   const { data } = await supabase.from("plan_templates").select("version").eq("id", templateId).maybeSingle();
@@ -259,28 +241,6 @@ export async function deleteTemplate(id: string): Promise<Result> {
 export type PreviewItem = { title: string; sport: string; date: string; week: number; movedFrom: string | null; missing: string[]; past: boolean };
 export type Preview = { athleteId: string; name: string; start: string; end: string; items: PreviewItem[]; missing: string[]; moved: number; past: number };
 
-async function loadTemplate(supabase: Supa, id: string) {
-  const [{ data: t }, { data: rows }] = await Promise.all([
-    supabase.from("plan_templates").select("id, name, weeks, race_week, version").eq("id", id).maybeSingle(),
-    supabase.from("plan_template_workouts").select(TW_COLS).eq("template_id", id).order("week").order("day").order("position"),
-  ]);
-  return t ? { t, workouts: (rows ?? []).map(rowToTw) } : null;
-}
-
-async function planFor(supabase: Supa, templateId: string, athleteId: string, dates: { raceDate?: string | null; startDate?: string | null }) {
-  const loaded = await loadTemplate(supabase, templateId);
-  if (!loaded) return null;
-  const [{ data: zones }, { data: week }, { data: prof }] = await Promise.all([
-    supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", athleteId).maybeSingle(),
-    supabase.from("athlete_week").select("days").eq("athlete_id", athleteId).maybeSingle(),
-    supabase.from("profiles").select("full_name, email, timezone").eq("id", athleteId).maybeSingle(),
-  ]);
-  if (!prof) return null;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: prof.timezone || "America/Chicago" });
-  const start = startMonday({ weeks: loaded.t.weeks, raceWeek: loaded.t.race_week, raceDate: dates.raceDate, startDate: dates.startDate });
-  const items = applyTo({ workouts: loaded.workouts, start, zones: (zones ?? null) as RelZones, week: week?.days, today });
-  return { ...loaded, start, items, today, name: ((prof.full_name || prof.email || "Athlete") as string).split(" ")[0] };
-}
 
 const toPreview = (athleteId: string, p: NonNullable<Awaited<ReturnType<typeof planFor>>>): Preview => ({
   athleteId,
@@ -360,26 +320,6 @@ export async function applyTemplate(
   };
 }
 
-function draftRow(i: PlannedItem, athleteId: string, coachId: string, applicationId: string) {
-  return {
-    athlete_id: athleteId,
-    coach_id: coachId,
-    title: i.tw.title,
-    sport: i.tw.sport,
-    scheduled_date: i.date,
-    description: i.tw.description,
-    why: i.tw.why,
-    steps: i.steps,
-    brick: i.tw.sport === "bike" ? i.brick : null,
-    strength: i.tw.sport === "strength" ? (i.tw.strength ?? []) : null,
-    pool_length: i.tw.pool?.length ?? null,
-    pool_unit: i.tw.pool?.unit ?? null,
-    status: "draft",
-    start_time: i.startTime,
-    plan_application_id: applicationId,
-    template_workout_id: i.tw.id ?? null,
-  };
-}
 
 // ---------------------------------------------------------------- template updates
 
