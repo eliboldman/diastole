@@ -167,6 +167,10 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
             RideCoordinator.openHub()
             return
         }
+        if type == "fuelToday", let snapshot = body["snapshot"] {
+            FuelShare.save(snapshot)
+            return
+        }
         if type == "shareImage", let b64 = body["data"] as? String {
             ShareSheet.present(base64PNG: b64)
             return

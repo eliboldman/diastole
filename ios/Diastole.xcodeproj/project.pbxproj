@@ -354,15 +354,15 @@
 				DEVELOPMENT_TEAM = X3B9DZ4SS9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Diastole-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Diastole;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_FILE = "Diastole-Info.plist";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Diastole connects to your smart trainer and heart-rate sensor so your coach's bike workouts can set the resistance for you.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Diastole finds your Apple TV on your Wi-Fi so your iPhone can pass trainer data to it during a ride.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Diastole uses the camera so you can send photos to your coach and pod, log meals and scan food barcodes.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Diastole reads your workouts, heart rate variability, resting heart rate and sleep from Apple Health so your coach can see how you're recovering.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Diastole puts workouts from your coach in the Workout app on your Apple Watch.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Diastole finds your Apple TV on your Wi-Fi so your iPhone can pass trainer data to it during a ride.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Diastole uses the microphone to record voice notes in Messages.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -395,15 +395,15 @@
 				DEVELOPMENT_TEAM = X3B9DZ4SS9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Diastole-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Diastole;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_FILE = "Diastole-Info.plist";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Diastole connects to your smart trainer and heart-rate sensor so your coach's bike workouts can set the resistance for you.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Diastole finds your Apple TV on your Wi-Fi so your iPhone can pass trainer data to it during a ride.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Diastole uses the camera so you can send photos to your coach and pod, log meals and scan food barcodes.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Diastole reads your workouts, heart rate variability, resting heart rate and sleep from Apple Health so your coach can see how you're recovering.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Diastole puts workouts from your coach in the Workout app on your Apple Watch.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Diastole finds your Apple TV on your Wi-Fi so your iPhone can pass trainer data to it during a ride.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Diastole uses the microphone to record voice notes in Messages.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -500,6 +500,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DiastoleWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X3B9DZ4SS9;
@@ -528,6 +529,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DiastoleWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X3B9DZ4SS9;
@@ -552,32 +554,6 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		D1A57E000000000000000020 /* XCLocalSwiftPackageReference "TrainerKit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = TrainerKit;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		D1A57E000000000000000021 /* RideUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = RideUI;
-		};
-		D1A57E000000000000000023 /* TrainerKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = TrainerKit;
-		};
-		D1A57E000000000000000039 /* RideUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = RideUI;
-		};
-		D1A57E000000000000000040 /* TrainerKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = TrainerKit;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		D1A57E000000000000000007 /* Build configuration list for PBXNativeTarget "Diastole" */ = {
@@ -617,6 +593,32 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		D1A57E000000000000000020 /* XCLocalSwiftPackageReference "TrainerKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = TrainerKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D1A57E000000000000000021 /* RideUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RideUI;
+		};
+		D1A57E000000000000000023 /* TrainerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TrainerKit;
+		};
+		D1A57E000000000000000039 /* RideUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RideUI;
+		};
+		D1A57E000000000000000040 /* TrainerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TrainerKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D1A57E000000000000000010 /* Project object */;
 }

@@ -8,6 +8,8 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { getFuelDays, getFuelMode, getMealDay } from "@/lib/fuel/data";
 import { requireUser } from "@/lib/supabase/server";
 
+import WidgetSync, { type FuelSnapshot } from "@/components/fuel/WidgetSync";
+
 export const metadata: Metadata = { title: "Fuel · Diastole" };
 
 export default async function FuelPage({ searchParams }: { searchParams: Promise<{ log?: string; via?: string }> }) {
@@ -17,8 +19,20 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
   const [mode, days] = await Promise.all([getFuelMode(me.id), getFuelDays(me.id, today, 7)]);
   const meals = mode === "workout" ? null : await getMealDay(me.id, today, me.timezone, days[0].level);
+  const r = (n: number) => Math.round(n);
+  const show = mode === "full" && meals?.targets;
+  const snapshot: FuelSnapshot = {
+    date: today,
+    level: meals?.level ?? days[0].level,
+    mode,
+    meals: meals?.meals.length ?? 0,
+    carbs: show ? { eaten: r(meals.eaten.carbs), low: r(meals.targets!.carbs.low), high: r(meals.targets!.carbs.high) } : null,
+    protein: show ? { eaten: r(meals.eaten.protein), low: r(meals.targets!.protein.low), high: r(meals.targets!.protein.high) } : null,
+    kcal: show ? { eaten: r(meals.eaten.kcal), low: r(meals.targets!.kcal.low), high: r(meals.targets!.kcal.high) } : null,
+  };
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
+      <WidgetSync snapshot={snapshot} />
       <FuelView mode={mode} days={days} log={meals && <FuelLog day={meals} mode={mode} timeZone={me.timezone} units={me.units} autoOpen={log === "1"} start={start} />} />
       <Link href="/races" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
         <span>

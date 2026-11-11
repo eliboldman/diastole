@@ -22,13 +22,59 @@ struct FuelWidgetIntent: WidgetConfigurationIntent {
 struct FuelEntry: TimelineEntry {
     let date: Date
     let actions: [FuelAction]
+    let fuel: FuelToday?
 }
 
 struct FuelProvider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> FuelEntry { FuelEntry(date: .now, actions: [.photo, .scan, .describe, .today]) }
-    func snapshot(for configuration: FuelWidgetIntent, in context: Context) async -> FuelEntry { FuelEntry(date: .now, actions: configuration.actions) }
+    private static let sample = FuelToday(date: "", level: "high", mode: "full", meals: 2,
+                                          carbs: .init(eaten: 210, low: 490, high: 700), protein: .init(eaten: 64, low: 112, high: 140), kcal: .init(eaten: 1450, low: 3100, high: 3900))
+    func placeholder(in context: Context) -> FuelEntry { FuelEntry(date: .now, actions: [.photo, .scan, .describe, .today], fuel: Self.sample) }
+    func snapshot(for configuration: FuelWidgetIntent, in context: Context) async -> FuelEntry {
+        FuelEntry(date: .now, actions: configuration.actions, fuel: FuelToday.load() ?? (context.isPreview ? Self.sample : nil))
+    }
+    /// Now, then again at midnight so a new day starts clean. The app asks for a redraw after each log.
     func timeline(for configuration: FuelWidgetIntent, in context: Context) async -> Timeline<FuelEntry> {
-        Timeline(entries: [FuelEntry(date: .now, actions: configuration.actions)], policy: .never)
+        let midnight = Calendar.current.startOfDay(for: .now.addingTimeInterval(86_400))
+        return Timeline(entries: [
+            FuelEntry(date: .now, actions: configuration.actions, fuel: FuelToday.load()),
+            FuelEntry(date: midnight, actions: configuration.actions, fuel: nil),
+        ], policy: .after(midnight.addingTimeInterval(60)))
+    }
+}
+
+/// Carbs (or calories) eaten against today's range: a bar with the range shaded.
+struct RangeBar: View {
+    let amount: FuelToday.Amount
+    var body: some View {
+        GeometryReader { geo in
+            let top = Double(max(amount.high, amount.eaten, 1)) * 1.08
+            let x = { (v: Int) in geo.size.width * min(1, Double(v) / top) }
+            ZStack(alignment: .leading) {
+                Capsule().fill(.white.opacity(0.1))
+                Rectangle().fill(Brand.accent.opacity(0.22))
+                    .frame(width: max(2, x(amount.high) - x(amount.low)))
+                    .offset(x: x(amount.low))
+                Capsule().fill(Brand.accent).frame(width: max(6, x(amount.eaten)))
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 8)
+    }
+}
+
+/// "210 g of 490–700 g carbs"
+struct AmountLine: View {
+    let label: String
+    let unit: String
+    let amount: FuelToday.Amount
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(amount.eaten)").font(.system(.title3, design: .rounded).weight(.semibold)).foregroundStyle(.white).contentTransition(.numericText())
+                Text("/ \(amount.low)–\(amount.high) \(unit) \(label)").font(.caption2).foregroundStyle(.white.opacity(0.6)).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            RangeBar(amount: amount)
+        }
     }
 }
 
@@ -39,17 +85,38 @@ struct FuelWidgetView: View {
     var body: some View {
         switch family {
         case .accessoryCircular:
-            ZStack {
-                AccessoryWidgetBackground()
-                Image(systemName: entry.actions.first?.symbol ?? "fork.knife").font(.title3)
+            if let c = entry.fuel?.carbs {
+                Gauge(value: Double(min(c.eaten, c.high)), in: 0...Double(max(c.high, 1))) {
+                    Image(systemName: "fork.knife")
+                } currentValueLabel: {
+                    Text("\(c.eaten)")
+                }
+                .gaugeStyle(.accessoryCircular)
+                .widgetURL(entry.actions.first?.url)
+            } else {
+                ZStack {
+                    AccessoryWidgetBackground()
+                    Image(systemName: entry.actions.first?.symbol ?? "fork.knife").font(.title3)
+                }
+                .widgetURL(entry.actions.first?.url)
             }
-            .widgetURL(entry.actions.first?.url)
         case .accessoryRectangular:
-            HStack(spacing: 8) {
-                Image(systemName: entry.actions.first?.symbol ?? "fork.knife").font(.title2)
-                VStack(alignment: .leading) {
-                    Text("Log fuel").font(.headline)
-                    Text(entry.actions.first?.title ?? "Log meal").font(.caption).foregroundStyle(.secondary)
+            Group {
+                if let c = entry.fuel?.carbs {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Carbs \(c.eaten) g").font(.headline)
+                        Gauge(value: Double(min(c.eaten, c.high)), in: 0...Double(max(c.high, 1))) { EmptyView() }
+                            .gaugeStyle(.accessoryLinearCapacity)
+                        Text("Target \(c.low)–\(c.high) g").font(.caption2).foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: entry.actions.first?.symbol ?? "fork.knife").font(.title2)
+                        VStack(alignment: .leading) {
+                            Text("Log fuel").font(.headline)
+                            Text(entry.fuel?.mealsText ?? entry.actions.first?.title ?? "Log meal").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
             .widgetURL(entry.actions.first?.url)
@@ -60,31 +127,52 @@ struct FuelWidgetView: View {
         }
     }
 
-    /// One big target: the first button.
+    /// One big target (the first button), with today's carbs when there are numbers to show.
     private var small: some View {
         let a = entry.actions.first ?? .photo
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Image("Logo").resizable().frame(width: 22, height: 22).clipShape(.rect(cornerRadius: 5))
                 Spacer()
+                Image(systemName: a.symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Brand.accent)
             }
             Spacer()
-            Image(systemName: a.symbol)
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(Brand.accent)
-            Text("Log fuel").font(.headline).foregroundStyle(.white).padding(.top, 6)
-            Text(a.title).font(.caption).foregroundStyle(.white.opacity(0.6))
+            if let f = entry.fuel, let c = f.carbs {
+                Text(f.levelText).font(.caption2).foregroundStyle(.white.opacity(0.55))
+                AmountLine(label: "carbs", unit: "g", amount: c).padding(.top, 2)
+                if let k = f.kcal {
+                    Text("\(k.eaten) of \(k.low)–\(k.high) kcal").font(.caption2).foregroundStyle(.white.opacity(0.6)).padding(.top, 6).lineLimit(1).minimumScaleFactor(0.7)
+                }
+            } else {
+                Image(systemName: a.symbol)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Brand.accent)
+                Text("Log fuel").font(.headline).foregroundStyle(.white).padding(.top, 6)
+                Text(entry.fuel.map { "\($0.levelText) · \($0.mealsText)" } ?? a.title).font(.caption).foregroundStyle(.white.opacity(0.6)).lineLimit(2)
+            }
         }
         .widgetURL(a.url)
     }
 
-    /// Up to four buttons, each straight to its step.
+    /// Today's numbers (when there are any) over up to four buttons, each straight to its step.
     private var medium: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image("Logo").resizable().frame(width: 20, height: 20).clipShape(.rect(cornerRadius: 5))
-                Text("Log fuel").font(.headline).foregroundStyle(.white)
-                Spacer()
+                if let f = entry.fuel, let c = f.carbs {
+                    Link(destination: FuelAction.today.url) {
+                        HStack(spacing: 12) {
+                            AmountLine(label: "carbs", unit: "g", amount: c)
+                            if let k = f.kcal { AmountLine(label: "kcal", unit: "", amount: k) }
+                        }
+                    }
+                } else {
+                    Text("Log fuel").font(.headline).foregroundStyle(.white)
+                    Spacer()
+                    if let f = entry.fuel {
+                        Text("\(f.levelText) · \(f.mealsText)").font(.caption2).foregroundStyle(.white.opacity(0.6)).lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                }
             }
             HStack(spacing: 8) {
                 ForEach(entry.actions.prefix(4), id: \.self) { a in
@@ -112,7 +200,7 @@ struct FuelWidget: Widget {
                 }
         }
         .configurationDisplayName("Log fuel")
-        .description("Quick ways to log what you ate: photo, barcode, or type it.")
+        .description("Today's fuel and quick ways to log what you ate: photo, barcode, or type it.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
     }
 }
