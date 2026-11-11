@@ -68,6 +68,7 @@ export type RacePlan = {
   minutes: number;
   carbsPerHour: number;
   fluidMlPerHour: number | null; // null: drink to thirst (short races)
+  fluidFromTest?: boolean; // sized from the athlete's sweat-rate test, not the default
   sodiumMgPerHour: number | null;
   carbLoad: { days: number; gPerKg: [number, number]; grams: [number, number] | null } | null;
   breakfast: { hoursBefore: number; gPerKg: [number, number]; grams: [number, number] | null };
@@ -121,7 +122,7 @@ export function racePlan(o: { minutes: number; sport: RaceSport; weightKg: numbe
   }
   if (!weightKg) notes.push("Add your body weight on the Fuel page to see carb-load and breakfast grams.");
   if (short) notes.push("Under an hour: a normal breakfast and a sip of fluid if you're thirsty is plenty.");
-  return { minutes, carbsPerHour: carbs, fluidMlPerHour: fluid, sodiumMgPerHour: sodium, carbLoad, breakfast, feeds, notes };
+  return { minutes, carbsPerHour: carbs, fluidMlPerHour: fluid, fluidFromTest: fluid != null && !!o.sweatRateMlH, sodiumMgPerHour: sodium, carbLoad, breakfast, feeds, notes };
 }
 
 /** Sweat rate in ml/hour. Only this result is saved; the weights are never stored. */

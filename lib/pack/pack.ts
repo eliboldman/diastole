@@ -59,7 +59,7 @@ export function fuelQuantities(plan: RacePlan | null, sport: string): Item[] {
   const out: Item[] = [{ key: "fuel-gels", label: "Gels or chews", qty: `${gels} (+2 spare)`, bag: "course", why: `${plan.carbsPerHour} g carbs an hour for about ${Math.round(hours * 10) / 10} h (25 g each)`, source: "fuel" }];
   if (plan.fluidMlPerHour) {
     const litres = (plan.fluidMlPerHour * hours) / 1000;
-    out.push({ key: "fuel-fluid", label: sport === "run" ? "Soft flask or plan the aid stations" : "Bottles", qty: `${Math.round(litres * 10) / 10} L over the race`, bag: "course", why: `About ${plan.fluidMlPerHour} ml an hour from your sweat test`, source: "fuel" });
+    out.push({ key: "fuel-fluid", label: sport === "run" ? "Soft flask or plan the aid stations" : "Bottles", qty: `${Math.round(litres * 10) / 10} L over the race`, bag: "course", why: plan.fluidFromTest ? `About ${plan.fluidMlPerHour} ml an hour from your sweat test` : `About ${plan.fluidMlPerHour} ml an hour (a starting point until you do a sweat test)`, source: "fuel" });
   }
   if (plan.sodiumMgPerHour) out.push({ key: "fuel-salt", label: "Electrolyte tabs or salt caps", qty: `${Math.ceil((plan.sodiumMgPerHour * hours) / 250)} × 250 mg sodium`, bag: "course", source: "fuel" });
   out.push({ key: "fuel-breakfast", label: "Race breakfast you've practised", qty: plan.breakfast.grams ? `${plan.breakfast.grams[0]}–${plan.breakfast.grams[1]} g carbs` : undefined, bag: "morning", why: `${plan.breakfast.hoursBefore} h before the start`, source: "fuel" });
