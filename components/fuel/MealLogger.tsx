@@ -36,7 +36,7 @@ async function shrink(file: File): Promise<string> {
 }
 
 /** "Log a meal": photo and/or words -> Claude's estimate -> one confirm card -> saved. The photo never leaves this sheet except for the estimate. */
-export default function MealLogger({ numbers = true, autoOpen = false, compact = false }: { numbers?: boolean; autoOpen?: boolean; compact?: boolean }) {
+export default function MealLogger({ numbers = true, autoOpen = false, compact = false, start }: { numbers?: boolean; autoOpen?: boolean; compact?: boolean; start?: "photo" | "scan" | "describe" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: "capture" });
@@ -45,6 +45,8 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const started = useRef(false);
   const [inApp, setInApp] = useState(false);
   const [typing, setTyping] = useState(false);
   const [code, setCode] = useState("");
@@ -109,6 +111,19 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
       setStage({ kind: "capture" });
     }
   }
+
+  // Opened from the iPhone widget straight into a step (?via=photo|scan|describe), once.
+  useEffect(() => {
+    if (!open || !start || started.current) return;
+    if (start === "scan" && !inApp && document.documentElement.dataset.app === "ios") return; // wait for the app bridge
+    started.current = true;
+    const t = setTimeout(() => {
+      if (start === "describe") noteRef.current?.focus();
+      else if (start === "photo") fileRef.current?.click();
+      else scan();
+    }, 150);
+    return () => clearTimeout(t);
+  });
 
   function scan() {
     setError(null);
@@ -222,6 +237,7 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
             <label className="block">
               <span className="text-sm text-white/60">Anything to add? (optional)</span>
               <textarea
+                ref={noteRef}
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, 500))}
                 rows={2}

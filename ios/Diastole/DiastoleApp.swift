@@ -32,6 +32,10 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: session.state)
+        // Widget and Control Center buttons: diastole://fuel/<action>.
+        .onOpenURL { url in
+            if let href = DeepLink.href(for: url) { PushCenter.shared.open(href) }
+        }
         .onChange(of: session.state, initial: true) { _, state in
             if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut {
                 PushCenter.shared.signedInChanged(false)
@@ -54,4 +58,19 @@ struct RootView: View {
 struct SignInScreen: View {
     @State private var page = WebPage(root: AppConfig.url("/login"))
     var body: some View { WebContainer(page: page).ignoresSafeArea() }
+}
+
+/// Turns a diastole:// link (from the home screen widget or Control Center) into a page to open.
+enum DeepLink {
+    static func href(for url: URL) -> String? {
+        guard url.scheme == "diastole" else { return nil }
+        switch (url.host() ?? "", url.lastPathComponent) {
+        case ("fuel", "photo"): return "/fuel?log=1&via=photo"
+        case ("fuel", "scan"): return "/fuel?log=1&via=scan"
+        case ("fuel", "describe"): return "/fuel?log=1&via=describe"
+        case ("fuel", "meal"): return "/fuel?log=1"
+        case ("fuel", _): return "/fuel"
+        default: return nil
+        }
+    }
 }

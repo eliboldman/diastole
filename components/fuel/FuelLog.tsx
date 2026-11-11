@@ -17,6 +17,7 @@ export default function FuelLog({
   units,
   viewer = "athlete",
   autoOpen = false,
+  start,
   firstName,
 }: {
   day: MealDay;
@@ -25,6 +26,7 @@ export default function FuelLog({
   units: "mi" | "km";
   viewer?: "athlete" | "coach";
   autoOpen?: boolean;
+  start?: "photo" | "scan" | "describe";
   firstName?: string;
 }) {
   if (mode === "workout") return null;
@@ -40,7 +42,7 @@ export default function FuelLog({
             {`Targets for a ${FUEL_DAYS[day.level].label.toLowerCase()}`}
           </p>
         </div>
-        {athlete && <MealLogger numbers={numbers} autoOpen={autoOpen} />}
+        {athlete && <MealLogger numbers={numbers} autoOpen={autoOpen} start={start} />}
       </div>
 
       <div className="mt-5">
