@@ -9,7 +9,7 @@ export default async function RecentCheckins({ athleteId, timeZone }: { athleteI
   const supabase = await createClient();
   const { data } = await supabase
     .from("workout_checkins")
-    .select("activity_id, feel, rpe, pain, note, created_at, activities!inner(name, sport, start_time, duration_s)")
+    .select("activity_id, feel, rpe, fuel, pain, note, created_at, activities!inner(name, sport, start_time, duration_s)")
     .eq("athlete_id", athleteId)
     .order("created_at", { ascending: false })
     .limit(8);
@@ -36,6 +36,7 @@ export default async function RecentCheckins({ athleteId, timeZone }: { athleteI
                       new Date(r.act.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone }),
                       r.rpe ? `RPE ${r.rpe} · ${RPE_LABEL[r.rpe]}` : null,
                       load ? `load ${load}` : null,
+                      r.fuel ? (r.fuel === "all" ? "fuel: all of it" : r.fuel === "some" ? "fuel: some" : "fuel: none") : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}

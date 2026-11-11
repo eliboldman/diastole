@@ -4,7 +4,7 @@ import { DEVICE_KINDS, startPairing, type DeviceKind } from "@/lib/devices/auth"
 import { createAdminClient } from "@/lib/supabase/server";
 
 // A watch or TV asks for a pairing code to show. Public: the device has no account yet.
-// Body: { kind: "garmin_watch" | "apple_tv", label?: string }.
+// Body: { kind: "garmin_watch" | "garmin_field" | "apple_tv", label?: string }.
 // Answers { code, secret, expiresIn, pollEvery }; the device keeps `secret` and polls /pair/poll.
 
 export async function POST(request: Request) {

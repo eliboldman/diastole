@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { claimDeviceCode, type PairState } from "@/lib/devices/actions";
 
-const NAMES: Record<string, string> = { garmin_watch: "Your watch", apple_tv: "Your Apple TV" };
+const NAMES: Record<string, string> = { garmin_watch: "Your watch", garmin_field: "Your fuel field", apple_tv: "Your Apple TV" };
 
 export default function DevicePairForm({ initialCode = "" }: { initialCode?: string }) {
   const [state, action, pending] = useActionState<PairState, FormData>(claimDeviceCode, null);

@@ -21,7 +21,7 @@ export async function claimDeviceCode(_prev: PairState, form: FormData): Promise
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("claim_device_code", { p_code: code });
   if (error) return { ok: false, error: "Couldn't check that code. Try again." };
-  if (data === "garmin_watch" || data === "apple_tv") {
+  if (data === "garmin_watch" || data === "garmin_field" || data === "apple_tv") {
     revalidatePath("/me/devices");
     return { ok: true, kind: data };
   }

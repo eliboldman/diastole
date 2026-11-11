@@ -8,7 +8,7 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Watch & TV apps · Diastole" };
 
-const KIND: Record<string, string> = { garmin_watch: "Garmin watch app", apple_tv: "Apple TV" };
+const KIND: Record<string, string> = { garmin_watch: "Garmin watch app", garmin_field: "Garmin fuel field", apple_tv: "Apple TV" };
 
 function seen(at: string | null, tz: string) {
   if (!at) return "Not used yet";
@@ -28,8 +28,10 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
       <BackLink href="/connect" label="Connections" />
       <h1 className="mt-2 text-3xl font-medium tracking-tight">Watch &amp; TV apps</h1>
       <p className="mt-2 max-w-xl text-white/60">
-        The Diastole Garmin watch app shows today&apos;s plan and your readiness on your wrist. The Apple TV app runs your coach&apos;s bike
-        workouts on your smart trainer. Open either one and type the code it shows here.
+        The Diastole Garmin watch app shows today&apos;s plan and your readiness on your wrist, and asks how a session went when you
+        finish. The Diastole Fuel data field buzzes when it&apos;s time to eat and drink during a workout: add it to a data screen and
+        start an activity to see its code. The Apple TV app runs your coach&apos;s bike workouts on your smart trainer. Type the code a
+        device shows here.
       </p>
 
       <div className="mt-8 grid max-w-2xl gap-6">
@@ -61,7 +63,7 @@ export default async function DevicesPage({ searchParams }: { searchParams: Prom
         </section>
 
         <p className="text-sm text-white/45">
-          These devices can read your plan and readiness, and the TV can save rides. Signing one out here stops it right away.
+          These devices can read your plan and readiness, the watch app can save check-ins, and the TV can save rides. Signing one out here stops it right away.
         </p>
       </div>
     </AthleteShell>

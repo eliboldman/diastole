@@ -171,7 +171,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const [{ data: ownerAvatar }, { data: checkin }] = await Promise.all([
     supabase.from("avatars").select("look").eq("athlete_id", act.athlete_id).maybeSingle(),
     // Only the athlete and their coach can read check-ins (row-level security).
-    supabase.from("workout_checkins").select("feel, rpe, pain, note, updated_at").eq("activity_id", id).maybeSingle(),
+    supabase.from("workout_checkins").select("feel, rpe, fuel, pain, note, updated_at").eq("activity_id", id).maybeSingle(),
   ]);
 
   const streams = (detail?.streams ?? null) as Streams | null;
@@ -382,6 +382,11 @@ export default async function ActivityPage({ params, searchParams }: { params: P
               firstName={owner?.full_name?.split(" ")[0] ?? "The athlete"}
               presetFeel={presetFeel}
             />
+            {checkin?.fuel && (
+              <p className="mt-3 text-sm text-white/60">
+                Fuel during: {checkin.fuel === "all" ? "took all of it" : checkin.fuel === "some" ? "took some of it" : "didn't take any"}
+              </p>
+            )}
           </Card>
         </section>
       )}

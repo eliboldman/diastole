@@ -5,7 +5,8 @@ import Toybox.Lang;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Signed in: pages you scroll with up/down.
+// Signed in: pages you scroll with up/down. A finished session without a check-in opens the
+// check-in first (see CheckinView).
 //   0 Today    readiness + first workout + why
 //   1 Steps    the workout's steps (each workout gets its own page)
 //   2 Body     HRV, resting HR, sleep, Body Battery
@@ -20,10 +21,17 @@ class TodayView extends WatchUi.View {
         View.initialize();
     }
 
+    hidden var offered as Boolean = false;
+
     function onShow() as Void {
         // Refresh if the stored day is older than 15 minutes (or missing).
         var t = data();
         if (t == null || !(t["u"] instanceof Number) || Time.now().value() - (t["u"] as Number) > 900) { refresh(); }
+        else { offerCheckin(); }
+    }
+
+    hidden function offerCheckin() as Void {
+        if (!offered) { offered = Checkin.offer(data()); }
     }
 
     function data() as Dictionary? {
@@ -52,6 +60,7 @@ class TodayView extends WatchUi.View {
         loading = false;
         if (code == 200 && d instanceof Dictionary) {
             Application.Storage.setValue(Api.TODAY_KEY, d);
+            offerCheckin();
         } else if (code == 401) {
             signOut();
             var pair = new PairView();
@@ -124,6 +133,11 @@ class TodayView extends WatchUi.View {
         dc.drawText(w / 2, h * 0.1, Graphics.FONT_XTINY, (wk["t"] as String).toUpper(), Graphics.TEXT_JUSTIFY_CENTER);
         var lines = wk["l"];
         var y = (h * 0.22).toNumber();
+        var f = wk["f"];
+        if (f instanceof Dictionary && f["first"] instanceof Number && f["every"] instanceof Number) {
+            var fuel = "Fuel: " + (f["n"] as String) + " at " + ((f["first"] as Number) / 60).toString() + " min, then every " + ((f["every"] as Number) / 60).toString();
+            y = Ui.drawWrapped(dc, y, fuel, Graphics.FONT_XTINY, Ui.AMBER, 2) + 4;
+        }
         if (!(lines instanceof Array) || lines.size() == 0) {
             Ui.drawWrapped(dc, y + 20, "Open on your phone for the steps", Graphics.FONT_XTINY, Ui.DIM, 2);
             return;
