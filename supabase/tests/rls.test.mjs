@@ -1126,5 +1126,19 @@ check("an FTP change pings", (await db.query(`select count(*)::int as n from net
 await db.query(`select public.delete_intervals_key('${A1}')`);
 check("key can be deleted", (await db.query(`select public.get_intervals_key('${A1}') as k`)).rows[0]?.k === null);
 
+// ---------------------------------------------------------------- linked activity marks the workout done
+const wid = (await db.query(`insert into public.planned_workouts (athlete_id, coach_id, scheduled_date, sport, title, status, approved_at, sent_at) values ('${A1}', '${COACH}', '2026-11-10', 'swim', 'Swim CSS', 'sent', now(), now()) returning id`)).rows[0].id;
+const aid = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'done-test-1', 'lap_swimming', now(), 1200) returning id`)).rows[0].id;
+const wStatus = async () => (await db.query(`select status from public.planned_workouts where id = '${wid}'`)).rows[0].status;
+check("unlinked workout stays sent", (await wStatus()) === "sent");
+await db.query(`update public.activities set planned_workout_id = '${wid}' where id = '${aid}'`);
+check("linking an activity marks the workout completed", (await wStatus()) === "completed");
+await db.query(`update public.activities set planned_workout_id = null where id = '${aid}'`);
+check("unlinking puts it back to sent", (await wStatus()) === "sent");
+await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s, planned_workout_id) values ('${A1}', 'garmin', 'done-test-2', 'lap_swimming', now(), 600, '${wid}')`);
+check("inserting a linked activity marks it completed", (await wStatus()) === "completed");
+await db.query(`delete from public.activities where external_id = 'done-test-2'`);
+check("deleting the only linked activity reverts it", (await wStatus()) === "sent");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

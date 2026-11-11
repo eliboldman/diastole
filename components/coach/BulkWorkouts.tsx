@@ -90,8 +90,8 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
                     {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   </span>
                 </span>
-                <span className={`shrink-0 text-xs uppercase tracking-wider ${w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"}`}>
-                  {w.status}
+                <span className={`shrink-0 text-xs uppercase tracking-wider ${w.status === "sent" ? "text-emerald-200/80" : w.status === "completed" ? "text-white/45" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"}`}>
+                  {w.status === "completed" ? "done" : w.status}
                 </span>
               </Link>
             </li>

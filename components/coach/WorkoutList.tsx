@@ -73,10 +73,10 @@ export default function WorkoutList({
                 </span>
                 <span
                   className={`shrink-0 text-xs uppercase tracking-wider ${
-                    w.status === "sent" ? "text-emerald-200/80" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"
+                    w.status === "sent" ? "text-emerald-200/80" : w.status === "completed" ? "text-white/45" : w.status === "draft" ? "text-white/55" : "text-amber-200/80"
                   }`}
                 >
-                  {w.status}
+                  {w.status === "completed" ? "done" : w.status}
                 </span>
               </Link>
               <button
