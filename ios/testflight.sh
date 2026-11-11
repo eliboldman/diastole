@@ -42,5 +42,18 @@ xcodebuild -project "$HERE/Diastole.xcodeproj" -scheme Diastole -configuration R
   -destination generic/platform=iOS -archivePath "$OUT/Diastole.xcarchive" \
   -allowProvisioningUpdates "${AUTH[@]}" archive | grep -E "error:|warning: .*signing|ARCHIVE" || true
 [[ -d "$OUT/Diastole.xcarchive" ]] || { echo "Archive failed"; exit 1; }
-xcodebuild -exportArchive -archivePath "$OUT/Diastole.xcarchive" -exportOptionsPlist "$HERE/ExportOptions.plist" \
-  -exportPath "$OUT/export" -allowProvisioningUpdates "${AUTH[@]}" 2>&1 | grep -E "error|Upload succeeded|EXPORT"
+export_with() {
+  rm -rf "$OUT/export"
+  xcodebuild -exportArchive -archivePath "$OUT/Diastole.xcarchive" -exportOptionsPlist "$HERE/ExportOptions.plist" \
+    -exportPath "$OUT/export" -allowProvisioningUpdates "$@" 2>&1 | tee "$OUT/export.log" | grep -E "error|Upload succeeded|EXPORT"
+  grep -q "Upload succeeded" "$OUT/export.log"
+}
+if ! export_with "${AUTH[@]}"; then
+  # An App Manager key can't use Apple's cloud signing certificate; Xcode's Admin sign-in can.
+  if (( ${#AUTH[@]} )) && grep -q "Cloud signing permission" "$OUT/export.log"; then
+    echo "The API key lacks cloud signing (needs the Admin role). Retrying with Xcode's signed-in account…"
+    export_with || { echo "Upload failed. Sign in under Xcode → Settings → Accounts, or give the key the Admin role."; exit 1; }
+  else
+    exit 1
+  fi
+fi
