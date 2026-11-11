@@ -149,7 +149,7 @@ class FuelField extends WatchUi.DataField {
         dc.setColor(green, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, 2, Graphics.FONT_XTINY, label, Graphics.TEXT_JUSTIFY_CENTER);
         var bigFont = h > 90 ? Graphics.FONT_NUMBER_MEDIUM : Graphics.FONT_NUMBER_MILD;
-        if (big.length() > 6 || !(big.toNumber() != null || big.find(":") != null)) { bigFont = Graphics.FONT_MEDIUM; }
+        if (big.find(":") == null) { bigFont = Graphics.FONT_MEDIUM; } // number fonts only have digits and ":"
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, h / 2, bigFont, big, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         if (small.length() > 0 && h > 60) {

@@ -83,7 +83,7 @@ class PairView extends WatchUi.View {
         dc.drawText(w / 2, h * 0.14, Graphics.FONT_XTINY, "SIGN IN TO DIASTOLE", Graphics.TEXT_JUSTIFY_CENTER);
         if (code != null) {
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, h * 0.36, Graphics.FONT_NUMBER_MILD, code, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(w / 2, h * 0.36, Graphics.FONT_LARGE, code, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             Ui.drawWrapped(dc, (h * 0.52).toNumber(), "Type this code at", Graphics.FONT_XTINY, Ui.DIM, 1);
         }
         Ui.drawWrapped(dc, (h * (code != null ? 0.62 : 0.4)).toNumber(), message, Graphics.FONT_XTINY, code != null ? Graphics.COLOR_WHITE : Ui.DIM, 4);
