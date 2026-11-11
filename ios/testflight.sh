@@ -16,12 +16,14 @@ HERE="${0:A:h}"
 if [[ "${1:-}" == "setup" ]]; then
   key="${2:?Usage: ios/testflight.sh setup <path to AuthKey_XXXX.p8> <issuer id>}"
   issuer="${3:?Usage: ios/testflight.sh setup <path to AuthKey_XXXX.p8> <issuer id>}"
+  [[ -f "$key" ]] || { echo "No file at $key. Use the real name, e.g. ~/Downloads/AuthKey_AB12CD34EF.p8"; exit 1; }
   name="${key:t}"
   [[ "$name" == AuthKey_*.p8 ]] || { echo "Expected a file named AuthKey_<KEY ID>.p8"; exit 1; }
   [[ "$issuer" =~ '^[0-9a-f-]{36}$' ]] || { echo "The issuer ID looks like 69a6de70-xxxx-xxxx-xxxx-xxxxxxxxxxxx"; exit 1; }
   kid="${${name#AuthKey_}%.p8}"
   mkdir -p "$ASC_DIR/private_keys" && chmod 700 "$ASC_DIR" "$ASC_DIR/private_keys"
-  mv "$key" "$ASC_DIR/private_keys/$name" && chmod 600 "$ASC_DIR/private_keys/$name"
+  mv "$key" "$ASC_DIR/private_keys/$name" || { echo "Couldn't move the key."; exit 1; }
+  chmod 600 "$ASC_DIR/private_keys/$name"
   printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' "$kid" "$issuer" > "$ENV_FILE" && chmod 600 "$ENV_FILE"
   echo "Installed key $kid. Uploads no longer need Xcode's sign-in."
   exit 0
