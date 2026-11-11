@@ -303,7 +303,8 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const interval = streams?.interval_s ?? 5;
   const hrSecs = streams?.hr && maxHr ? timeInZones(hrZones(maxHr), streams.hr, interval) : null;
   const paceSecs = foot && streams?.speed && zonesRow?.threshold_speed_mps ? timeInZones(paceZones(Number(zonesRow.threshold_speed_mps)), streams.speed, interval, 0.5) : null;
-  const powerSecs = streams?.power && zonesRow?.ftp_w ? timeInZones(powerZones(zonesRow.ftp_w), streams.power, interval) : null;
+  // FTP zones are for rides; running power on the bike FTP scale means nothing.
+  const powerSecs = streams?.power && zonesRow?.ftp_w && !isRun && /cycl|bik|ride|spin/i.test(act.sport ?? "") ? timeInZones(powerZones(zonesRow.ftp_w), streams.power, interval) : null;
   const hasZones = [hrSecs, paceSecs, powerSecs].some((s) => s?.some(Boolean));
 
   // "Explain this" on the tiles, with this athlete's own numbers.

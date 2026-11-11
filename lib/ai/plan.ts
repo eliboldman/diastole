@@ -32,6 +32,7 @@ const SYSTEM = `You are the planning assistant for an endurance coach. You draft
 
 How to plan:
 - Follow the coach's guide first. Where it names a training framework (periodization, pace systems, key-session rules), apply it.
+- FTP is cycling only: running_power on runs reads much higher than bike power and is never an FTP signal.
 - Numbers come only from the app: every target uses this athlete's zones in the context (FTP, threshold pace, max and threshold heart rate). The coach's guide and notes give the structure (session types, intervals and durations, % of FTP or threshold, progression and key-session rules, and this athlete's preferences and injuries); any FTP, pace or heart rate in them has been removed and must never be used or guessed at. If a zone you need isn't in the app, use heart-rate zones or effort cues in the step notes, and say so in assumptions.
 - The weekly layout comes only from the athlete's preferred_week, which the athlete filled in: which disciplines on which days, how many sessions and how much time each day. The guide's own weekly schedule has been removed; don't impose one. If preferred_week is empty, spread the sessions sensibly and say so in assumptions. The coach's guidance for this request (events, travel) can still move days.
 - Use the athlete's closet (their shoes, bikes, trainer, and pool, track or gym access). Only plan what they can do with it: indoor trainer sessions only if they have a trainer, TT-bike or trail sessions only with that bike or those shoes, pool or open-water swims only with access, bike sessions always with power targets. When the gear matters, name it in the description (for example "TT bike", "race shoes", "trainer in ERG mode", "pull buoy") so the athlete can pack for it.
@@ -147,7 +148,7 @@ async function gather(athleteId: string, coachId: string, start: string, end: st
       training_by_week: [...weeks.entries()].map(([week_start, w]) => ({ week_start, ...w })),
       last_14_days: real
         .filter((a) => Date.parse(a.start_time) >= fortnight)
-        .map((a) => ({ date: a.start_time.slice(0, 10), sport: a.sport, name: a.name, minutes: Math.round((a.duration_s ?? 0) / 60), km: a.distance_m ? Math.round(Number(a.distance_m) / 100) / 10 : null, avg_hr: a.avg_hr, avg_power: a.avg_power })),
+        .map((a) => ({ date: a.start_time.slice(0, 10), sport: a.sport, name: a.name, minutes: Math.round((a.duration_s ?? 0) / 60), km: a.distance_m ? Math.round(Number(a.distance_m) / 100) / 10 : null, avg_hr: a.avg_hr, ...(/cycl|bik|ride|spin/i.test(a.sport ?? "") && !/run|treadmill|track|trail/i.test(a.sport ?? "") ? { avg_power: a.avg_power } : a.avg_power ? { running_power: a.avg_power } : {}) })),
       recent_checkins: (checkins.data ?? []).map((c) => ({ date: c.created_at.slice(0, 10), feel_1_to_5: c.feel, rpe: c.rpe, pain: c.pain && Object.keys(c.pain as object).length ? c.pain : null, note: c.note })),
       already_scheduled: (planned.data ?? []).filter((p) => !p.plan_batch || p.status !== "draft").map((p) => ({ date: p.scheduled_date, sport: p.sport, title: p.title, status: p.status })),
     },

@@ -32,6 +32,7 @@ const SYSTEM = `You are Ask Diastole, an analyst inside Diastole, a coaching app
 - Link people and sessions so the coach can open them: athletes as [Name](/athlete/ATHLETE_ID), activities as [short label](/activity/ACTIVITY_ID), planned workouts as [title](/athlete/ATHLETE_ID/workouts/WORKOUT_ID). Only link to ids that came from the tools.
 - Format: short paragraphs, bullet lists, and small markdown tables when comparing several athletes or weeks. No headings larger than bold text.
 - You inform the coach; you don't change plans or message athletes. Training guidance only, not medical advice; if something looks like an injury or illness, suggest checking in with the athlete or an athletic trainer.
+- FTP is a cycling number: only ride power (avg/normalized power and best 20-min power on rides) relates to it. Runs report running power separately (running_power); it reads much higher than bike power and must never be used to estimate, suggest or compare against FTP.
 - Today is {TODAY}.`;
 
 function tools(supabase: SupabaseClient, coachId: string, onStep: (label: string) => void, names: Map<string, string>) {
@@ -106,7 +107,7 @@ function tools(supabase: SupabaseClient, coachId: string, onStep: (label: string
   const activities = betaZodTool({
     name: "activities",
     description:
-      "One athlete's completed workouts between two dates (YYYY-MM-DD, inclusive; max 200 rows), newest first: id, date, sport, name, minutes, distance (m), avg/max HR, avg and normalized power, avg pace, the planned workout it fulfilled, and best efforts inside it (fastest mile/5K/10K/half in seconds, best 20-min power).",
+      "One athlete's completed workouts between two dates (YYYY-MM-DD, inclusive; max 200 rows), newest first: id, date, sport, name, minutes, distance (m), avg/max HR, avg and normalized power (rides only; runs give running_power, which is not comparable to FTP), avg pace, the planned workout it fulfilled, and best efforts inside it (fastest mile/5K/10K/half in seconds, best 20-min power on rides).",
     inputSchema: z.object({ athlete_id: z.string(), from: z.string(), to: z.string(), sport: z.enum(["run", "bike", "swim", "other"]).nullable().optional() }),
     run: async ({ athlete_id, from, to, sport }) => {
       checkId(athlete_id);
@@ -124,7 +125,10 @@ function tools(supabase: SupabaseClient, coachId: string, onStep: (label: string
         (data ?? [])
           .filter((a) => !sport || fam(a.sport) === sport)
           .map((a) => {
-            const det = (Array.isArray(a.activity_details) ? a.activity_details[0] : a.activity_details) as { bests?: unknown } | null;
+            const det = (Array.isArray(a.activity_details) ? a.activity_details[0] : a.activity_details) as { bests?: Record<string, number> | null } | null;
+            // Ride power and running power aren't comparable: only rides report under the FTP-related names.
+            const ride = /cycl|bik|ride|spin/i.test(a.sport ?? "") && !/run|treadmill|track|trail/i.test(a.sport ?? "");
+            const bests = det?.bests ? Object.fromEntries(Object.entries(det.bests).filter(([k]) => ride || k !== "power_20m")) : null;
             return {
               id: a.id,
               date: a.start_time.slice(0, 10),
@@ -134,11 +138,12 @@ function tools(supabase: SupabaseClient, coachId: string, onStep: (label: string
               distance_m: round(a.distance_m, 0),
               avg_hr: round(a.avg_hr, 0),
               max_hr: round(a.max_hr, 0),
-              avg_power: round(a.avg_power, 0),
-              normalized_power: round(a.normalized_power, 0),
+              avg_power: ride ? round(a.avg_power, 0) : null,
+              normalized_power: ride ? round(a.normalized_power, 0) : null,
+              running_power: ride ? undefined : round(a.avg_power, 0),
               avg_speed_mps: round(a.avg_speed_mps, 2),
               planned_workout_id: a.planned_workout_id,
-              bests: det?.bests ?? null,
+              bests,
             };
           }),
       );

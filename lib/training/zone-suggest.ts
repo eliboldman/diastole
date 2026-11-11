@@ -7,10 +7,17 @@ export type CurrentZones = { ftp_w?: number | null; threshold_speed_mps?: number
 export type Effort = {
   activity_id: string;
   start_time: string;
+  sport?: string | null;
   bests?: { run_5k?: number; run_10k?: number; run_half?: number; power_20m?: number } | null;
   max_hr?: number | null;
 };
 export type Suggestion = { key: ZoneKey; current: number | null; suggested: number; why: string; activity_id: string; date: string };
+
+// FTP is a cycling number. Running power (Garmin, Stryd) reads far higher than bike power, so a
+// run must never feed an FTP suggestion, even if an old stored best has power on it.
+const BIKE = /cycl|bik|ride|spin/i;
+const RUN = /run|treadmill|track|trail/i;
+const isRide = (sport: string | null | undefined) => BIKE.test(sport ?? "") && !RUN.test(sport ?? "");
 
 const MIN_RAISE = 0.03; // suggest only when at least 3% above the current zone
 const RIEGEL = 1.06;
@@ -42,7 +49,7 @@ export function suggestZones(zones: CurrentZones, efforts: Effort[]): Suggestion
   };
 
   // FTP: 95% of the best 20-minute power.
-  const p = efforts.filter((e) => (e.bests?.power_20m ?? 0) > 0).sort((a, b) => b.bests!.power_20m! - a.bests!.power_20m!)[0];
+  const p = efforts.filter((e) => isRide(e.sport) && (e.bests?.power_20m ?? 0) > 0).sort((a, b) => b.bests!.power_20m! - a.bests!.power_20m!)[0];
   if (p) {
     const ftp = Math.round(p.bests!.power_20m! * 0.95);
     const cur = zones?.ftp_w ? Number(zones.ftp_w) : null;
