@@ -84,7 +84,7 @@ export default function Library({
         />
       </div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {["", "run", "bike", "swim"].map((s) => (
+        {["", "run", "bike", "swim", "strength"].map((s) => (
           <button key={s || "all"} onClick={() => setSport(s)} className={`${chip} shrink-0 ${sport === s ? "border-emerald-300/30 bg-emerald-300/15 text-emerald-50" : "border-white/10 text-white/55"}`}>
             {s || "All sports"}
           </button>

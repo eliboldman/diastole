@@ -47,7 +47,7 @@ export default function SwimTechniqueCard({ view, coach, athleteId, videos }: { 
       </h2>
       {last ? (
         <>
-          <p className="mt-1 text-xs text-white/45">Freestyle, last {recent.length} pool swim{recent.length === 1 ? "" : "s"} (per 25 m so pools compare).</p>
+          <p className="mt-1 text-xs text-white/45">Freestyle, {recent.length === 1 ? "your last pool swim" : `last ${recent.length} pool swims`} (per 25 m so pools compare).</p>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               { label: "Distance / stroke", value: `${avg("dps").toFixed(2)} m`, delta: <Delta t={view.trends.dps} better="up" fmt={(v) => v.toFixed(2)} /> },

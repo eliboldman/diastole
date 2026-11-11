@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -18,7 +19,10 @@ export default function CampCreator({ podId, templates, today }: { podId: string
   const [goal, setGoal] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, run] = useTransition();
-  if (!templates.length) return <p className="text-sm text-white/55">Camps use one of your plans. Save a plan of up to 4 weeks in Library → Plans, then start a camp here.</p>;
+  if (!templates.length) return <p className="text-sm text-white/55">
+        Camps use one of your plans. Save a plan of up to 4 weeks in{" "}
+        <Link href="/library#plans-h" className="text-emerald-200 hover:underline">Library → Plans</Link>, then start a camp here.
+      </p>;
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"

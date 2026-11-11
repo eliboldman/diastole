@@ -91,9 +91,10 @@ export default function PackingList({ raceId, sport, items, checked, travel, wat
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+      {/* Columns, not a grid: short bags stack under each other instead of leaving gaps. */}
+      <div className="mt-5 gap-x-5 sm:columns-2">
         {bags.map((b) => (
-          <section key={b.key} className="break-inside-avoid">
+          <section key={b.key} className="mb-5 break-inside-avoid">
             <h3 className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">{b.label}</h3>
             <ul className="mt-2 grid gap-1">
               {items
