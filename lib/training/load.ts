@@ -9,8 +9,9 @@
 
 import type { Step } from "../workouts/garmin-format.ts";
 import { workoutTotals } from "../workouts/totals.ts";
+import { strengthLoad, strengthSeconds, type StrengthItem } from "../strength/workout.ts";
 
-export type LoadSource = "power" | "pace" | "hr" | "time";
+export type LoadSource = "power" | "pace" | "hr" | "rpe" | "time";
 export type LoadActivity = {
   start_day: string; // athlete's local YYYY-MM-DD
   sport: string | null;
@@ -19,6 +20,7 @@ export type LoadActivity = {
   avg_power: number | null;
   normalized_power: number | null;
   avg_speed_mps: number | null;
+  training_load?: number | null; // set by Diastole for logged strength sessions (minutes × RPE)
 };
 export type LoadContext = { ftp: number | null; thresholdSpeed: number | null; thresholdHr: number | null; maxHr: number | null; restingHr: number | null };
 
@@ -39,6 +41,7 @@ export function sessionLoad(a: LoadActivity, c: LoadContext): { load: number; so
   const hours = (a.duration_s ?? 0) / 3600;
   if (!(hours > 0)) return { load: 0, source: "time" };
   const cap = (v: number) => Math.round(Math.min(v, 450) * 10) / 10;
+  if (/strength/i.test(a.sport ?? "") && a.training_load) return { load: cap(Number(a.training_load)), source: "rpe" };
 
   const power = a.normalized_power ?? a.avg_power;
   if (isBike(a.sport) && power && c.ftp) {
@@ -61,7 +64,8 @@ export function sessionLoad(a: LoadActivity, c: LoadContext): { load: number; so
 }
 
 /** Rough load for a planned workout: easy time at ~70% of threshold, hard time at ~95%. */
-export function plannedLoad(steps: Step[], sport: string): number {
+export function plannedLoad(steps: Step[], sport: string, strength?: StrengthItem[] | null): number {
+  if (sport === "strength") return strengthLoad(strengthSeconds(strength ?? []), 6);
   const t = workoutTotals(steps, sport);
   const hard = t.hardSeconds / 3600;
   const easy = Math.max(0, t.seconds - t.hardSeconds) / 3600;

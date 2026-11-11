@@ -9,13 +9,14 @@ import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Brick, type Pool, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { validateStrength, type StrengthItem } from "@/lib/strength/workout";
 import { cleanWeek, windowFor } from "@/lib/week-prefs";
 
 export type WorkoutInput = {
   id?: string;
   athleteId: string;
   title: string;
-  sport: Sport;
+  sport: Sport | "strength";
   scheduledDate: string;
   description: string;
   steps: Step[];
@@ -23,6 +24,7 @@ export type WorkoutInput = {
   why?: string; // what the athlete sees about the session's purpose (the coach wrote or approved it)
   brick?: Brick; // bike workouts only: a run off the bike
   startTime?: string | null; // "HH:MM"; undefined = the athlete's training window that day
+  strength?: StrengthItem[]; // strength workouts: exercises instead of steps
 };
 
 export type ActionResult = { ok: true; id: string; message?: string } | { ok: false; error: string };
@@ -30,6 +32,10 @@ export type ActionResult = { ok: true; id: string; message?: string } | { ok: fa
 function check(input: WorkoutInput): string | null {
   if (!input.title.trim()) return "Give the workout a title.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledDate)) return "Pick a date.";
+  if (input.sport === "strength") {
+    const e = validateStrength(input.strength ?? []);
+    return e.length ? [...new Set(e)].join(" ") : null;
+  }
   if (!["run", "bike", "swim"].includes(input.sport)) return "Pick a sport.";
   const pool = input.sport === "swim" ? (input.pool ?? null) : null;
   if (pool && (!(pool.length >= 10 && pool.length <= 100) || !["METER", "YARD"].includes(pool.unit))) return "Pick a pool length.";
@@ -62,6 +68,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
     description: input.description.trim() || null,
     steps,
     brick,
+    strength: input.sport === "strength" ? (input.strength ?? []) : null,
     start_time: startTime,
     pool_length: input.sport === "swim" ? (input.pool?.length ?? null) : null,
     pool_unit: input.sport === "swim" ? (input.pool?.unit ?? null) : null,

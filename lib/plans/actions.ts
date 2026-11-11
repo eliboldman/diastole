@@ -7,6 +7,7 @@ import { resendWorkoutToGarmin } from "@/lib/garmin/training";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, stripRel, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
+import { validateStrength, type StrengthItem } from "@/lib/strength/workout";
 import { retireWorkout } from "@/lib/workouts/retire";
 
 import { addDays, applyTo, startMonday, toTemplate, updatesFor, type AppliedRow, type Change, type PlannedItem, type TemplateWorkout } from "./template";
@@ -20,7 +21,7 @@ const poolOf = (l: unknown, u: unknown): Pool => (l && u ? { length: Number(l), 
 const cleanTags = (tags: unknown) =>
   [...new Set((Array.isArray(tags) ? tags : []).map((t) => String(t).toLowerCase().replace(/[^a-z0-9.+ -]/g, "").trim().slice(0, 24)).filter(Boolean))].slice(0, 12);
 
-const TW_COLS = "id, template_id, week, day, position, title, sport, description, why, steps, brick, pool_length, pool_unit, updated_at";
+const TW_COLS = "id, template_id, week, day, position, title, sport, description, why, steps, brick, pool_length, pool_unit, strength, updated_at";
 function rowToTw(r: Record<string, unknown>): TemplateWorkout {
   return {
     id: r.id as string,
@@ -34,6 +35,7 @@ function rowToTw(r: Record<string, unknown>): TemplateWorkout {
     steps: (r.steps ?? []) as Step[],
     brick: (r.brick ?? null) as Brick,
     pool: poolOf(r.pool_length, r.pool_unit),
+    strength: (r.strength ?? null) as StrengthItem[] | null,
     updated_at: r.updated_at as string,
   };
 }
@@ -57,7 +59,7 @@ export async function saveAsTemplate(input: { athleteId: string; from: string; t
   const [{ data: rows }, { data: zones }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("scheduled_date, title, sport, description, why, steps, brick, pool_length, pool_unit")
+      .select("scheduled_date, title, sport, description, why, steps, brick, pool_length, pool_unit, strength")
       .eq("athlete_id", input.athleteId)
       .is("deleted_at", null)
       .gte("scheduled_date", input.from)
@@ -91,6 +93,7 @@ export async function saveAsTemplate(input: { athleteId: string; from: string; t
         // Percentages of the source athlete's zones, so the plan scales to anyone.
         steps: annotate(stripRel(w.steps), z, w.pool),
         brick: w.brick?.steps?.length ? { sport: "run", steps: annotate(stripRel(w.brick.steps), z) } : null,
+        strength: w.sport === "strength" ? (w.strength ?? []) : null,
         pool_length: w.pool?.length ?? null,
         pool_unit: w.pool?.unit ?? null,
       })),
@@ -161,7 +164,8 @@ export async function saveTemplateWorkout(input: {
   week: number;
   day: number;
   title: string;
-  sport: Sport;
+  sport: Sport | "strength";
+  strength?: StrengthItem[] | null;
   description: string;
   why?: string;
   steps: Step[];
@@ -172,7 +176,7 @@ export async function saveTemplateWorkout(input: {
   if (!UUID.test(input.templateId)) return { ok: false, error: "Unknown plan." };
   if (!input.title.trim()) return { ok: false, error: "Give the workout a title." };
   const pool = input.sport === "swim" ? (input.pool ?? null) : null;
-  const errors = validateSteps(input.steps, 0, input.sport, pool);
+  const errors = input.sport === "strength" ? validateStrength(input.strength ?? []) : validateSteps(input.steps, 0, input.sport, pool);
   if (input.sport === "bike" && input.brick?.steps?.length) errors.push(...validateSteps(input.brick.steps, 0, "run", null).map((e) => `Run off the bike: ${e}`));
   if (errors.length) return { ok: false, error: [...new Set(errors)].join(" ") };
   const supabase = await createClient();
@@ -187,7 +191,8 @@ export async function saveTemplateWorkout(input: {
     sport: input.sport,
     description: input.description.trim() || null,
     why: input.why?.replace(/\s+/g, " ").trim().slice(0, 400) || null,
-    steps: annotate(stripRel(input.steps), z, pool),
+    steps: input.sport === "strength" ? [] : annotate(stripRel(input.steps), z, pool),
+    strength: input.sport === "strength" ? (input.strength ?? []) : null,
     brick: input.sport === "bike" && input.brick?.steps?.length ? { sport: "run", steps: annotate(stripRel(input.brick.steps), z) } : null,
     pool_length: pool?.length ?? null,
     pool_unit: pool?.unit ?? null,
@@ -213,11 +218,11 @@ export async function addLibraryWorkout(templateId: string, libraryId: string, w
   if (!UUID.test(templateId) || !UUID.test(libraryId)) return { ok: false, error: "Pick a workout." };
   const supabase = await createClient();
   const [{ data: item }, { data: t }] = await Promise.all([
-    supabase.from("workout_library").select("title, sport, description, steps, brick, pool_length, pool_unit").eq("id", libraryId).maybeSingle(),
+    supabase.from("workout_library").select("title, sport, description, steps, brick, pool_length, pool_unit, strength").eq("id", libraryId).maybeSingle(),
     supabase.from("plan_templates").select("weeks").eq("id", templateId).maybeSingle(),
   ]);
   if (!item || !t) return { ok: false, error: "Not found." };
-  if (!["run", "bike", "swim"].includes(item.sport)) return { ok: false, error: "Only run, bike and swim workouts go in plans." };
+  if (!["run", "bike", "swim", "strength"].includes(item.sport)) return { ok: false, error: "Only run, bike, swim and strength workouts go in plans." };
   const { error } = await supabase.from("plan_template_workouts").insert({
     template_id: templateId,
     week,
@@ -228,6 +233,7 @@ export async function addLibraryWorkout(templateId: string, libraryId: string, w
     description: item.description,
     steps: item.steps ?? [], // library steps carry their own percentages when they have them
     brick: item.brick ?? null,
+    strength: item.strength ?? null,
     pool_length: item.pool_length,
     pool_unit: item.pool_unit,
   });
@@ -365,6 +371,7 @@ function draftRow(i: PlannedItem, athleteId: string, coachId: string, applicatio
     why: i.tw.why,
     steps: i.steps,
     brick: i.tw.sport === "bike" ? i.brick : null,
+    strength: i.tw.sport === "strength" ? (i.tw.strength ?? []) : null,
     pool_length: i.tw.pool?.length ?? null,
     pool_unit: i.tw.pool?.unit ?? null,
     status: "draft",
@@ -385,7 +392,7 @@ async function changesFor(supabase: Supa, applicationId: string) {
   if (!p) return null;
   const { data: rows } = await supabase
     .from("planned_workouts")
-    .select("id, template_workout_id, scheduled_date, title, description, steps, brick, status, external_id, activities(id)")
+    .select("id, template_workout_id, scheduled_date, title, description, steps, brick, strength, status, external_id, activities(id)")
     .eq("plan_application_id", applicationId)
     .is("deleted_at", null);
   const applied: (AppliedRow & { external_id: string | null })[] = (rows ?? []).map((r) => ({
@@ -396,6 +403,7 @@ async function changesFor(supabase: Supa, applicationId: string) {
     description: r.description,
     steps: (r.steps ?? []) as Step[],
     brick: (r.brick ?? null) as Brick,
+    strength: (r.strength ?? null) as StrengthItem[] | null,
     status: r.status,
     external_id: r.external_id,
     done: Array.isArray(r.activities) ? r.activities.length > 0 : Boolean(r.activities),
@@ -436,7 +444,7 @@ export async function applyUpdate(applicationId: string): Promise<Result<{ messa
     if (ch.kind === "update") {
       const { data: row } = await supabase
         .from("planned_workouts")
-        .update({ title: ch.item.tw.title, description: ch.item.tw.description, steps: ch.item.steps, brick: ch.item.tw.sport === "bike" ? ch.item.brick : null })
+        .update({ title: ch.item.tw.title, description: ch.item.tw.description, steps: ch.item.steps, brick: ch.item.tw.sport === "bike" ? ch.item.brick : null, strength: ch.item.tw.sport === "strength" ? (ch.item.tw.strength ?? []) : null })
         .eq("id", ch.row.id)
         .select("status, external_id")
         .maybeSingle();
@@ -477,4 +485,28 @@ export async function skipUpdate(applicationId: string): Promise<Result> {
   await supabase.from("plan_applications").update({ template_version: t?.version ?? 1 }).eq("id", applicationId);
   revalidatePath(`/library/plans/${app.template_id}`);
   return { ok: true };
+}
+
+/** Add the starter strength plans to this coach's plans (skips any already added by name). */
+export async function addStrengthStarters(): Promise<Result<{ added: number }>> {
+  const coach = await requireCoach();
+  const supabase = await createClient();
+  const { STARTERS } = await import("@/lib/strength/starters");
+  const { data: have } = await supabase.from("plan_templates").select("name").eq("coach_id", coach.id);
+  const names = new Set((have ?? []).map((h) => h.name as string));
+  let added = 0;
+  for (const s of STARTERS) {
+    if (names.has(s.name)) continue;
+    const { data: t, error } = await supabase
+      .from("plan_templates")
+      .insert({ coach_id: coach.id, name: s.name, description: s.description, tags: s.tags, weeks: s.weeks, race_week: false, week_notes: s.notes, ref_zones: {} })
+      .select("id")
+      .single();
+    if (error || !t) continue;
+    const rows = s.schedule.flatMap((sch) => sch.weeks.map((week) => ({ template_id: t.id, week, day: sch.day, position: 0, title: sch.session.title, sport: "strength", steps: [], strength: sch.session.items })));
+    await supabase.from("plan_template_workouts").insert(rows);
+    added++;
+  }
+  revalidatePath("/library");
+  return { ok: true, added };
 }

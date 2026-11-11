@@ -6,6 +6,11 @@ import { notFound } from "next/navigation";
 import SessionFuel from "@/components/fuel/SessionFuel";
 import RideButtons from "@/components/RideButtons";
 import BackLink from "@/components/layout/BackLink";
+import StrengthSession from "@/components/strength/StrengthSession";
+import Spotlight from "@/components/Spotlight";
+import { seen, TIPS } from "@/lib/discovery";
+import { describeStrength, type StrengthItem } from "@/lib/strength/workout";
+import { videoMap } from "@/lib/recovery/data";
 import { clock12 } from "@/lib/week-prefs";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
@@ -33,7 +38,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const [{ data: w }, { data: done }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick, start_time")
+      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick, start_time, strength")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -78,7 +83,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {w.start_time ? ` · ${clock12(String(w.start_time).slice(0, 5))}` : ""}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
-      <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} brick={brick} className="mt-4" />
+      {w.sport !== "strength" && <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} brick={brick} className="mt-4" />}
       {w.sport === "bike" && w.athlete_id === me.id && !done && <RideButtons workoutId={w.id} />}
 
       {w.why && (
@@ -174,6 +179,23 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         </section>
       )}
 
+      {w.sport === "strength" ? (
+        w.athlete_id === me.id ? (
+          <>
+          <Spotlight tip={TIPS.strength} seen={seen(((await supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle()).data?.seen_tips ?? []) as string[], TIPS.strength.id)} />
+          <StrengthSession workoutId={w.id} items={(w.strength ?? []) as StrengthItem[]} unit={me.units === "km" ? "kg" : "lb"} videos={await videoMap(supabase)} done={Boolean(done)} />
+          </>
+        ) : (
+          <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+            <h2 className="text-lg font-medium">Exercises</h2>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-white/80">
+              {describeStrength((w.strength ?? []) as StrengthItem[], me.units === "km" ? "kg" : "lb").map((l, k) => (
+                <li key={k}>{l}</li>
+              ))}
+            </ol>
+          </section>
+        )
+      ) : (
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
         <h2 className="text-lg font-medium">{brick ? "Bike" : "Steps"}</h2>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-white/80">
@@ -197,6 +219,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         )}
         <p className="mt-4 text-xs text-white/45">On your watch after it syncs. Training guidance from your coach, not medical advice.</p>
       </section>
+      )}
 
       {!done && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">

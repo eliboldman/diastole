@@ -6,6 +6,7 @@ import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Brick, Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
+import type { StrengthItem } from "@/lib/strength/workout";
 
 export const metadata: Metadata = { title: "Plan session · Diastole" };
 
@@ -20,7 +21,7 @@ export default async function PlanSessionPage({ params, searchParams }: { params
   const isNew = wid === "new";
   const { data: w } = isNew
     ? { data: null }
-    : await supabase.from("plan_template_workouts").select("id, week, day, title, sport, description, why, steps, brick, pool_length, pool_unit").eq("id", wid).eq("template_id", id).maybeSingle();
+    : await supabase.from("plan_template_workouts").select("id, week, day, title, sport, description, why, steps, brick, pool_length, pool_unit, strength").eq("id", wid).eq("template_id", id).maybeSingle();
   if (!isNew && !w) notFound();
   const week = w?.week ?? Math.min(52, Math.max(1, Number(sp.week) || 1));
   const day = w?.day ?? Math.min(6, Math.max(0, Number(sp.day) || 0));
@@ -45,7 +46,8 @@ export default async function PlanSessionPage({ params, searchParams }: { params
               ? {
                   id: w.id,
                   title: w.title,
-                  sport: w.sport as Sport,
+                  sport: w.sport as Sport | "strength",
+                  strength: (w.strength ?? null) as StrengthItem[] | null,
                   scheduledDate: new Date().toISOString().slice(0, 10),
                   description: w.description,
                   steps: (w.steps ?? []) as Step[],

@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { assignFromLibrary, deleteLibraryItem, updateLibraryItem } from "@/lib/workouts/actions";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { hasRelative } from "@/lib/workouts/relative";
+import { describeStrength, type StrengthItem } from "@/lib/strength/workout";
 import { describe } from "@/lib/workouts/describe";
 import type { Brick, PoolUnit, Step } from "@/lib/workouts/garmin-format";
 
@@ -23,6 +24,7 @@ type Item = {
   pool_length?: number | null;
   pool_unit?: PoolUnit | null;
   brick?: Brick;
+  strength?: StrengthItem[] | null;
   use_count: number;
   last_used_at: string | null;
 };
@@ -133,8 +135,15 @@ export default function Library({
               )}
               {open === i.id && (
                 <div className="mt-4 grid gap-3 border-t border-white/[0.09] pt-4 text-sm">
-                  <WorkoutSummary steps={i.steps} sport={i.sport} pool={i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null} units={units} brick={i.brick ?? null} />
+                  {i.sport !== "strength" && (<WorkoutSummary steps={i.steps} sport={i.sport} pool={i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null} units={units} brick={i.brick ?? null} />)}
                   {hasRelative(i.steps) && <p className="text-xs text-emerald-100/70">Targets scale to each athlete&apos;s zones when assigned.</p>}
+                  {i.sport === "strength" && (
+                    <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
+                      {describeStrength(i.strength ?? [], units === "km" ? "kg" : "lb").map((l, k) => (
+                        <li key={k}>{l}</li>
+                      ))}
+                    </ol>
+                  )}
                   <ol className="list-decimal space-y-0.5 pl-5 text-white/60">
                     {describe(i.steps, units, i.pool_length && i.pool_unit ? { length: Number(i.pool_length), unit: i.pool_unit } : null, i.sport === "swim", true).map((l, k) => (
                       <li key={k}>{l}</li>

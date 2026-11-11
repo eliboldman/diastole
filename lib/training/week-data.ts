@@ -4,6 +4,7 @@ import { compareWorkout, complianceOf, type Compliance } from "@/lib/activity/co
 import type { Lap } from "@/lib/activity/fit";
 import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { inferPool, type Brick, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
+import type { StrengthItem } from "@/lib/strength/workout";
 
 import { addDays, mondayOf, weekReview, type WeekReview } from "./week";
 
@@ -30,7 +31,7 @@ export async function getWeek(supabase: SupabaseClient, athleteId: string, tz: s
   const [{ data: plans }, { data: acts }, { data: zones }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, scheduled_date, sport, title, steps, pool_length, pool_unit, brick")
+      .select("id, scheduled_date, sport, title, steps, pool_length, pool_unit, brick, strength")
       .eq("athlete_id", athleteId)
       .neq("status", "draft")
       .is("deleted_at", null)
@@ -53,7 +54,7 @@ export async function getWeek(supabase: SupabaseClient, athleteId: string, tz: s
     zones,
     plans: (plans ?? []).map((p) => {
       const saved = p.pool_length && p.pool_unit ? { length: Number(p.pool_length), unit: p.pool_unit as PoolUnit } : null;
-      return { id: p.id, date: p.scheduled_date, sport: p.sport, title: p.title, steps: (p.steps ?? []) as Step[], pool: p.sport === "swim" ? inferPool((p.steps ?? []) as Step[], saved) : saved, brick: (p.brick ?? null) as Brick };
+      return { id: p.id, date: p.scheduled_date, sport: p.sport, title: p.title, steps: (p.steps ?? []) as Step[], pool: p.sport === "swim" ? inferPool((p.steps ?? []) as Step[], saved) : saved, brick: (p.brick ?? null) as Brick, strength: (p.strength ?? null) as StrengthItem[] | null };
     }),
     activities: acts ?? [],
   });

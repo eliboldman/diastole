@@ -18,7 +18,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
   const [{ data: items }, { data: athletes }, { data: plans }, { data: apps }, { data: prof }] = await Promise.all([
     supabase
       .from("workout_library")
-      .select("id, title, sport, workout_type, tags, description, steps, use_count, last_used_at, updated_at, pool_length, pool_unit, brick")
+      .select("id, title, sport, workout_type, tags, description, steps, use_count, last_used_at, updated_at, pool_length, pool_unit, brick, strength")
       .eq("coach_id", coach.id)
       .order("updated_at", { ascending: false })
       .limit(500),

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { estimateMaxHr } from "@/lib/activity/zones";
 import type { Brick, Step } from "@/lib/workouts/garmin-format";
+import type { StrengthItem } from "@/lib/strength/workout";
 
 import { formBand, loadSeries, plannedLoad, rampRate, sessionLoad, type FormBand, type LoadDay, type LoadSource } from "./load";
 
@@ -30,7 +31,7 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
   const [{ data: acts }, { data: zones }, { data: rhr }, { data: plans }] = await Promise.all([
     supabase
       .from("activities")
-      .select("start_time, sport, duration_s, avg_hr, max_hr, avg_power, normalized_power, avg_speed_mps")
+      .select("start_time, sport, duration_s, avg_hr, max_hr, avg_power, normalized_power, avg_speed_mps, training_load")
       .eq("athlete_id", athleteId)
       .gte("start_time", new Date(Date.parse(`${addDays(from, -1)}T00:00:00Z`)).toISOString())
       .order("start_time")
@@ -39,7 +40,7 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
     supabase.from("daily_wellness").select("resting_hr").eq("athlete_id", athleteId).gte("date", addDays(today, -60)).not("resting_hr", "is", null).limit(60),
     supabase
       .from("planned_workouts")
-      .select("scheduled_date, sport, steps, brick")
+      .select("scheduled_date, sport, steps, brick, strength")
       .eq("athlete_id", athleteId)
       .neq("status", "draft")
       .is("deleted_at", null)
@@ -58,7 +59,7 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
   };
 
   const done = new Map<string, number>();
-  const sources: Record<LoadSource, number> = { power: 0, pace: 0, hr: 0, time: 0 };
+  const sources: Record<LoadSource, number> = { power: 0, pace: 0, hr: 0, rpe: 0, time: 0 };
   let sessions = 0;
   let doneToday = false;
   for (const a of acts) {
@@ -77,7 +78,7 @@ export async function getLoad(supabase: SupabaseClient, athleteId: string, tz: s
   for (const p of plans ?? []) {
     if (p.scheduled_date === today && doneToday) continue;
     const run = (p.brick as Brick)?.steps?.length ? plannedLoad((p.brick as NonNullable<Brick>).steps, "run") : 0;
-    planned.set(p.scheduled_date, (planned.get(p.scheduled_date) ?? 0) + plannedLoad((p.steps ?? []) as Step[], p.sport) + run);
+    planned.set(p.scheduled_date, (planned.get(p.scheduled_date) ?? 0) + plannedLoad((p.steps ?? []) as Step[], p.sport, (p.strength ?? null) as StrengthItem[] | null) + run);
   }
 
   const all = loadSeries({ from, to, today, done, planned });

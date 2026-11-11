@@ -14,6 +14,7 @@ export async function getWatchStatuses(supabase: SupabaseClient, athleteIds: str
       .from("planned_workouts")
       .select("athlete_id, scheduled_date, status, external_id, sent_at, deleted_at, removal_status")
       .in("athlete_id", athleteIds)
+      .neq("sport", "strength") // strength isn't sent to watches the same way (Apple: in-app only)
       .is("deleted_at", null)
       .in("status", ["approved", "sent"])
       .gte("scheduled_date", today),

@@ -29,6 +29,7 @@ import FitnessSection from "@/components/training/FitnessSection";
 import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
 import SaveAsPlan from "@/components/plans/SaveAsPlan";
 import BedtimeTrend from "@/components/sleep/BedtimeTrend";
+import StrengthCoachCard from "@/components/strength/StrengthCoachCard";
 import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import { getLoad } from "@/lib/training/load-data";
 import { getWeek, weekStartFrom } from "@/lib/training/week-data";
@@ -127,6 +128,9 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
       </div>
       <div className="mt-6">
         <FitnessSection view={load} />
+      </div>
+      <div className="mt-6 empty:hidden">
+        <StrengthCoachCard athleteId={profile.id} units={me.units === "km" ? "km" : "mi"} />
       </div>
       <div className="mt-6">
         <BedtimeTrend athleteId={profile.id} timeZone={athleteTz} name={(profile.full_name ?? "").split(" ")[0] || "They"} />

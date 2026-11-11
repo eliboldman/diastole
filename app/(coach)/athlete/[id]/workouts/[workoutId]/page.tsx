@@ -10,6 +10,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 import type { Brick, Pool, PoolUnit, Sport, Step } from "@/lib/workouts/garmin-format";
 import { cleanWeek, WEEKDAYS } from "@/lib/week-prefs";
+import type { StrengthItem } from "@/lib/strength/workout";
 import BackLink from "@/components/layout/BackLink";
 import { MessageAbout, WorkoutMessages } from "@/components/messages/WorkoutMessages";
 
@@ -20,6 +21,7 @@ type Row = {
   why: string | null;
   brick: Brick | null;
   start_time: string | null;
+  strength: StrengthItem[] | null;
   title: string;
   sport: string;
   scheduled_date: string;
@@ -44,13 +46,14 @@ export default async function WorkoutPage({
   const { id, workoutId } = await params;
   const { sport: sportParam } = await searchParams;
   const me = await requireCoach();
-  const startSport: Sport = sportParam === "bike" || sportParam === "swim" ? sportParam : "run";
+  const startSport: Sport | "strength" = sportParam === "bike" || sportParam === "swim" || sportParam === "strength" ? sportParam : "run";
   const supabase = await createClient();
 
-  const [{ data: athlete }, { data: device }, { data: weekRow }] = await Promise.all([
+  const [{ data: athlete }, { data: device }, { data: weekRow }, { data: clips }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email").eq("id", id).maybeSingle(),
     supabase.from("device_connections").select("source").eq("athlete_id", id).maybeSingle(),
     supabase.from("athlete_week").select("days").eq("athlete_id", id).maybeSingle(),
+    supabase.from("recovery_videos").select("slug"),
   ]);
   const week = cleanWeek(weekRow?.days);
   const windows = WEEKDAYS.map(([k]) => week[k].window?.start ?? null);
@@ -63,7 +66,7 @@ export default async function WorkoutPage({
     const [{ data }, { data: v }] = await Promise.all([
       supabase
         .from("planned_workouts")
-        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why, brick, start_time")
+        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why, brick, start_time, strength")
         .eq("id", workoutId)
         .eq("athlete_id", id)
         .maybeSingle(),
@@ -84,7 +87,8 @@ export default async function WorkoutPage({
     ? {
         id: w.id,
         title: w.title,
-        sport: w.sport as Sport,
+        sport: w.sport as Sport | "strength",
+        strength: (w.strength ?? null) as StrengthItem[] | null,
         scheduledDate: w.scheduled_date,
         description: w.description,
         steps: w.steps,
@@ -154,7 +158,7 @@ export default async function WorkoutPage({
 
       {!w?.deleted_at && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:p-6">
-          <WorkoutBuilder athleteId={id} athleteName={firstName} device={source} initial={initial} startSport={startSport} units={me.units} windows={windows} />
+          <WorkoutBuilder athleteId={id} athleteName={firstName} device={source} initial={initial} startSport={startSport} units={me.units} windows={windows} demos={(clips ?? []).map((c) => c.slug as string)} />
         </section>
       )}
 

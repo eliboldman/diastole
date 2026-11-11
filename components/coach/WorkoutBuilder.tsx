@@ -2,13 +2,16 @@
 
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { draftWhyForBuilder } from "@/lib/ai/why";
 import { requestWorkout, saveMyWorkout } from "@/lib/workouts/athlete-actions";
 import { saveTemplateWorkout } from "@/lib/plans/actions";
+import StrengthEditor from "@/components/strength/StrengthEditor";
+import { describeStrength, heavyLegs, strengthSeconds, type StrengthItem } from "@/lib/strength/workout";
+import { heavyLegsWarning } from "@/lib/strength/actions";
 import WorkoutSummary from "@/components/workouts/WorkoutSummary";
 import { describe } from "@/lib/workouts/describe";
 import {
@@ -523,25 +526,30 @@ export default function WorkoutBuilder({
   hasCoach = true,
   template,
   windows,
+  demos,
 }: {
   // athlete: their own builder. No AI; saves to My workouts and asks the coach to add it.
   // template: a session in a plan template (week and day, no date, nothing is sent).
   mode?: "coach" | "athlete" | "template";
   template?: { id: string; week: number; day: number; weeks: number };
   hasCoach?: boolean;
-  startSport?: Sport;
+  startSport?: Sport | "strength";
   units?: "mi" | "km";
   athleteId: string;
   athleteName: string;
   device: "garmin" | "apple" | null;
-  initial?: { id: string; title: string; sport: Sport; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null; brick?: Brick; startTime?: string | null };
+  initial?: { id: string; title: string; sport: Sport | "strength"; strength?: StrengthItem[] | null; scheduledDate: string; description: string | null; steps: Step[]; status: string; pool?: Pool; why?: string | null; brick?: Brick; startTime?: string | null };
   // The athlete's training window per weekday (0 = Monday): the default time for a new date.
   windows?: (string | null)[];
+  // Exercise slugs that have a demo clip (strength).
+  demos?: string[];
 }) {
   const router = useRouter();
   const [id, setId] = useState(initial?.id);
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [sport, setSport] = useState<Sport>(initial?.sport ?? startSport);
+  // "strength" is a builder mode of its own (exercises, not steps); everything else is endurance.
+  const [sport, setSport] = useState<Sport | "strength">(initial?.sport ?? startSport);
+  const [strength, setStrength] = useState<StrengthItem[]>(initial?.strength ?? []);
   // Tomorrow in the coach's local time (en-CA formats as YYYY-MM-DD).
   const [date, setDate] = useState(() => initial?.scheduledDate ?? new Date(Date.now() + 86400_000).toLocaleDateString("en-CA"));
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -558,6 +566,7 @@ export default function WorkoutBuilder({
   const [paceUnit, setPaceUnit] = useState<"mi" | "km">(units);
   const [pool, setPool] = useState<Pool>(initial ? inferPool(initial.steps, initial.pool ?? null) : { length: 25, unit: "YARD" });
   const swim = sport === "swim";
+  const strengthMode = sport === "strength";
   // Keep the same number of lengths' worth of distance in the new unit (100 yd -> 100 m).
   const changePool = (next: Pool) => {
     const factor = hundredMeters(next) / hundredMeters(pool);
@@ -580,17 +589,26 @@ export default function WorkoutBuilder({
   const templateMode = mode === "template";
   const [tWeek, setTWeek] = useState(template?.week ?? 1);
   const [tDay, setTDay] = useState(template?.day ?? 0);
+  // Heavy legs the day before a key bike/run on this athlete's calendar (checked as you build).
+  const [legsWarning, setLegsWarning] = useState<string | null>(null);
+  useEffect(() => {
+    if (!strengthMode || templateMode || athleteMode) return;
+    const t = setTimeout(() => {
+      heavyLegsWarning(athleteId, date, strength).then(setLegsWarning).catch(() => setLegsWarning(null));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [strengthMode, templateMode, athleteMode, athleteId, date, strength]);
   const editable = athleteMode || !initial || initial.status === "draft";
 
   // Describe it: Claude turns the coach's words into steps that fill this builder for review.
   const [prompt, setPrompt] = useState("");
   const [building, startBuild] = useTransition();
-  const [built, setBuilt] = useState<{ note: string | null; cost: number; undo: { title: string; sport: Sport; steps: UiStep[]; description: string } } | null>(null);
+  const [built, setBuilt] = useState<{ note: string | null; cost: number; undo: { title: string; sport: Sport | "strength"; steps: UiStep[]; description: string } } | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
   const buildIt = () =>
     startBuild(async () => {
       setBuildError(null);
-      const r = await buildWorkoutFromPrompt({ athleteId, prompt, sport, paceUnit, pool: sport === "swim" ? pool : pool ?? { length: 25, unit: "YARD" } });
+      const r = await buildWorkoutFromPrompt({ athleteId, prompt, sport: sport === "strength" ? "run" : sport, paceUnit, pool: sport === "swim" ? pool : pool ?? { length: 25, unit: "YARD" } });
       if (!r.ok) return setBuildError(r.error);
       setBuilt({ note: r.assumptions, cost: r.costUsd, undo: { title, sport, steps, description } });
       setTitle(r.title);
@@ -599,9 +617,23 @@ export default function WorkoutBuilder({
       if (r.description) setDescription(r.description);
       navigator.vibrate?.([8, 30, 8]);
     });
-  const mine = () => ({ id, title, sport, description, steps: stripIds(steps), pool: swim ? pool : null });
+  // Athletes' own builder never offers strength.
+  const mine = () => ({ id, title, sport: (sport === "strength" ? "run" : sport) as Sport, description, steps: stripIds(steps), pool: swim ? pool : null });
   const brickOut = (): Brick => (sport === "bike" && brick?.length ? { sport: "run", steps: stripIds(brick) } : null);
-  const input = (): WorkoutInput => ({ id, athleteId, title, sport, scheduledDate: date, description, steps: stripIds(steps), pool: swim ? pool : null, why, brick: brickOut(), startTime: startTime || null });
+  const input = (): WorkoutInput => ({
+    id,
+    athleteId,
+    title,
+    sport,
+    scheduledDate: date,
+    description,
+    steps: strengthMode ? [] : stripIds(steps),
+    pool: swim ? pool : null,
+    why,
+    brick: brickOut(),
+    startTime: startTime || null,
+    ...(strengthMode ? { strength } : {}),
+  });
   const draftTheWhy = () =>
     startDraft(async () => {
       setWhyNote(null);
@@ -612,11 +644,11 @@ export default function WorkoutBuilder({
     });
 
   // Switching sport on an untouched starter workout swaps in that sport's starter.
-  const changeSport = (next: Sport) => {
+  const changeSport = (next: Sport | "strength") => {
     const current = JSON.stringify(stripIds(steps));
     const untouched = current === JSON.stringify(DEFAULT_STEPS) || current === JSON.stringify(swimDefault(pool));
     setSport(next);
-    if (untouched) setSteps(withIds(next === "swim" ? swimDefault(pool) : DEFAULT_STEPS));
+    if (untouched && next !== "strength") setSteps(withIds(next === "swim" ? swimDefault(pool) : DEFAULT_STEPS));
   };
 
 
@@ -634,7 +666,7 @@ export default function WorkoutBuilder({
 
   return (
     <div className="grid gap-5">
-      {editable && !athleteMode && !templateMode && (
+      {editable && !athleteMode && !templateMode && !strengthMode && (
         <section className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.04] p-3">
           <label className="block">
             <span className="mb-1.5 flex items-center gap-2 text-sm font-medium">
@@ -701,10 +733,11 @@ export default function WorkoutBuilder({
       )}
       <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
         <input className={field} placeholder="Workout title, e.g. 4 × 3 min threshold" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!editable} maxLength={100} />
-        <select className={sel} value={sport} onChange={(e) => changeSport(e.target.value as Sport)} disabled={!editable} aria-label="Sport">
+        <select className={sel} value={sport} onChange={(e) => changeSport(e.target.value as Sport | "strength")} disabled={!editable} aria-label="Sport">
           <option value="run">Run</option>
           <option value="bike">Bike</option>
           <option value="swim">Swim</option>
+          {!athleteMode && <option value="strength">Strength</option>}
         </select>
         {templateMode ? (
           <div className="grid grid-cols-2 gap-2">
@@ -814,6 +847,21 @@ export default function WorkoutBuilder({
         </div>
       )}
 
+      {strengthMode ? (
+        <>
+          <div className="rounded-[22px] border border-white/10 bg-white/[0.055] p-4">
+            <p className="text-[15px] font-medium text-white/90">{strength.length ? `${strength.length} exercise${strength.length === 1 ? "" : "s"} · about ${Math.round(strengthSeconds(strength) / 60)} min` : "No exercises yet"}</p>
+            {legsWarning ? (
+              <p className="mt-1 text-sm text-amber-100/90">{legsWarning}</p>
+            ) : (
+              heavyLegs(strength).length > 0 && <p className="mt-1 text-xs text-white/55">Heavy legs ({heavyLegs(strength).join(", ")}): you&apos;ll see a warning here if this lands the day before a key bike or run.</p>
+            )}
+          </div>
+          <h2 className="text-lg font-medium">Exercises</h2>
+          <StrengthEditor items={strength} setItems={setStrength} unit={paceUnit === "km" ? "kg" : "lb"} editable={editable} demos={demos ?? []} />
+        </>
+      ) : (
+        <>
       {/* Live totals: stays in view while the steps below are edited. */}
       <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-30 md:top-2">
         <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} brick={brickOut()} className="bg-canvas/90 backdrop-blur-xl" />
@@ -833,6 +881,8 @@ export default function WorkoutBuilder({
       </div>
 
       <StepsList steps={steps} setSteps={setSteps} paceUnit={paceUnit} swim={swim} pool={pool} editable={editable} />
+        </>
+      )}
 
       {sport === "bike" && !athleteMode && (
         <div className="grid gap-3 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
@@ -873,6 +923,7 @@ export default function WorkoutBuilder({
                   day: tDay,
                   title,
                   sport,
+                  strength: strengthMode ? strength : null,
                   description,
                   why,
                   steps: stripIds(steps),
@@ -960,9 +1011,9 @@ export default function WorkoutBuilder({
               <strong className="text-white">{title || "Untitled"}</strong> ({sport}) on{" "}
               {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} → {destination}
             </p>
-            <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} brick={brickOut()} className="mt-4" />
+            {!strengthMode && <WorkoutSummary steps={stripIds(steps)} sport={sport} pool={swim ? pool : null} units={paceUnit} brick={brickOut()} className="mt-4" />}
             <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-white/70">
-              {describe(stripIds(steps), paceUnit, swim ? pool : null, swim).map((l, i) => (
+              {(strengthMode ? describeStrength(strength, paceUnit === "km" ? "kg" : "lb") : describe(stripIds(steps), paceUnit, swim ? pool : null, swim)).map((l, i) => (
                 <li key={i}>{l}</li>
               ))}
             </ol>

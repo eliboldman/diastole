@@ -3,6 +3,13 @@ import "server-only";
 import { garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { toGarminWorkout, type Brick, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { toGarminStrength, type StrengthItem } from "@/lib/strength/workout";
+
+/** The athlete's weight unit for the watch (pounds for mile users). */
+async function weightUnit(admin: ReturnType<typeof createAdminClient>, athleteId: string): Promise<"kg" | "lb"> {
+  const { data } = await admin.from("profiles").select("units").eq("id", athleteId).maybeSingle();
+  return data?.units === "km" ? "kg" : "lb";
+}
 
 /**
  * Sends one planned workout to the athlete's Garmin calendar (Training API V2).
@@ -12,7 +19,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
   const admin = createAdminClient();
   const { data: w, error } = await admin
     .from("planned_workouts")
-    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit, brick")
+    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit, brick, strength")
     .eq("id", workoutId)
     .single();
   if (error || !w) throw new Error("Workout not found.");
@@ -24,7 +31,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     throw new Error("Workout must be approved by the coach before sending.");
   if (w.external_id) throw new Error("Workout was already sent to Garmin.");
 
-  const body = toGarminWorkout({
+  const body = w.sport === "strength" ? toGarminStrength(w.title, (w.strength ?? []) as StrengthItem[], await weightUnit(admin, w.athlete_id), w.description) : toGarminWorkout({
     title: w.title,
     description: w.description,
     sport: w.sport as Sport,

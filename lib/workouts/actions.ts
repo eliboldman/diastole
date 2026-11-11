@@ -10,6 +10,7 @@ import { fromConnectWorkout } from "@/lib/workouts/connect-import";
 import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { annotate, hasRelative, resolve, ZONE_COLUMNS, type RelZones } from "@/lib/workouts/relative";
 import { cleanWeek, windowFor } from "@/lib/week-prefs";
+import type { StrengthItem } from "@/lib/strength/workout";
 import { planSchedule, type ImportedRef, type ScheduleRow, type ScheduleSkip } from "@/lib/workouts/schedule-import";
 
 export type Result = { ok: true; id?: string; ids?: string[]; message?: string } | { ok: false; error: string };
@@ -31,9 +32,10 @@ type WorkoutRow = {
   pool_length: number | null;
   pool_unit: PoolUnit | null;
   brick: Brick;
+  strength?: StrengthItem[] | null;
 };
 
-const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id, pool_length, pool_unit, brick";
+const COLS = "id, athlete_id, coach_id, title, sport, scheduled_date, description, steps, status, external_id, deleted_at, library_id, pool_length, pool_unit, brick, strength";
 const poolOf = (w: { pool_length: number | null; pool_unit: PoolUnit | null }): Pool =>
   w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit } : null;
 
@@ -117,7 +119,7 @@ export async function syncToLibrary(workoutId: string): Promise<void> {
   const supabase = await createClient();
   const w = await load(supabase, workoutId);
   if (!w) return;
-  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps, brick: w.brick ?? null, pool_length: w.pool_length, pool_unit: w.pool_unit };
+  const content = { title: w.title, sport: w.sport, description: w.description, steps: w.steps, brick: w.brick ?? null, strength: w.strength ?? null, pool_length: w.pool_length, pool_unit: w.pool_unit };
 
   const { data: existing } = await supabase
     .from("workout_library")
@@ -309,6 +311,7 @@ export async function duplicateWorkout(id: string, date?: string): Promise<Resul
       description: w.description,
       steps: w.steps,
       brick: w.brick,
+      strength: w.strength ?? null,
       pool_length: w.pool_length,
       pool_unit: w.pool_unit,
       status: "draft",
@@ -363,7 +366,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("workout_library")
-    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit, source_workout_id, brick")
+    .select("id, title, sport, description, steps, use_count, pool_length, pool_unit, source_workout_id, brick, strength")
     .eq("id", libraryId)
     .maybeSingle();
   if (!item) return { ok: false, error: "Library workout not found." };
@@ -408,6 +411,7 @@ export async function assignFromLibrary(libraryId: string, athleteIds: string[],
         description: item.description,
         steps: scaled.steps,
         brick: run ? { sport: "run", steps: run.steps } : null,
+        strength: item.sport === "strength" ? (item.strength ?? []) : null,
         start_time: windowFor(cleanWeek(weeks?.find((x) => x.athlete_id === athleteId)?.days), date)?.start ?? null,
         pool_length: item.pool_length,
         pool_unit: item.pool_unit,

@@ -3,6 +3,7 @@
 // with `node`.
 
 import type { Brick, Pool, Step } from "../workouts/garmin-format.ts";
+import type { StrengthItem } from "../strength/workout.ts";
 import { resolve, stripRel, type Missing, type RelZones } from "../workouts/relative.ts";
 import { cleanWeek, WEEKDAYS, windowFor, type WeekPrefs } from "../week-prefs.ts";
 
@@ -11,7 +12,7 @@ export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00
 export const mondayOf = (d: string) => addDays(d, -((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7));
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / DAY);
 
-export type Sport = "run" | "bike" | "swim";
+export type Sport = "run" | "bike" | "swim" | "strength";
 export type TemplateWorkout = {
   id?: string;
   week: number; // 1-based
@@ -24,10 +25,11 @@ export type TemplateWorkout = {
   steps: Step[];
   brick: Brick;
   pool: Pool;
+  strength?: StrengthItem[] | null;
   updated_at?: string;
 };
 
-export type DatedWorkout = { scheduled_date: string; title: string; sport: string; description: string | null; why?: string | null; steps: Step[]; brick?: Brick; pool: Pool };
+export type DatedWorkout = { scheduled_date: string; title: string; sport: string; description: string | null; why?: string | null; steps: Step[]; brick?: Brick; pool: Pool; strength?: StrengthItem[] | null };
 
 /** Dated workouts (an athlete's block) as template slots, counting weeks from the Monday of `from`. */
 export function toTemplate(workouts: DatedWorkout[], from: string): { weeks: number; workouts: TemplateWorkout[] } {
@@ -35,7 +37,7 @@ export function toTemplate(workouts: DatedWorkout[], from: string): { weeks: num
   const out: TemplateWorkout[] = [];
   const perDay = new Map<string, number>();
   for (const w of [...workouts].sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))) {
-    if (!["run", "bike", "swim"].includes(w.sport)) continue;
+    if (!["run", "bike", "swim", "strength"].includes(w.sport)) continue;
     const diff = daysBetween(start, w.scheduled_date);
     if (diff < 0) continue;
     const slot = `${Math.floor(diff / 7)}:${diff % 7}`;
@@ -52,6 +54,7 @@ export function toTemplate(workouts: DatedWorkout[], from: string): { weeks: num
       steps: w.steps,
       brick: w.brick ?? null,
       pool: w.pool,
+      strength: w.strength ?? null,
     });
   }
   const weeks = Math.max(1, ...out.map((w) => w.week));
@@ -132,6 +135,7 @@ export type AppliedRow = {
   description: string | null;
   steps: Step[];
   brick: Brick;
+  strength?: StrengthItem[] | null;
   status: string;
   done: boolean; // an activity is linked to it
 };
@@ -166,6 +170,7 @@ export function updatesFor(opts: { rows: AppliedRow[]; items: PlannedItem[]; tod
     if ((row.description ?? null) !== (item.tw.description ?? null)) what.push("description");
     if (!same(bare(row.steps), bare(item.steps))) what.push("steps");
     if (!same(row.brick ? bare(row.brick.steps) : null, item.brick ? bare(item.brick.steps) : null)) what.push("run off the bike");
+    if (item.tw.sport === "strength" && !same(row.strength ?? [], item.tw.strength ?? [])) what.push("exercises");
     if (what.length) changes.push({ kind: "update", row, item, what });
   }
   for (const row of opts.rows) {

@@ -10,6 +10,7 @@ const FAMILY: Record<Family, { label: string; icon: typeof Bike }> = {
   run: { label: "Run", icon: Footprints },
   bike: { label: "Bike", icon: Bike },
   swim: { label: "Swim", icon: Waves },
+  strength: { label: "Strength", icon: Dumbbell },
   other: { label: "Other", icon: Dumbbell },
 };
 

@@ -3,6 +3,7 @@
 // Pure module (type imports only) so it can be tested directly with `node`.
 
 import type { Brick, Pool, Step } from "../workouts/garmin-format.ts";
+import { strengthSeconds, type StrengthItem } from "../strength/workout.ts";
 import { workoutTotals, type Zones } from "../workouts/totals.ts";
 
 const DAY = 86_400_000;
@@ -10,11 +11,11 @@ export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00
 export const mondayOf = (d: string) => addDays(d, -((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7));
 export const localDay = (iso: string, tz: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: tz });
 
-export type Family = "run" | "bike" | "swim" | "other";
+export type Family = "run" | "bike" | "swim" | "strength" | "other";
 export const familyOf = (s: string | null | undefined): Family =>
-  /swim/i.test(s ?? "") ? "swim" : /run|treadmill|track|trail/i.test(s ?? "") ? "run" : /cycl|bik|ride|spin/i.test(s ?? "") ? "bike" : "other";
+  /swim/i.test(s ?? "") ? "swim" : /run|treadmill|track|trail/i.test(s ?? "") ? "run" : /cycl|bik|ride|spin/i.test(s ?? "") ? "bike" : /strength|weight|gym/i.test(s ?? "") ? "strength" : "other";
 
-export type WeekPlan = { id: string; date: string; sport: string; title: string; steps: Step[]; pool: Pool; brick?: Brick };
+export type WeekPlan = { id: string; date: string; sport: string; title: string; steps: Step[]; pool: Pool; brick?: Brick; strength?: StrengthItem[] | null };
 export type WeekActivity = { id: string; start_time: string; sport: string | null; duration_s: number | null; distance_m: number | null; planned_workout_id: string | null };
 
 export type SessionStatus = "done" | "short" | "missed" | "today" | "upcoming";
@@ -91,7 +92,7 @@ export function weekReview(opts: { start: string; today: string; tz: string; pla
   let due = 0;
   let done = 0;
   const sessions: WeekSession[] = plans.map((p) => {
-    const t = workoutTotals(p.steps, p.sport, p.pool, opts.zones ?? null);
+    const t = p.sport === "strength" ? { seconds: strengthSeconds(p.strength ?? []), meters: 0, distanceEstimated: false, timeEstimated: true, openSteps: 0, hardSeconds: 0 } : workoutTotals(p.steps, p.sport, p.pool, opts.zones ?? null);
     const fam = familyOf(p.sport);
     const s = sport(fam);
     s.plannedSec += t.seconds;
@@ -124,7 +125,7 @@ export function weekReview(opts: { start: string; today: string; tz: string; pla
     s.doneM += x.a.distance_m ?? 0;
   }
 
-  const order: Family[] = ["run", "bike", "swim", "other"];
+  const order: Family[] = ["run", "bike", "swim", "strength", "other"];
   return {
     start,
     end,

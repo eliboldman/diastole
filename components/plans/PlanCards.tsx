@@ -1,14 +1,20 @@
 "use client";
 
-import { CalendarRange, ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronRight, Dumbbell } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+
+import { addStrengthStarters } from "@/lib/plans/actions";
 
 export type PlanCard = { id: string; name: string; weeks: number; tags: string[]; sessions: number; athletes: number; behind: number; updated_at: string };
 
 /** The Plans shelf at the top of the Library: templates with tag filters. */
 export default function PlanCards({ plans }: { plans: PlanCard[] }) {
+  const router = useRouter();
   const [tag, setTag] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const hasStarters = plans.some((p) => p.tags.includes("strength") && /off-season strength|maintenance|resilience/i.test(p.name));
   const tags = useMemo(() => [...new Set(plans.flatMap((p) => p.tags))].sort(), [plans]);
   const shown = tag ? plans.filter((p) => p.tags.includes(tag)) : plans;
   return (
@@ -19,6 +25,16 @@ export default function PlanCards({ plans }: { plans: PlanCard[] }) {
         </h2>
         <p className="text-xs text-white/45">Save a block from any athlete&apos;s page (Planned workouts → Save as plan).</p>
       </div>
+      {!hasStarters && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => start(async () => { await addStrengthStarters(); router.refresh(); })}
+          className="mt-3 flex min-h-10 items-center gap-1.5 rounded-xl border border-white/10 px-3 text-sm text-white/75 hover:bg-white/[0.05] disabled:opacity-50"
+        >
+          <Dumbbell size={14} className="text-emerald-200" aria-hidden /> {pending ? "Adding…" : "Add starter strength plans (off-season, in-season, resilience)"}
+        </button>
+      )}
       {plans.length === 0 ? (
         <p className="mt-3 text-sm text-white/55">No plans yet. Open an athlete, pick the weeks you like in Planned workouts, and save them as a plan to reuse.</p>
       ) : (
