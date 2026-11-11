@@ -2,8 +2,8 @@
 // a training session isn't an all-out effort, so it can show someone got fitter but never that they
 // got slower. Pure module, testable with `node`.
 
-export type ZoneKey = "ftp_w" | "threshold_speed_mps" | "max_hr";
-export type CurrentZones = { ftp_w?: number | null; threshold_speed_mps?: number | null; max_hr?: number | null; dismissed?: Partial<Record<ZoneKey, number>> | null } | null;
+export type ZoneKey = "ftp_w" | "threshold_speed_mps" | "max_hr" | "css_sec_per_100m";
+export type CurrentZones = { ftp_w?: number | null; threshold_speed_mps?: number | null; max_hr?: number | null; css_sec_per_100m?: number | null; dismissed?: Partial<Record<string, number>> | null } | null;
 export type Effort = {
   activity_id: string;
   start_time: string;
@@ -11,7 +11,16 @@ export type Effort = {
   bests?: { run_5k?: number; run_10k?: number; run_half?: number; power_20m?: number } | null;
   max_hr?: number | null;
 };
-export type Suggestion = { key: ZoneKey; current: number | null; suggested: number; why: string; activity_id: string; date: string };
+export type Suggestion = {
+  key: ZoneKey;
+  current: number | null;
+  suggested: number;
+  why: string;
+  activity_id: string;
+  date: string;
+  /** From a threshold test: can lower the zone, and applying or dismissing it settles this test. */
+  test?: { kind: string; title: string; thresholdHr?: number };
+};
 
 // FTP is a cycling number. Running power (Garmin, Stryd) reads far higher than bike power, so a
 // run must never feed an FTP suggestion, even if an old stored best has power on it.
@@ -98,7 +107,8 @@ export function zoneText(key: ZoneKey, v: number | null, units: "mi" | "km"): st
   if (v === null) return "not set";
   if (key === "ftp_w") return `${v} W`;
   if (key === "max_hr") return `${v} bpm`;
+  if (key === "css_sec_per_100m") return units === "mi" ? `${clock(v * 0.9144)}/100 yd` : `${clock(v)}/100 m`;
   const per = units === "mi" ? 1609.344 : 1000;
   return `${clock(per / v)}/${units}`;
 }
-export const ZONE_LABEL: Record<ZoneKey, string> = { ftp_w: "FTP", threshold_speed_mps: "Threshold pace", max_hr: "Max HR" };
+export const ZONE_LABEL: Record<ZoneKey, string> = { ftp_w: "FTP", threshold_speed_mps: "Threshold pace", max_hr: "Max HR", css_sec_per_100m: "Swim CSS" };

@@ -21,7 +21,9 @@ export default function ZoneSuggestions({ rows, units, title = true }: { rows: Z
           <TrendingUp size={17} className="text-emerald-200" aria-hidden /> Zone updates
         </h2>
       )}
-      <p className={`${title ? "mt-1 " : ""}text-sm text-white/60`}>Recent efforts say these zones are out of date. Applying one also updates upcoming workouts that aren&apos;t on the watch yet.</p>
+      <p className={`${title ? "mt-1 " : ""}text-sm text-white/60`}>
+        {items.some((s) => s.test) ? "Tests and recent efforts say these zones are out of date (a test can lower one, too)." : "Recent efforts say these zones are out of date."} Applying one also updates upcoming workouts that aren&apos;t on the watch yet.
+      </p>
       <ul className="mt-3 divide-y divide-white/[0.08]">
         {items.map((s) => (
           <Item key={`${s.athleteId}:${s.key}`} s={s} units={units} />
@@ -46,10 +48,12 @@ function Item({ s, units }: { s: Suggestion & { athleteId: string; name?: string
             </Link>
           )}
           {s.name ? " · " : ""}
+          {s.test && <span className="mr-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-100">Test</span>}
           {ZONE_LABEL[s.key]}: <span className="text-white/55">{zoneText(s.key, s.current, units)}</span> → <span className="text-emerald-100">{zoneText(s.key, s.suggested, units)}</span>
         </p>
         <p className="text-xs text-white/55">
-          {s.why}{" "}
+          {s.why}
+          {s.test?.thresholdHr ? ` Applying also sets threshold heart rate to ${s.test.thresholdHr} bpm.` : ""}{" "}
           <Link href={`/activity/${s.activity_id}`} className="text-emerald-200/80 hover:underline">
             See workout
           </Link>
@@ -61,9 +65,9 @@ function Item({ s, units }: { s: Suggestion & { athleteId: string; name?: string
           disabled={pending}
           onClick={() =>
             start(async () => {
-              const r = await dismissZoneSuggestion(s.athleteId, s.key, s.suggested);
+              const r = await dismissZoneSuggestion(s.athleteId, s.key, s.suggested, s.test ? { testActivityId: s.activity_id } : {});
               if (r.ok) {
-                setDone(`Okay. ${ZONE_LABEL[s.key]} won't be suggested again unless a higher number shows up.`);
+                setDone(s.test ? `Okay. ${ZONE_LABEL[s.key]} stays as it is.` : `Okay. ${ZONE_LABEL[s.key]} won't be suggested again unless a higher number shows up.`);
                 router.refresh();
               }
             })
@@ -77,7 +81,7 @@ function Item({ s, units }: { s: Suggestion & { athleteId: string; name?: string
           disabled={pending}
           onClick={() =>
             start(async () => {
-              const r = await applyZoneSuggestion(s.athleteId, s.key, s.suggested);
+              const r = await applyZoneSuggestion(s.athleteId, s.key, s.suggested, s.test ? { testActivityId: s.activity_id, thresholdHr: s.test.thresholdHr } : {});
               setDone(r.ok ? `${ZONE_LABEL[s.key]} is now ${zoneText(s.key, s.suggested, units)}. ${r.message.replace(/^Saved\.\s*/, "")}`.trim() : r.message);
               if (r.ok) router.refresh();
             })
