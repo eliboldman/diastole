@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { approveAndSendMany } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { deleteWorkouts, undoDeletes } from "@/lib/workouts/actions";
 
 import { useToast } from "./Toast";
@@ -14,6 +15,7 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [pending, start] = useTransition();
   const { show, element } = useToast(10000);
 
@@ -26,6 +28,21 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
     });
   const allOn = workouts.length > 0 && workouts.every((w) => selected.has(w.id));
   const sentCount = workouts.filter((w) => selected.has(w.id) && w.status === "sent").length;
+  const drafts = workouts.filter((w) => w.status === "draft");
+  const pickedDrafts = drafts.filter((w) => selected.has(w.id));
+  const pickedAthletes = new Set(pickedDrafts.map((w) => w.athleteName)).size;
+  const today = new Date().toLocaleDateString("en-CA");
+  const pastDrafts = pickedDrafts.filter((w) => w.scheduled_date < today).length;
+
+  const approve = () =>
+    start(async () => {
+      navigator.vibrate?.(15);
+      const r = await approveAndSendMany(pickedDrafts.map((w) => w.id));
+      setApproving(false);
+      setSelected(new Set());
+      router.refresh();
+      show(r.ok ? r.message : r.error, { ok: r.ok && !/didn't send/.test(r.message) });
+    });
 
   const remove = () =>
     start(async () => {
@@ -59,14 +76,28 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
           />
           {selected.size ? `${selected.size} selected` : `${workouts.length} workout${workouts.length === 1 ? "" : "s"}`}
         </label>
-        <button
-          disabled={!selected.size || pending}
-          onClick={() => setConfirming(true)}
-          className="min-h-11 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 text-sm font-medium text-red-100 transition active:scale-95 disabled:opacity-30"
-        >
-          Delete selected
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            disabled={!pickedDrafts.length || pending}
+            onClick={() => setApproving(true)}
+            className="min-h-11 rounded-2xl bg-emerald-300 px-4 text-sm font-medium text-black transition active:scale-95 disabled:opacity-30"
+          >
+            {pickedDrafts.length ? `Approve & send ${pickedDrafts.length}` : "Approve & send"}
+          </button>
+          <button
+            disabled={!selected.size || pending}
+            onClick={() => setConfirming(true)}
+            className="min-h-11 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 text-sm font-medium text-red-100 transition active:scale-95 disabled:opacity-30"
+          >
+            Delete
+          </button>
+        </div>
       </div>
+      {drafts.length > 0 && pickedDrafts.length < drafts.length && (
+        <button type="button" onClick={() => setSelected(new Set(drafts.map((w) => w.id)))} className="mt-1 min-h-11 px-2 text-sm text-emerald-200 hover:underline">
+          Select all {drafts.length} draft{drafts.length === 1 ? "" : "s"}
+        </button>
+      )}
 
       {workouts.length === 0 ? (
         <p className="mt-6 text-sm text-white/55">
@@ -97,6 +128,29 @@ export default function BulkWorkouts({ workouts }: { workouts: Row[] }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {approving && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
+          <div className="toast-in w-full max-w-sm rounded-[28px] border border-white/10 bg-panel p-6">
+            <h3 className="text-lg font-medium">
+              Approve and send {pickedDrafts.length} workout{pickedDrafts.length === 1 ? "" : "s"}?
+            </h3>
+            <p className="mt-2 text-sm text-white/60">
+              {pickedAthletes === 1 ? `For ${pickedDrafts[0]?.athleteName}.` : `Across ${pickedAthletes} athletes.`}{" "}Each goes to that athlete&apos;s watch (Garmin) or their Diastole app (Apple Watch), and they&apos;re notified.
+            </p>
+            {pastDrafts > 0 && <p className="mt-2 text-sm text-amber-100/80">{`${pastDrafts} ${pastDrafts === 1 ? "is" : "are"} dated in the past.`}</p>}
+            {selected.size > pickedDrafts.length && <p className="mt-2 text-sm text-white/50">{`${selected.size - pickedDrafts.length} selected ${selected.size - pickedDrafts.length === 1 ? "isn't a draft" : "aren't drafts"} and will be left as is.`}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setApproving(false)} className="min-h-12 rounded-2xl px-4 text-sm text-white/60">
+                Cancel
+              </button>
+              <button disabled={pending} onClick={approve} className="min-h-12 rounded-2xl bg-emerald-300 px-5 text-sm font-medium text-black active:scale-95 disabled:opacity-50">
+                {pending ? "Sending…" : "Approve & send"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirming && (

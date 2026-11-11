@@ -141,6 +141,51 @@ export async function deliver(workoutId: string, athleteId: string): Promise<Act
   return { ok: true, id: workoutId, message: "Approved. The athlete has no device connected yet." };
 }
 
+/**
+ * Approve several drafts at once and send each to its athlete's watch (Garmin, or queued for the
+ * iPhone app). Only the coach's own drafts are touched; anything already approved or sent is skipped.
+ */
+export async function approveAndSendMany(ids: string[]): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const coach = await requireCoach();
+  const clean = [...new Set(ids)].filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 200);
+  if (!clean.length) return { ok: false, error: "Pick some drafts first." };
+  const supabase = await createClient();
+  const { data: drafts } = await supabase
+    .from("planned_workouts")
+    .select("id, athlete_id")
+    .in("id", clean)
+    .eq("coach_id", coach.id)
+    .eq("status", "draft")
+    .is("deleted_at", null)
+    .order("scheduled_date");
+  if (!drafts?.length) return { ok: false, error: "None of those are drafts." };
+  const { data: approved, error } = await supabase
+    .from("planned_workouts")
+    .update({ status: "approved", approved_at: new Date().toISOString() })
+    .in("id", drafts.map((d) => d.id))
+    .eq("status", "draft")
+    .select("id, athlete_id");
+  if (error) return { ok: false, error: error.message };
+  let failed = 0;
+  let noDevice = 0;
+  for (const d of approved ?? []) {
+    const r = await deliver(d.id, d.athlete_id);
+    if (!r.ok) failed += 1;
+    else if (r.message?.startsWith("Approved. The athlete has no device")) noDevice += 1;
+    await retireReplacedBy(supabase, d.id);
+  }
+  revalidatePath("/workouts");
+  const n = approved?.length ?? 0;
+  const parts = [`Approved ${n} workout${n === 1 ? "" : "s"}`];
+  const sent = n - failed - noDevice;
+  if (sent) parts.push(`${sent} sent`);
+  if (noDevice) parts.push(`${noDevice} waiting for a device`);
+  if (failed) parts.push(`${failed} didn't send (retry from the athlete page)`);
+  const skipped = clean.length - drafts.length;
+  if (skipped) parts.push(`${skipped} skipped (not drafts)`);
+  return { ok: true, message: parts.join(" · ") + "." };
+}
+
 export async function deleteDraft(workoutId: string, athleteId: string): Promise<ActionResult> {
   await requireCoach();
   const supabase = await createClient();

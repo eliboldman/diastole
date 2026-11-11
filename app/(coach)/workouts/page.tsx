@@ -8,7 +8,7 @@ import { createClient, requireCoach } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Workouts · Diastole" };
 
-type Search = { athlete?: string; from?: string; to?: string; q?: string; test?: string };
+type Search = { athlete?: string; from?: string; to?: string; q?: string; test?: string; status?: string };
 
 export default async function WorkoutsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const coach = await requireCoach();
@@ -29,6 +29,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
     .order("scheduled_date", { ascending: false })
     .limit(300);
   if (sp.athlete) query = query.eq("athlete_id", sp.athlete);
+  if (sp.status && ["draft", "approved", "sent", "completed"].includes(sp.status)) query = query.eq("status", sp.status);
   if (sp.from && /^\d{4}-\d{2}-\d{2}$/.test(sp.from)) query = query.gte("scheduled_date", sp.from);
   if (sp.to && /^\d{4}-\d{2}-\d{2}$/.test(sp.to)) query = query.lte("scheduled_date", sp.to);
   const text = sp.test === "1" ? "test" : (sp.q ?? "").trim();
@@ -42,7 +43,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Workouts</h1>
-          <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, and clean up in bulk.</p>
+          <p className="mt-2 text-sm text-white/55">Every planned workout across your athletes. Filter, select, then approve and send or clean up in bulk.</p>
         </div>
         <Link
           href="/endurance-lab"
@@ -52,8 +53,9 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
         </Link>
       </div>
 
-      <form className="mt-6 grid gap-2 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr_auto]">
-        <select name="athlete" defaultValue={sp.athlete ?? ""} className="min-h-12 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:text-sm">
+      <form className="mt-6 grid gap-2 rounded-[28px] border border-white/10 bg-white/[0.055] p-4 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1.2fr_auto]">
+        <div className="grid grid-cols-2 gap-2 sm:contents">
+        <select name="athlete" defaultValue={sp.athlete ?? ""} className="min-h-12 min-w-0 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:text-sm">
           <option value="">All athletes</option>
           {(athletes ?? []).map((a) => (
             <option key={a.id} value={a.id}>
@@ -61,6 +63,14 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
             </option>
           ))}
         </select>
+        <select name="status" defaultValue={sp.status ?? ""} aria-label="Status" className="min-h-12 min-w-0 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:text-sm">
+          <option value="">Any status</option>
+          <option value="draft">Drafts</option>
+          <option value="approved">Approved</option>
+          <option value="sent">Sent</option>
+          <option value="completed">Done</option>
+        </select>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:contents">
           <label className="grid min-w-0 gap-1 text-xs text-white/55 sm:block">
             <span className="sm:sr-only">From</span>
