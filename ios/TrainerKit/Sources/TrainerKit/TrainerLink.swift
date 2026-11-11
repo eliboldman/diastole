@@ -9,4 +9,6 @@ import Foundation
   var canControl: Bool { get }
   /// ERG: hold `watts`; nil = light fixed resistance (free ride / paused).
   func setTarget(_ watts: Int?)
+  /// Course riding: make the trainer feel this road grade (%), simulation mode where supported.
+  func setGrade(_ percent: Double)
 }

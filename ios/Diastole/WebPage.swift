@@ -4,7 +4,8 @@ import WebKit
 
 /// One web view showing Diastole pages. All pages share the default data store, so they share the
 /// web sign-in. The page knows it's inside the app (html[data-app="ios"]) and that this build has the
-/// native ride screen (html[data-ride="1"]; older builds lack it, so the page hides its Ride buttons).
+/// native ride screen (html[data-ride="1"]; older builds lack it, so the page hides its Ride buttons),
+/// and course riding (html[data-course="1"]).
 final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     let root: URL
@@ -20,7 +21,7 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.addUserScript(
-            WKUserScript(source: "document.documentElement.dataset.app = 'ios'; document.documentElement.dataset.ride = '1';", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            WKUserScript(source: "document.documentElement.dataset.app = 'ios'; document.documentElement.dataset.ride = '1'; document.documentElement.dataset.course = '1';", injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
         config.userContentController.add(bridge, name: "diastole")
         webView = WKWebView(frame: .zero, configuration: config)
@@ -160,7 +161,8 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
             return
         }
         if type == "startRide" {
-            RideCoordinator.startRide(id: (body["id"] as? String).flatMap { $0.range(of: "^[0-9a-fA-F-]{36}$", options: .regularExpression) != nil ? $0 : nil }, from: message.webView)
+            let uuid = { (v: Any?) in (v as? String).flatMap { $0.range(of: "^[0-9a-fA-F-]{36}$", options: .regularExpression) != nil ? $0 : nil } }
+            RideCoordinator.startRide(id: uuid(body["id"]), course: uuid(body["course"]), from: message.webView)
             return
         }
         if type == "openHub" {

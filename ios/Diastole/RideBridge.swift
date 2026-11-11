@@ -10,10 +10,11 @@ import WebKit
 enum RideCoordinator {
     private static weak var presented: UIViewController?
 
-    static func startRide(id: String?, from webView: WKWebView?) {
+    /// `id` = a planned workout to ride; `course` = a race whose bike course to ride.
+    static func startRide(id: String?, course: String? = nil, from webView: WKWebView?) {
         guard presented == nil, let webView else { return }
         let api = WebRideAPI(webView: webView)
-        let model = RideFlowModel(api: api, preselect: id)
+        let model = RideFlowModel(api: api, preselect: id, preselectCourse: course)
         present(RideFlowView(model: model, onClose: dismiss))
     }
 

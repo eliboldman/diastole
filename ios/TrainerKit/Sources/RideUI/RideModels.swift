@@ -22,6 +22,12 @@ public struct RidesResponse: Codable, Sendable {
   public let ftp: Int?
   public let units: String? // "mi" | "km"
   public let rides: [RidePlan]
+  /// Bike courses from the athlete's races (older servers don't send these).
+  public let courses: [RideCourse]?
+  /// Rider + bike, for course physics.
+  public let massKg: Double?
+
+  enum CodingKeys: String, CodingKey { case ftp, units, rides, courses, massKg = "mass_kg" }
 }
 
 /// Answer from the upload routes.
@@ -112,6 +118,11 @@ enum DeviceMemory {
   static var strap: UUID? {
     get { UserDefaults.standard.string(forKey: "ride.strap").flatMap(UUID.init(uuidString:)) }
     set { UserDefaults.standard.set(newValue?.uuidString, forKey: "ride.strap") }
+  }
+  /// Course riding: share of the real grade the trainer applies (default 50%).
+  static var difficulty: Double {
+    get { UserDefaults.standard.object(forKey: "ride.difficulty") as? Double ?? 0.5 }
+    set { UserDefaults.standard.set(min(1, max(0, newValue)), forKey: "ride.difficulty") }
   }
   static func rollers(_ id: UUID?) -> Bool { id.map { UserDefaults.standard.bool(forKey: "ride.rollers.\($0.uuidString)") } ?? false }
   static func setRollers(_ id: UUID?, _ on: Bool) { if let id { UserDefaults.standard.set(on, forKey: "ride.rollers.\(id.uuidString)") } }

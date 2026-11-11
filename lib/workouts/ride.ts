@@ -51,3 +51,39 @@ export function toRideSteps(steps: Step[]): RideStep[] {
 
 /** Total planned seconds of the timed steps (for list rows). */
 export const rideSeconds = (steps: RideStep[]) => steps.reduce((n, s) => n + ("time" in s.length ? s.length.time.seconds : 0), 0);
+
+// --- Race courses on the trainer -------------------------------------------------------------
+
+/** A race's bike course for the trainer apps: elevation profile and climbs (no map, no video). Matches TrainerKit's RideCourse. */
+export type RideCourse = {
+  id: string; // race id
+  name: string; // race name
+  course_name: string | null;
+  date: string;
+  distance_m: number;
+  gain_m: number;
+  profile: [number, number][]; // [distance m, elevation m], ~1,000 points, smoothed
+  climbs: { start_m: number; end_m: number; gain_m: number; grade: number }[];
+};
+
+type CourseRow = { id: string; name: string; race_date: string; course_name: string | null; course_leg: string | null; course: unknown };
+
+/** Rows from races → courses the trainer can ride (bike legs with a usable profile only). */
+export function toRideCourses(rows: CourseRow[]): RideCourse[] {
+  const out: RideCourse[] = [];
+  for (const r of rows) {
+    const c = r.course as { distance_m?: unknown; gain_m?: unknown; profile?: unknown; climbs?: unknown } | null;
+    if (r.course_leg !== "bike" || !c || !Array.isArray(c.profile) || c.profile.length < 2) continue;
+    const profile = (c.profile as unknown[])
+      .filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+      .sort((a, b) => a[0] - b[0]);
+    const distance = Number(c.distance_m);
+    if (profile.length < 2 || !(distance >= 500)) continue;
+    const climbs = Array.isArray(c.climbs) ? (c.climbs as RideCourse["climbs"]).filter((k) => Number.isFinite(k?.start_m) && Number.isFinite(k?.end_m)) : [];
+    out.push({ id: r.id, name: r.name, course_name: r.course_name, date: r.race_date, distance_m: Math.round(distance), gain_m: Math.round(Number(c.gain_m) || 0), profile, climbs });
+  }
+  return out;
+}
+
+/** Rider plus bike for the course physics: body weight + 9 kg, else a typical 75 kg rider. */
+export const rideMassKg = (weightKg: number | null | undefined) => Math.round(((weightKg && weightKg >= 35 && weightKg <= 160 ? weightKg : 75) + 9) * 10) / 10;

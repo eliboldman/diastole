@@ -5,7 +5,7 @@ import type { Profile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { describe } from "@/lib/workouts/describe";
 import type { Pool, Step } from "@/lib/workouts/garmin-format";
-import { rideSeconds, toRideSteps, type RidePlan } from "@/lib/workouts/ride";
+import { rideMassKg, rideSeconds, toRideCourses, toRideSteps, type RideCourse, type RidePlan } from "@/lib/workouts/ride";
 import { estimateSession } from "@/lib/fuel/plan";
 import { watchFuel, type WatchFuel } from "@/lib/fuel/watch";
 
@@ -144,7 +144,7 @@ export async function buildFuel(profile: Profile, admin: Admin = createAdminClie
 }
 
 /** Bike workouts the trainer apps can ride: today first, then the next few days, plus the FTP. */
-export async function buildRides(profile: Profile, opts: { id?: string } = {}, admin: Admin = createAdminClient()): Promise<{ ftp: number | null; units: "mi" | "km"; rides: RidePlan[] }> {
+export async function buildRides(profile: Profile, opts: { id?: string } = {}, admin: Admin = createAdminClient()): Promise<{ ftp: number | null; units: "mi" | "km"; rides: RidePlan[]; courses: RideCourse[]; mass_kg: number }> {
   const tz = profile.timezone || "America/Los_Angeles";
   const today = localDate(new Date(), tz);
   const until = localDate(new Date(Date.now() + 6 * 86_400_000), tz);
@@ -156,14 +156,20 @@ export async function buildRides(profile: Profile, opts: { id?: string } = {}, a
     .in("status", ["approved", "sent", "completed"])
     .is("deleted_at", null);
   q = opts.id ? q.eq("id", opts.id) : q.gte("scheduled_date", localDate(new Date(Date.now() - 86_400_000), tz)).lte("scheduled_date", until);
-  const [{ data }, { data: zones }] = await Promise.all([q.order("scheduled_date").limit(10), admin.from("athlete_zones").select("ftp_w").eq("athlete_id", profile.id).maybeSingle()]);
+  const [{ data }, { data: zones }, { data: raceRows }, { data: body }] = await Promise.all([
+    q.order("scheduled_date").limit(10),
+    admin.from("athlete_zones").select("ftp_w").eq("athlete_id", profile.id).maybeSingle(),
+    // Bike courses from the athlete's races (upcoming, or within the last 90 days) to ride on the trainer.
+    admin.from("races").select("id, name, race_date, course_name, course_leg, course").eq("athlete_id", profile.id).eq("course_leg", "bike").not("course", "is", null).gte("race_date", localDate(new Date(Date.now() - 90 * 86_400_000), tz)).order("race_date").limit(10),
+    admin.from("athlete_body").select("weight_kg").eq("athlete_id", profile.id).maybeSingle(),
+  ]);
   const ftp = zones?.ftp_w ?? null;
   const rides = (data ?? [])
     .map((r) => ({ id: r.id, date: r.scheduled_date, title: r.title, why: r.why ?? null, ftp, steps: toRideSteps((r.steps ?? []) as Step[]) }))
     .filter((r) => r.steps.length)
     // Today first, then upcoming, then yesterday (a missed ride).
     .sort((a, b) => rank(a.date, today) - rank(b.date, today) || a.date.localeCompare(b.date));
-  return { ftp, units: profile.units ?? "mi", rides };
+  return { ftp, units: profile.units ?? "mi", rides, courses: toRideCourses(raceRows ?? []), mass_kg: rideMassKg(body?.weight_kg ? Number(body.weight_kg) : null) };
 }
 
 const rank = (d: string, today: string) => (d === today ? 0 : d > today ? 1 : 2);

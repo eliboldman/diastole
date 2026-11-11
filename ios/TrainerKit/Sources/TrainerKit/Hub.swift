@@ -18,6 +18,7 @@ public enum HubMessage: Codable, Equatable, Sendable {
   case denied // phone → TV: wrong code or rider declined
   case status(metrics: LiveMetrics, trainer: String?, canControl: Bool) // phone → TV, ~2 Hz
   case target(watts: Int?) // TV → phone
+  case grade(percent: Double) // TV → phone: course riding
   case bye
 
   func line() -> Data {
@@ -139,6 +140,8 @@ public final class HubServer {
       state = .asking(tv: String(name.prefix(40)))
     case let .target(watts):
       if case .connected = state { trainer.setTarget(watts) }
+    case let .grade(percent):
+      if case .connected = state, percent.isFinite { trainer.setGrade(percent) }
     case .bye:
       drop()
     default: break
@@ -189,6 +192,7 @@ public final class HubClient: TrainerLink {
   @ObservationIgnored private var connection: NWConnection?
   @ObservationIgnored private var lines = LineBuffer()
   @ObservationIgnored private var lastTarget: Int??
+  @ObservationIgnored private var lastGrade: Double?
   @ObservationIgnored private let queue = DispatchQueue(label: "diastole.hub.client")
 
   public init() {}
@@ -242,7 +246,16 @@ public final class HubClient: TrainerLink {
   public func setTarget(_ watts: Int?) {
     guard state == .connected, let c = connection, lastTarget != .some(watts) else { return }
     lastTarget = .some(watts)
+    lastGrade = nil
     c.send(content: HubMessage.target(watts: watts).line(), completion: .contentProcessed { _ in })
+  }
+
+  public func setGrade(_ percent: Double) {
+    let g = (percent * 10).rounded() / 10
+    guard state == .connected, let c = connection, lastGrade.map({ abs($0 - g) >= 0.1 }) ?? true else { return }
+    lastGrade = g
+    lastTarget = nil
+    c.send(content: HubMessage.grade(percent: g).line(), completion: .contentProcessed { _ in })
   }
 
   private func receive(_ c: NWConnection) {

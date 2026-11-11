@@ -8,8 +8,10 @@ public struct RideSample: Codable, Equatable, Sendable {
   public var heartRateBpm: Int?
   public var speedMps: Double?
   public var distanceM: Double
-  public init(time: Date, powerW: Int? = nil, cadenceRpm: Int? = nil, heartRateBpm: Int? = nil, speedMps: Double? = nil, distanceM: Double = 0) {
-    self.time = time; self.powerW = powerW; self.cadenceRpm = cadenceRpm; self.heartRateBpm = heartRateBpm; self.speedMps = speedMps; self.distanceM = distanceM
+  /// Course rides: elevation on the course here (metres).
+  public var altitudeM: Double?
+  public init(time: Date, powerW: Int? = nil, cadenceRpm: Int? = nil, heartRateBpm: Int? = nil, speedMps: Double? = nil, distanceM: Double = 0, altitudeM: Double? = nil) {
+    self.time = time; self.powerW = powerW; self.cadenceRpm = cadenceRpm; self.heartRateBpm = heartRateBpm; self.speedMps = speedMps; self.distanceM = distanceM; self.altitudeM = altitudeM
   }
 }
 
@@ -83,9 +85,10 @@ public enum FitWriter {
     e.write(local: 1, [.u32(start), .u8(0), .u8(0)])
 
     // record
-    e.define(local: 2, global: 20, [Field(num: 253, base: .uint32), Field(num: 3, base: .uint8), Field(num: 4, base: .uint8), Field(num: 5, base: .uint32), Field(num: 6, base: .uint16), Field(num: 7, base: .uint16)])
+    // altitude (field 2): scale 5, offset 500 m; invalid (0xFFFF) when there's no course.
+    e.define(local: 2, global: 20, [Field(num: 253, base: .uint32), Field(num: 3, base: .uint8), Field(num: 4, base: .uint8), Field(num: 5, base: .uint32), Field(num: 6, base: .uint16), Field(num: 7, base: .uint16), Field(num: 2, base: .uint16)])
     for s in samples {
-      e.write(local: 2, [.u32(ts(s.time)), .u8(s.heartRateBpm), .u8(s.cadenceRpm), .u32(Int((s.distanceM * 100).rounded())), .u16(s.speedMps.map { Int(($0 * 1000).rounded()) }), .u16(s.powerW.map { max(0, $0) })])
+      e.write(local: 2, [.u32(ts(s.time)), .u8(s.heartRateBpm), .u8(s.cadenceRpm), .u32(Int((s.distanceM * 100).rounded())), .u16(s.speedMps.map { Int(($0 * 1000).rounded()) }), .u16(s.powerW.map { max(0, $0) }), .u16(s.altitudeM.map { Int((($0 + 500) * 5).rounded()) })])
     }
     e.write(local: 1, [.u32(end), .u8(0), .u8(4)])
 

@@ -12,6 +12,12 @@ public final class RideFlowModel {
   public private(set) var ftp: Int?
   public private(set) var miles = true
   public private(set) var selected: RidePlan?
+  public private(set) var courses: [RideCourse] = []
+  public private(set) var massKg: Double = 84
+  /// Riding a race course instead of a workout.
+  public private(set) var selectedCourse: RideCourse?
+  /// Course riding: share of the real grade the trainer applies (remembered on this device).
+  public var difficulty: Double = DeviceMemory.difficulty { didSet { DeviceMemory.difficulty = difficulty } }
   public private(set) var session: RideSession?
   public private(set) var upload: Upload = .idle
   public private(set) var pendingCount = 0
@@ -23,12 +29,15 @@ public final class RideFlowModel {
   public let hub: HubClient?
   @ObservationIgnored let api: RideAPI
   @ObservationIgnored private let preselect: String?
+  @ObservationIgnored private let preselectCourse: String?
   @ObservationIgnored private var lastFile: URL?
 
-  /// `allowHub` on Apple TV; `preselect` = a planned workout id to jump straight to.
-  public init(api: RideAPI, preselect: String? = nil, allowHub: Bool = false) {
+  /// `allowHub` on Apple TV; `preselect` = a planned workout id to jump straight to;
+  /// `preselectCourse` = a race id whose bike course to ride.
+  public init(api: RideAPI, preselect: String? = nil, preselectCourse: String? = nil, allowHub: Bool = false) {
     self.api = api
     self.preselect = preselect
+    self.preselectCourse = preselectCourse
     self.hub = allowHub ? HubClient() : nil
   }
 
@@ -45,7 +54,10 @@ public final class RideFlowModel {
       rides = r.rides
       ftp = r.ftp
       miles = r.units != "km"
-      if let id = preselect, let plan = rides.first(where: { $0.id == id }) { choose(plan) } else { screen = .choose }
+      courses = r.courses ?? []
+      massKg = r.massKg ?? 84
+      if let id = preselectCourse, let c = courses.first(where: { $0.id == id }) { chooseCourse(c) }
+      else if let id = preselect, let plan = rides.first(where: { $0.id == id }) { choose(plan) } else { screen = .choose }
     } catch {
       screen = .failed(error.localizedDescription)
     }
@@ -55,6 +67,18 @@ public final class RideFlowModel {
   /// nil = free ride.
   public func choose(_ plan: RidePlan?) {
     selected = plan
+    selectedCourse = nil
+    connect()
+  }
+
+  /// Ride a race's bike course.
+  public func chooseCourse(_ course: RideCourse) {
+    selected = nil
+    selectedCourse = course
+    connect()
+  }
+
+  private func connect() {
     screen = .connect
     if bluetooth.state != .connected { bluetooth.reconnect(trainer: DeviceMemory.trainer, strap: DeviceMemory.strap) }
     rollers = DeviceMemory.rollers(DeviceMemory.trainer)
@@ -63,7 +87,8 @@ public final class RideFlowModel {
   public var canStart: Bool { useHub ? hub?.state == .connected : bluetooth.state == .connected }
 
   public func start() {
-    let s = RideSession(title: selected?.title ?? "Free ride", steps: selected?.steps ?? [], link: link, rollers: rollers)
+    let s = selectedCourse.map { RideSession(course: $0, massKg: massKg, link: link, rollers: rollers, difficulty: difficulty) }
+      ?? RideSession(title: selected?.title ?? "Free ride", steps: selected?.steps ?? [], link: link, rollers: rollers)
     s.onFinish = { [weak self] in self?.end() }
     session = s
     upload = .idle
@@ -150,7 +175,10 @@ public struct RideFlowView: View {
       case .choose: chooser
       case .connect: connector
       case .ride:
-        if let s = model.session { RideDashboard(session: s, link: model.link, ftp: model.selected?.ftp ?? model.ftp, miles: model.miles, onEnd: model.end) }
+        if let s = model.session {
+          if s.isCourse { CourseDashboard(session: s, link: model.link, miles: model.miles, onEnd: model.end) }
+          else { RideDashboard(session: s, link: model.link, ftp: model.selected?.ftp ?? model.ftp, miles: model.miles, onEnd: model.end) }
+        }
       case .summary: summary
       }
     }
@@ -205,6 +233,30 @@ public struct RideFlowView: View {
         }
         .buttonStyle(.bordered)
       }
+      if !model.courses.isEmpty {
+        Text("Race courses").font(.title3.weight(.semibold)).padding(.top, 8)
+        Text("Ride your race's bike course: the trainer feels every climb and descent.").font(.footnote).foregroundStyle(RidePalette.dim)
+        ForEach(model.courses) { c in
+          Button { model.chooseCourse(c) } label: {
+            VStack(alignment: .leading, spacing: 10) {
+              HStack {
+                Text(c.title).font(.headline).lineLimit(2)
+                Spacer()
+                Text(dayLabel(c.date)).font(.subheadline).foregroundStyle(RidePalette.dim)
+              }
+              CourseProfile(course: c, compact: true).frame(height: 44)
+              HStack(spacing: 12) {
+                Text("\(distanceText(c.distanceM, miles: model.miles)) \(model.miles ? "mi" : "km")").font(.subheadline.monospacedDigit())
+                Text("\(Int((model.miles ? c.gainM * 3.28084 : c.gainM).rounded())) \(model.miles ? "ft" : "m") up").font(.subheadline.monospacedDigit()).foregroundStyle(RidePalette.dim)
+                if !c.climbs.isEmpty { Text("\(c.climbs.count) climb\(c.climbs.count == 1 ? "" : "s")").font(.subheadline).foregroundStyle(RidePalette.dim) }
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+          }
+          .buttonStyle(.bordered)
+        }
+      }
       Button { model.choose(nil) } label: {
         Label("Free ride", systemImage: "bicycle").frame(maxWidth: .infinity, alignment: .leading).padding(6)
       }
@@ -212,8 +264,31 @@ public struct RideFlowView: View {
     }
   }
 
+  /// Course riding: how much of the real grade the trainer applies. Buttons, not a slider (tvOS has none).
+  private var difficultyPicker: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("Trainer difficulty").font(.headline)
+        Spacer()
+        Button { model.difficulty = max(0, ((model.difficulty - 0.1) * 10).rounded() / 10) } label: { Image(systemName: "minus") }.buttonStyle(.bordered)
+          .accessibilityLabel("Less")
+        Text("\(Int((model.difficulty * 100).rounded()))%").font(.headline.monospacedDigit()).frame(minWidth: 56)
+        Button { model.difficulty = min(1, ((model.difficulty + 0.1) * 10).rounded() / 10) } label: { Image(systemName: "plus") }.buttonStyle(.bordered)
+          .accessibilityLabel("More")
+      }
+      Text("How much of each climb the trainer makes you feel. 50% is a good start; 100% is the real grade, which can run out of gears on steep pitches. Your speed and distance always use the real grade.")
+        .font(.footnote).foregroundStyle(RidePalette.dim)
+    }
+  }
+
   private var connector: some View {
-    page(model.selected?.title ?? "Free ride", back: { model.screen = .choose }) {
+    page(model.selectedCourse?.title ?? model.selected?.title ?? "Free ride", back: { model.screen = .choose }) {
+      if let c = model.selectedCourse {
+        CourseProfile(course: c).frame(height: 110)
+        Text("\(distanceText(c.distanceM, miles: model.miles)) \(model.miles ? "mi" : "km") · \(Int((model.miles ? c.gainM * 3.28084 : c.gainM).rounded())) \(model.miles ? "ft" : "m") of climbing")
+          .font(.subheadline.monospacedDigit()).foregroundStyle(RidePalette.dim)
+        difficultyPicker
+      }
       if let plan = model.selected {
         WorkoutProfile(steps: plan.steps, ftp: plan.ftp, index: -1).frame(height: 80)
         if !plan.steps.contains(where: { $0.targetWatts != nil }) {

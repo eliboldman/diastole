@@ -57,6 +57,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
   @ObservationIgnored private var wantStrap: UUID?
   /// .none = nothing sent yet (so the first "free ride" is sent too); .some(nil) = released.
   @ObservationIgnored private var lastTarget: Int?? = .none
+  @ObservationIgnored private var lastGrade: Double?? = .none
 
   private static let scanServices = [GATT.ftmsService, GATT.cyclingPowerService, GATT.heartRateService].map(CBUUID.init(string:))
 
@@ -113,6 +114,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
   public func setTarget(_ watts: Int?) {
     if case let .some(last) = lastTarget, last == watts { return }
     lastTarget = .some(watts)
+    lastGrade = .none
     if let w = watts {
       send(.setTargetPower(watts: powerRange?.clamp(w) ?? w))
     } else if features == nil || features?.canSimulate == true {
@@ -125,6 +127,20 @@ public final class TrainerConnection: NSObject, TrainerLink {
   }
 
   static let flatRoad = ControlCommand.simulation(windMps: 0, gradePercent: 0, crr: 0.004, cwKgPerM: 0.51)
+
+  /// Course riding: simulation mode with this grade. Trainers without simulation get a resistance
+  /// level that rises with the grade (FTMS levels vary by trainer; 0–100 covers most).
+  public func setGrade(_ percent: Double) {
+    let g = (min(20, max(-15, percent)) * 10).rounded() / 10
+    if case let .some(.some(last)) = lastGrade, abs(last - g) < 0.1 { return }
+    lastGrade = .some(g)
+    lastTarget = .none // a later setTarget must be sent even if it repeats an old value
+    if features == nil || features?.canSimulate == true {
+      send(.simulation(windMps: 0, gradePercent: g, crr: 0.004, cwKgPerM: 0.51))
+    } else if features?.canSetResistance == true {
+      send(.setResistance(level: min(100, max(0, 20 + g * 5))))
+    }
+  }
 
   public func send(_ command: ControlCommand) {
     guard controlPoint != nil else { return }
@@ -167,7 +183,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
 
   private func cleanUp(_ p: CBPeripheral) {
     if p == trainer {
-      controlPoint = nil; inControl = false; pending = []; inFlight = nil; lastTarget = .none
+      controlPoint = nil; inControl = false; pending = []; inFlight = nil; lastTarget = .none; lastGrade = .none
       features = nil; powerRange = nil; distanceBase = nil
       metrics.powerW = nil; metrics.cadenceRpm = nil; metrics.speedKph = nil
       if wantTrainer == p.identifier { state = .connecting; central.connect(p) } // auto-reconnect

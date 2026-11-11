@@ -38,13 +38,31 @@ public final class RideSession {
   @ObservationIgnored private var lapStart: Date?
   @ObservationIgnored private var lapStep = 0 // step the open lap belongs to
   @ObservationIgnored private var distance: Double = 0
+  @ObservationIgnored private var gradeSentAt = Date.distantPast
 
-  public var isFreeRide: Bool { runner.steps.isEmpty }
+  /// Course riding: position on a race course from the rider's power; the trainer feels the grade.
+  public private(set) var course: CourseRunner?
+  /// Share of the real grade the trainer applies (0…1). Like Zwift's trainer difficulty: 50% keeps
+  /// climbs honest without running out of gears. Changing it takes effect immediately.
+  /// (Clamped where it's set: an @Observable property can't reassign itself in didSet.)
+  public var difficulty: Double = 0.5 { didSet { push() } }
+  /// The grade the trainer was last told (after difficulty).
+  public private(set) var sentGrade: Double?
+
+  public var isCourse: Bool { course != nil }
+  public var isFreeRide: Bool { runner.steps.isEmpty && course == nil }
   public var elapsed: Int { samples.count }
   public var distanceM: Double { distance }
 
   /// The goal right now before ramping: workout step, or the free-ride number.
   public var goalWatts: Int? { isFreeRide ? manualTarget : runner.targetWatts }
+
+  /// Ride a race course: no workout steps; the course decides the resistance.
+  public convenience init(course: RideCourse, massKg: Double, link: TrainerLink, rollers: Bool = false, difficulty: Double = 0.5) {
+    self.init(title: course.title, steps: [], link: link, rollers: rollers)
+    self.course = CourseRunner(course: course, massKg: massKg)
+    self.difficulty = min(1, max(0, difficulty))
+  }
 
   public init(title: String, steps: [RideStep], link: TrainerLink, rollers: Bool = false) {
     self.title = title
@@ -89,7 +107,7 @@ public final class RideSession {
   }
 
   public func skip() {
-    guard phase == .riding || phase == .paused, !isFreeRide else { return }
+    guard phase == .riding || phase == .paused, !isFreeRide, !isCourse else { return }
     closeLap()
     runner.skip()
     stepChanged()
@@ -97,6 +115,10 @@ public final class RideSession {
 
   /// Rider's easier/harder nudge in 5% steps (workouts) or 5 W steps (free ride).
   public func nudge(_ direction: Int) {
+    if isCourse {
+      difficulty = min(1, max(0, ((difficulty + Double(direction) * 0.1) * 10).rounded() / 10)) // didSet pushes
+      return
+    }
     if isFreeRide {
       manualTarget = max(0, min(1500, (manualTarget ?? 100) + direction * 5))
       if manualTarget == 0 { manualTarget = nil }
@@ -136,9 +158,16 @@ public final class RideSession {
       return
     }
 
-    // Distance: trainer's odometer when it has one, else speed × 1 s.
+    // Distance: on a course, the physics from your power (the trainer's speed if it reports no
+    // power); otherwise the trainer's odometer when it has one, else speed × 1 s.
     var dm = 0.0
-    if let d = m.distanceM {
+    if var c = course {
+      let before = c.distanceM
+      if let w = m.powerW { c.advance(watts: Double(w), seconds: 1) } else if let kph = m.speedKph { c.advance(watts: Self.wattsFor(speedMps: kph / 3.6, on: c), seconds: 1) }
+      course = c
+      dm = c.distanceM - before
+      lastDistance = m.distanceM
+    } else if let d = m.distanceM {
       if let last = lastDistance, d >= last { dm = min(d - last, 30) }
       lastDistance = d
     } else if let kph = m.speedKph {
@@ -152,8 +181,12 @@ public final class RideSession {
     if guardState.update(cadence: m.cadenceRpm, now: now) { ergSuspended = guardState.suspended }
     push()
 
-    samples.append(RideSample(time: now, powerW: m.powerW, cadenceRpm: m.cadenceRpm.map { Int($0.rounded()) }, heartRateBpm: m.heartRateBpm, speedMps: m.speedKph.map { $0 / 3.6 }, distanceM: distance))
-    if runner.finished && !isFreeRide {
+    let speed = course.map(\.speedMps) ?? m.speedKph.map { $0 / 3.6 }
+    samples.append(RideSample(time: now, powerW: m.powerW, cadenceRpm: m.cadenceRpm.map { Int($0.rounded()) }, heartRateBpm: m.heartRateBpm, speedMps: speed, distanceM: distance, altitudeM: course?.elevationM))
+    if let c = course, c.finished {
+      finish()
+      onFinish?()
+    } else if runner.finished && !isFreeRide && !isCourse {
       finish()
       onFinish?()
     }
@@ -173,9 +206,27 @@ public final class RideSession {
     lapStart = nil
   }
 
+  /// Power that would hold this speed on the current grade (trainers that report speed but no power).
+  static func wattsFor(speedMps v: Double, on c: CourseRunner) -> Double {
+    let theta = atan(c.grade / 100)
+    let f = 0.5 * c.airDensity * c.cdA * v * v + c.massKg * 9.81 * (c.crr * cos(theta) + sin(theta))
+    return max(0, f * v / 0.975)
+  }
+
   /// Sends the current goal, ramped on rollers, dropped while the low-cadence guard is active.
+  /// On a course: the road grade (resent at least every 5 s in case a write was lost).
   private func push() {
     guard phase == .riding else { return }
+    if let c = course {
+      var g = c.trainerGrade(difficulty: difficulty)
+      if rollers { g = min(g, 4) } // rollers can't take steep resistance without upsetting balance
+      if sentGrade.map({ abs($0 - g) >= 0.1 }) ?? true || Date().timeIntervalSince(gradeSentAt) >= 5 {
+        sentGrade = g
+        gradeSentAt = Date()
+        link.setGrade(g)
+      }
+      return
+    }
     let goal = ergSuspended ? nil : goalWatts
     guard let g = goal else { send(nil); return }
     var next = g
@@ -189,6 +240,7 @@ public final class RideSession {
   }
 
   private func send(_ watts: Int?) {
+    if watts == nil { sentGrade = nil } // paused / finished: flat road
     sentTarget = watts
     link.setTarget(watts)
   }

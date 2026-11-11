@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import type { Step } from "./garmin-format.ts";
 import { rideSeconds, toRideSteps } from "./ride.ts";
+import { rideMassKg, toRideCourses } from "./ride.ts";
 
 const steps: Step[] = [
   { kind: "step", intensity: "WARMUP", duration: { type: "time", seconds: 600 }, target: { type: "power_range", low: 120, high: 150 } },
@@ -36,3 +37,19 @@ assert.equal(huge.length, 198);
 assert.deepEqual(toRideSteps(null as unknown as Step[]), []);
 
 console.log("ride.test.ts: all passed");
+
+// Race courses for the trainer: bike legs with a profile only; mass from body weight.
+const course = { distance_m: 90120, gain_m: 640, profile: [[0, 10], [45000, 120], [90120, 12]], climbs: [{ start_m: 30000, end_m: 45000, gain_m: 110, grade: 0.7 }] };
+const rows = [
+  { id: "r1", name: "70.3 Panama City", race_date: "2027-05-08", course_name: "Bike", course_leg: "bike", course },
+  { id: "r2", name: "Half", race_date: "2027-03-01", course_name: null, course_leg: "run", course },
+  { id: "r3", name: "Broken", race_date: "2027-03-01", course_name: null, course_leg: "bike", course: { distance_m: 100, profile: [] } },
+];
+const courses = toRideCourses(rows);
+assert.equal(courses.length, 1, "only the usable bike course");
+assert.equal(courses[0].id, "r1");
+assert.equal(courses[0].profile.length, 3);
+assert.equal(rideMassKg(70), 79);
+assert.equal(rideMassKg(null), 84, "typical rider when weight is unknown");
+assert.equal(rideMassKg(500), 84, "nonsense weight ignored");
+console.log("ride courses: passed");

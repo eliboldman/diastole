@@ -3,6 +3,8 @@ import { Mountain } from "lucide-react";
 import type { CourseView } from "@/lib/course/data";
 import { fmt } from "@/lib/predict/predict";
 
+import RideButtons from "@/components/RideButtons";
+
 import CourseSessions from "./CourseSessions";
 import CourseUpload from "./CourseUpload";
 import ElevationProfile from "./ElevationProfile";
@@ -106,6 +108,16 @@ export default function CourseCard({ raceId, athleteId, sport, view, units, coac
               <Bar key={p.key} label={p.label} score={p.score} detail={p.detail} />
             ))}
           </ul>
+        </section>
+      )}
+
+      {view.leg === "bike" && !coach && (
+        <section className={card}>
+          <h2 className="text-lg font-medium">Ride it on your trainer</h2>
+          <p className="mt-1 text-sm text-white/55">
+            The whole course on your smart trainer: every climb and descent changes the resistance, with distance, grade and what&apos;s coming on screen. Your speed comes from your power and weight, so it&apos;s an honest rehearsal.
+          </p>
+          <RideButtons courseId={raceId} />
         </section>
       )}
 

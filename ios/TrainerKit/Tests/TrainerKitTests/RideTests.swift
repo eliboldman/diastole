@@ -8,7 +8,9 @@ import Testing
   var trainerName: String? = "Fake"
   var canControl = true
   var targets: [Int?] = []
+  var grades: [Double] = []
   func setTarget(_ watts: Int?) { targets.append(watts) }
+  func setGrade(_ percent: Double) { grades.append(percent) }
 }
 
 @MainActor @Suite struct RideSessionTests {
