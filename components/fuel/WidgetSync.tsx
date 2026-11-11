@@ -10,7 +10,10 @@ export type FuelSnapshot = {
   // Numbers only for athletes who see numbers (full mode), and only once targets exist.
   carbs: { eaten: number; low: number; high: number } | null;
   protein: { eaten: number; low: number; high: number } | null;
+  fat: { eaten: number; low: number; high: number } | null;
   kcal: { eaten: number; low: number; high: number } | null;
+  // How full each ring is (0–1, as on the Fuel page), for anyone with targets, numbers or not.
+  rings: { carbs: number; protein: number; fat: number } | null;
 };
 
 /** Inside the iPhone app: hand today's fuel to the home-screen widget. Re-sent whenever the day changes (e.g. after logging). */

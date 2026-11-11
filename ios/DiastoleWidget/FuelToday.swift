@@ -9,7 +9,10 @@ struct FuelToday: Codable {
     let meals: Int
     let carbs: Amount?
     let protein: Amount?
+    let fat: Amount?
     let kcal: Amount?
+    struct Rings: Codable { let carbs: Double; let protein: Double; let fat: Double }
+    let rings: Rings?
 
     var levelText: String {
         switch level {

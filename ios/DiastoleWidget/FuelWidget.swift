@@ -27,7 +27,9 @@ struct FuelEntry: TimelineEntry {
 
 struct FuelProvider: AppIntentTimelineProvider {
     private static let sample = FuelToday(date: "", level: "high", mode: "full", meals: 2,
-                                          carbs: .init(eaten: 210, low: 490, high: 700), protein: .init(eaten: 64, low: 112, high: 140), kcal: .init(eaten: 1450, low: 3100, high: 3900))
+                                          carbs: .init(eaten: 210, low: 490, high: 700), protein: .init(eaten: 64, low: 112, high: 140),
+                                          fat: .init(eaten: 40, low: 56, high: 84), kcal: .init(eaten: 1450, low: 3100, high: 3900),
+                                          rings: .init(carbs: 0.43, protein: 0.57, fat: 0.71))
     func placeholder(in context: Context) -> FuelEntry { FuelEntry(date: .now, actions: [.photo, .scan, .describe, .today], fuel: Self.sample) }
     func snapshot(for configuration: FuelWidgetIntent, in context: Context) async -> FuelEntry {
         FuelEntry(date: .now, actions: configuration.actions, fuel: FuelToday.load() ?? (context.isPreview ? Self.sample : nil))
@@ -122,6 +124,8 @@ struct FuelWidgetView: View {
             .widgetURL(entry.actions.first?.url)
         case .systemSmall:
             small
+        case .systemLarge:
+            large
         default:
             medium
         }
@@ -189,6 +193,99 @@ struct FuelWidgetView: View {
             }
         }
     }
+
+    /// The Fuel page's rings (carbs, protein, fat) with the numbers beside them, and the buttons below.
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image("Logo").resizable().frame(width: 22, height: 22).clipShape(.rect(cornerRadius: 5))
+                Text(entry.fuel?.levelText ?? "Log fuel").font(.headline).foregroundStyle(.white)
+                Spacer()
+                if let f = entry.fuel { Text(f.mealsText).font(.caption).foregroundStyle(.white.opacity(0.6)) }
+            }
+            if let f = entry.fuel, let rings = f.rings {
+                Link(destination: FuelAction.today.url) {
+                    HStack(spacing: 18) {
+                        MacroRingsView(rings: rings).frame(width: 128, height: 128)
+                        VStack(alignment: .leading, spacing: 8) {
+                            MacroRow(label: "Carbs", color: Brand.accent, amount: f.carbs, fill: rings.carbs)
+                            MacroRow(label: "Protein", color: Macro.protein, amount: f.protein, fill: rings.protein)
+                            MacroRow(label: "Fat", color: Macro.fat, amount: f.fat, fill: rings.fat)
+                            if let k = f.kcal {
+                                Text("\(k.eaten) of \(k.low)–\(k.high) kcal").font(.caption).foregroundStyle(.white.opacity(0.6)).lineLimit(1).minimumScaleFactor(0.8)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            } else {
+                Spacer(minLength: 0)
+                Text(entry.fuel == nil ? "Open Fuel in the app once to see today's rings here." : "Add your weight on the Fuel page to get daily targets.")
+                    .font(.caption).foregroundStyle(.white.opacity(0.6))
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                ForEach(entry.actions.prefix(4), id: \.self) { a in
+                    Link(destination: a.url) {
+                        VStack(spacing: 6) {
+                            Image(systemName: a.symbol).font(.system(size: 22, weight: .semibold)).foregroundStyle(Brand.accent)
+                            Text(a.title).font(.caption2.weight(.medium)).foregroundStyle(.white.opacity(0.85)).lineLimit(1).minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 72)
+                        .background(.white.opacity(0.07), in: .rect(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum Macro {
+    static let protein = Color(red: 0x7d / 255, green: 0xd3 / 255, blue: 0xfc / 255)
+    static let fat = Color(red: 0xfc / 255, green: 0xd3 / 255, blue: 0x4d / 255)
+}
+
+/// Three rings, outer to inner: carbs, protein, fat. Each fills toward the bottom of its range (as on the Fuel page).
+struct MacroRingsView: View {
+    let rings: FuelToday.Rings
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            let line = side * 0.09
+            ZStack {
+                ForEach(Array([(rings.carbs, Brand.accent), (rings.protein, Macro.protein), (rings.fat, Macro.fat)].enumerated()), id: \.offset) { i, item in
+                    let inset = CGFloat(i) * (line * 1.35) + line / 2
+                    Circle().inset(by: inset).stroke(.white.opacity(0.08), lineWidth: line)
+                    Circle().inset(by: inset)
+                        .trim(from: 0, to: max(0.015, min(1, item.0)))
+                        .stroke(item.1, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+            }
+            .frame(width: side, height: side)
+        }
+    }
+}
+
+/// "● Carbs  210 g  of 490–700" — or "there" / "on the way" for athletes who don't see numbers.
+struct MacroRow: View {
+    let label: String
+    let color: Color
+    let amount: FuelToday.Amount?
+    let fill: Double
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(label).font(.subheadline).foregroundStyle(color)
+            if let a = amount {
+                Text("\(a.eaten) g").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                Text("of \(a.low)–\(a.high)").font(.caption2).foregroundStyle(.white.opacity(0.5)).lineLimit(1).minimumScaleFactor(0.7)
+            } else {
+                Text(fill >= 1 ? "there" : fill >= 0.5 ? "on the way" : "").font(.caption).foregroundStyle(.white.opacity(0.55))
+            }
+        }
+    }
 }
 
 struct FuelWidget: Widget {
@@ -201,7 +298,7 @@ struct FuelWidget: Widget {
         }
         .configurationDisplayName("Log fuel")
         .description("Today's fuel and quick ways to log what you ate: photo, barcode, or type it.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular])
     }
 }
 

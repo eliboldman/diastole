@@ -6,6 +6,7 @@ import FuelLog from "@/components/fuel/FuelLog";
 import FuelView from "@/components/fuel/FuelView";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { getFuelDays, getFuelMode, getMealDay } from "@/lib/fuel/data";
+import { ring } from "@/lib/fuel/meals";
 import { requireUser } from "@/lib/supabase/server";
 
 import WidgetSync, { type FuelSnapshot } from "@/components/fuel/WidgetSync";
@@ -28,7 +29,15 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
     meals: meals?.meals.length ?? 0,
     carbs: show ? { eaten: r(meals.eaten.carbs), low: r(meals.targets!.carbs.low), high: r(meals.targets!.carbs.high) } : null,
     protein: show ? { eaten: r(meals.eaten.protein), low: r(meals.targets!.protein.low), high: r(meals.targets!.protein.high) } : null,
+    fat: show ? { eaten: r(meals.eaten.fat), low: r(meals.targets!.fat.low), high: r(meals.targets!.fat.high) } : null,
     kcal: show ? { eaten: r(meals.eaten.kcal), low: r(meals.targets!.kcal.low), high: r(meals.targets!.kcal.high) } : null,
+    rings: meals?.targets
+      ? {
+          carbs: ring(meals.eaten.carbs, meals.targets.carbs).fill,
+          protein: ring(meals.eaten.protein, meals.targets.protein).fill,
+          fat: ring(meals.eaten.fat, meals.targets.fat).fill,
+        }
+      : null,
   };
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
