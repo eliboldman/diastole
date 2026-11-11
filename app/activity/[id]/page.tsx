@@ -9,7 +9,7 @@ import ActivityTitle from "@/components/activity/ActivityTitle";
 import FormSection from "@/components/activity/FormSection";
 import RouteMap from "@/components/activity/RouteMap";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { compareWorkout, complianceOf, complianceText, missText, type ComparedStep } from "@/lib/activity/compare";
+import { compareWorkoutWith, complianceOf, complianceText, missText, type ComparedStep } from "@/lib/activity/compare";
 import { formatDistance, formatDuration, workoutTotals } from "@/lib/workouts/totals";
 import type { Lap, Streams } from "@/lib/activity/fit";
 import type { SwimRep } from "@/lib/activity/swim";
@@ -226,7 +226,8 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const savedPool: Pool = plan?.pool_length && plan.pool_unit ? { length: Number(plan.pool_length), unit: plan.pool_unit as PoolUnit } : null;
   const planPool: Pool = plan?.sport === "swim" ? inferPool(plan.steps as Step[], savedPool) : savedPool;
   const planSwim = plan?.sport === "swim";
-  const comparison = plan && laps.length ? compareWorkout(plan.steps as Step[], laps, maxHr, planPool) : null;
+  const compared = plan && (laps.length || streams) ? compareWorkoutWith(plan.steps as Step[], laps, maxHr, planPool, streams) : null;
+  const comparison = compared?.steps ?? null;
   const score = complianceText(complianceOf(comparison));
   // Planned vs done totals, from the plan's steps (exact where the steps set them).
   const planTotals = plan ? workoutTotals(plan.steps as Step[], plan.sport, planPool, zonesRow) : null;
@@ -422,11 +423,15 @@ export default async function ActivityPage({ params, searchParams }: { params: P
           )}
           {!comparison ? (
             <p className="text-sm text-white/55">
-              {laps.length
+              {laps.length || streams
                 ? "The laps from this session don't line up with the planned steps (for example, the workout was run without the watch's workout screen), so they can't be compared step by step."
                 : "Step-by-step comparison appears once the watch's detailed file arrives."}
             </p>
           ) : (
+            <>
+            {compared?.method === "time" && (
+              <p className="mb-1 text-xs text-white/45">Split at the planned step times, since the watch&apos;s laps didn&apos;t mark the steps.</p>
+            )}
             <ol className="divide-y divide-white/10">
               {comparison.map((c, i) => {
                 const v = c.verdict ? VERDICT[c.verdict] : null;
@@ -452,6 +457,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
                 );
               })}
             </ol>
+            </>
           )}
         </Card>
       )}

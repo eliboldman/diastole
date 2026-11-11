@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 
 import type { Step } from "../workouts/garmin-format.ts";
-import { alignLaps, compareWorkout, expandSteps, judge } from "./compare.ts";
+import { alignLaps, compareWorkout, compareWorkoutWith, expandSteps, judge } from "./compare.ts";
 import type { Lap } from "./fit.ts";
 import { estimateMaxHr, hrZones, paceZones, timeInZones, zoneOf } from "./zones.ts";
 
@@ -87,4 +87,50 @@ console.log("compare: all passed");
   assert.equal(complianceText(k), "1 of 2 on target");
   assert.equal(complianceText(complianceOf([step(null, null, null, undefined)])), null);
   console.log("compliance: passed");
+}
+
+// Real-world lap shapes that used to give up
+{
+  const { sliceStreams } = await import("./compare.ts");
+  const ride: Step[] = [
+    { kind: "step", intensity: "WARMUP", duration: { type: "time", seconds: 600 } },
+    { kind: "step", intensity: "ACTIVE", duration: { type: "time", seconds: 2400 }, target: { type: "power_range", low: 150, high: 180 } },
+    { kind: "step", intensity: "COOLDOWN", duration: { type: "time", seconds: 600 } },
+  ];
+  const p3 = expandSteps(ride);
+  // Extra lap after the workout ended (watch kept recording until save)
+  const extra = [lap({ duration_s: 600 }), lap({ duration_s: 2400, avg_power: 165 }), lap({ duration_s: 600 }), lap({ duration_s: 8 })];
+  assert.equal(alignLaps(p3, extra)?.length, 3, "trailing sliver dropped");
+  assert.equal(compareWorkout(ride, extra, null)![1].verdict, "on");
+  // Same, with step indexes and a null-index tail lap
+  const idx = extra.map((l, i) => ({ ...l, step_index: i < 3 ? i : null }));
+  idx[3] = { ...idx[3], duration_s: 200 };
+  assert.equal(alignLaps(p3, idx)?.length, 3, "unindexed tail after the workout dropped");
+  // Auto-laps every 5 minutes, no step indexes: placed by the plan's clock
+  const auto = Array.from({ length: 12 }, (_, i) => lap({ duration_s: 300, avg_power: i >= 2 && i < 10 ? 170 : 110 }));
+  const a = alignLaps(p3, auto)!;
+  assert.deepEqual(a.map((x) => x.duration_s), [600, 2400, 600]);
+  assert.equal(a[1].avg_power, 170);
+  // A repeat with one inner step: the watch gives every rep the same step index
+  const reps: Step[] = [{ kind: "repeat", times: 3, steps: [{ kind: "step", intensity: "INTERVAL", duration: { type: "time", seconds: 300 } }] }];
+  const sameIdx = [0, 1, 2].map(() => lap({ duration_s: 300, step_index: 1 }));
+  assert.equal(alignLaps(expandSteps(reps), sameIdx)?.length, 3);
+  // Laps that genuinely don't fit still give no comparison
+  assert.equal(alignLaps(p3, [lap({ duration_s: 1200 }), lap({ duration_s: 2400 })]), null);
+
+  // One lap for the whole ride: cut the recording at the planned times
+  const t = Array.from({ length: 720 }, (_, i) => i * 5); // 60 min at 5 s
+  const power = t.map((s) => (s >= 600 && s < 3000 ? 168 : 100));
+  const sliced = sliceStreams(p3, { interval_s: 5, t, power })!;
+  assert.deepEqual(sliced.map((x) => x.duration_s), [600, 2400, 600]);
+  assert.equal(sliced[1].avg_power, 168);
+  const one = compareWorkoutWith(ride, [lap({ duration_s: 3600 })], null, null, { interval_s: 5, t, power })!;
+  assert.equal(one.method, "time");
+  assert.equal(one.steps[1].verdict, "on");
+  // A pause doesn't shift the cuts: 2 min gap in the middle
+  const tp = t.map((s) => (s >= 1800 ? s + 120 : s));
+  assert.deepEqual(sliceStreams(p3, { interval_s: 5, t: tp, power })!.map((x) => x.duration_s), [600, 2400, 600]);
+  // Too short a session to trust
+  assert.equal(sliceStreams(p3, { interval_s: 5, t: t.slice(0, 300), power }), null);
+  console.log("lap shapes: passed");
 }

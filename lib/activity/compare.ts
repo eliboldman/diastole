@@ -1,6 +1,6 @@
 // Planned vs completed, per interval. Pure module (testable with `node`).
 import { hundredMeters, type Duration, type Intensity, type Pool, type Step, type Target } from "../workouts/garmin-format.ts";
-import type { Lap } from "./fit.ts";
+import type { Lap, Streams } from "./fit.ts";
 import { hrZones, type Zone } from "./zones.ts";
 
 export type PlannedStep = { label: string; intensity: Intensity; duration: Duration; target?: Target; rep?: string };
@@ -53,23 +53,157 @@ function merge(laps: Lap[]): ComparedStep["actual"] {
   return { duration_s: time || null, distance_m: dist || null, avg_hr: weighted("avg_hr"), avg_speed: weighted("avg_speed"), avg_power: weighted("avg_power") };
 }
 
+/** A step's planned length in seconds or meters, when it has one. */
+function plannedSize(p: PlannedStep): { s?: number; m?: number } {
+  const d = p.duration;
+  if (d.type === "time" || d.type === "sendoff") return { s: d.seconds };
+  if (d.type === "distance") return { m: d.meters };
+  return {};
+}
+
+/** Groups consecutive laps that share a workout step index (auto-laps inside one step). */
+function byStepIndex(laps: Lap[]): Lap[][] | null {
+  if (!laps.every((l) => l.step_index !== null)) return null;
+  const groups: Lap[][] = [];
+  for (const l of laps) {
+    const last = groups[groups.length - 1];
+    if (last && last[0].step_index === l.step_index) last.push(l);
+    else groups.push([l]);
+  }
+  return groups;
+}
+
 /**
- * Lines laps up with the planned steps: one lap per step, or consecutive laps sharing a
- * workout step index merged. Null when they can't be matched with confidence.
+ * Laps outside the workout: a sliver at the very start, and anything recorded after the last step
+ * finished (the watch keeps a new lap running until the athlete saves). Only trims laps that are
+ * short next to the planned steps, so a real step is never dropped.
+ */
+function trimExtras(planned: PlannedStep[], laps: Lap[]): Lap[] {
+  const out = [...laps];
+  const lastPlan = plannedSize(planned[planned.length - 1]).s ?? 600;
+  while (out.length > 1 && (out[0].duration_s ?? 0) < 15) out.shift();
+  while (out.length > planned.length && (out[out.length - 1].duration_s ?? 0) <= Math.max(120, lastPlan * 0.25)) out.pop();
+  // Laps whose step index points past the workout (or is missing after indexed laps) come after it.
+  if (out.some((l) => l.step_index !== null)) {
+    while (out.length > planned.length && out[out.length - 1].step_index === null) out.pop();
+  }
+  return out;
+}
+
+/**
+ * Assigns laps to steps by when they happened: each lap goes to the step its middle falls in,
+ * measured on the plan's own clock (time steps) or distance (distance steps). Accepted only when
+ * every step gets laps and the lap edges land close to the planned edges.
+ */
+function byPlannedClock(planned: PlannedStep[], laps: Lap[]): Lap[][] | null {
+  const sizes = planned.map(plannedSize);
+  const useTime = sizes.every((z) => z.s);
+  const useDist = !useTime && sizes.every((z) => z.m) && laps.every((l) => l.distance_m);
+  if (!useTime && !useDist) return null;
+  const size = (i: number) => (useTime ? sizes[i].s! : sizes[i].m!);
+  const len = (l: Lap) => (useTime ? (l.duration_s ?? 0) : (l.distance_m ?? 0));
+  const edges: number[] = [];
+  let acc = 0;
+  for (let i = 0; i < planned.length; i++) edges.push((acc += size(i)));
+  const groups: Lap[][] = planned.map(() => []);
+  let pos = 0;
+  for (const l of laps) {
+    const mid = pos + len(l) / 2;
+    pos += len(l);
+    const i = edges.findIndex((e) => mid < e);
+    if (i === -1) {
+      // Past the end of the plan: part of the last step if it ran a little long, otherwise unmatched.
+      if (mid - acc > Math.max(60, size(planned.length - 1) * 0.3)) return null;
+      groups[planned.length - 1].push(l);
+    } else groups[i].push(l);
+  }
+  if (groups.some((g) => !g.length)) return null;
+  // Each step's laps should add up to about what was planned.
+  const ok = groups.every((g, i) => {
+    const got = g.reduce((a, l) => a + len(l), 0);
+    return Math.abs(got - size(i)) <= Math.max(useTime ? 30 : 100, size(i) * 0.2);
+  });
+  return ok ? groups : null;
+}
+
+/**
+ * Lines laps up with the planned steps: one lap per step, consecutive laps sharing a workout step
+ * index merged, or laps placed by the plan's clock. Null when they can't be matched with confidence.
  */
 export function alignLaps(planned: PlannedStep[], laps: Lap[]): ComparedStep["actual"][] | null {
   if (!planned.length || !laps.length) return null;
   if (laps.length === planned.length) return laps.map((l) => merge([l]));
-  if (laps.every((l) => l.step_index !== null)) {
-    const groups: Lap[][] = [];
-    for (const l of laps) {
-      const last = groups[groups.length - 1];
-      if (last && last[0].step_index === l.step_index) last.push(l);
-      else groups.push([l]);
-    }
-    if (groups.length === planned.length) return groups.map(merge);
+  const trimmed = trimExtras(planned, laps);
+  if (trimmed.length === planned.length) return trimmed.map((l) => merge([l]));
+  for (const set of [laps, trimmed]) {
+    const groups = byStepIndex(set);
+    if (groups?.length === planned.length) return groups.map(merge);
   }
-  return null;
+  const clocked = byPlannedClock(planned, trimmed);
+  return clocked ? clocked.map(merge) : null;
+}
+
+/**
+ * Last resort when laps don't help (one lap for the whole session, or the watch's laps ignore the
+ * steps): cut the recording itself at the planned step lengths, counting only moving time.
+ * Needs every step to have a length (an open-ended step only at the end) and the session to have
+ * covered most of the plan.
+ */
+export function sliceStreams(planned: PlannedStep[], streams: Streams | null): ComparedStep["actual"][] | null {
+  if (!streams?.t?.length || !planned.length) return null;
+  const sizes = planned.map(plannedSize);
+  const open = sizes.findIndex((z) => z.s === undefined && z.m === undefined);
+  if (open !== -1 && open !== planned.length - 1) return null;
+  if (sizes.some((z) => z.m !== undefined) && !streams.dist) return null;
+  const n = streams.t.length;
+  const step = streams.interval_s || 1;
+  // Moving clock and distance at each sample (pauses leave gaps in t; they don't count).
+  const clock: number[] = [];
+  let c = 0;
+  for (let i = 0; i < n; i++) {
+    if (i > 0) c += Math.min(streams.t[i] - streams.t[i - 1], step);
+    clock.push(c);
+  }
+  const dist = streams.dist ?? null;
+  let distBase = 0;
+  const cuts: [number, number][] = [];
+  let from = 0;
+  for (let k = 0; k < planned.length; k++) {
+    const z = sizes[k];
+    let to = n;
+    if (z.s !== undefined) {
+      const target = clock[from] + z.s;
+      to = from;
+      while (to < n && clock[to] < target) to++;
+    } else if (z.m !== undefined && dist) {
+      const startD = from > 0 ? (dist[from - 1] ?? distBase) : 0;
+      distBase = startD;
+      to = from;
+      while (to < n && ((dist[to] ?? startD) - startD) < z.m) to++;
+    }
+    if (to <= from) return null;
+    cuts.push([from, to]);
+    from = to;
+    if (from >= n && k < planned.length - 1) return null; // ran out before the plan did
+  }
+  const lastCut = cuts[cuts.length - 1];
+  const covered = clock[Math.min(lastCut[1], n) - 1] - clock[cuts[0][0]];
+  const plannedTotal = sizes.reduce((a, z) => a + (z.s ?? 0), 0);
+  if (plannedTotal && covered < plannedTotal * 0.8) return null;
+  const avg = (key: "hr" | "speed" | "power", a: number, b: number) => {
+    const xs = streams[key]?.slice(a, b).filter((v): v is number => v !== null && (key === "speed" || v > 0));
+    return xs?.length ? Number((xs.reduce((x, y) => x + y, 0) / xs.length).toFixed(3)) : null;
+  };
+  return cuts.map(([a, b]) => {
+    const d = dist ? (dist[b - 1] ?? 0) - (a > 0 ? (dist[a - 1] ?? 0) : 0) : null;
+    return {
+      duration_s: Math.round(clock[b - 1] - clock[a] + step) || null,
+      distance_m: d && d > 0 ? Math.round(d) : null,
+      avg_hr: avg("hr", a, b),
+      avg_speed: avg("speed", a, b),
+      avg_power: avg("power", a, b),
+    };
+  });
 }
 
 /** The target as a range in a measurable unit (bpm, m/s, W). */
@@ -109,16 +243,38 @@ export function judge(value: number | null, range: [number, number] | null): Ver
   return "on";
 }
 
-export function compareWorkout(steps: Step[], laps: Lap[], maxHr: number | null, pool: Pool = null): ComparedStep[] | null {
+export type MatchMethod = "laps" | "time";
+
+/** Planned vs done per step, and whether laps matched or the recording was cut at the planned times. */
+export function compareWorkoutWith(
+  steps: Step[],
+  laps: Lap[],
+  maxHr: number | null,
+  pool: Pool = null,
+  streams: Streams | null = null,
+): { steps: ComparedStep[]; method: MatchMethod } | null {
   const planned = expandSteps(steps);
-  const actual = alignLaps(planned, laps);
+  let method: MatchMethod = "laps";
+  let actual = laps.length ? alignLaps(planned, laps) : null;
+  if (!actual) {
+    actual = sliceStreams(planned, streams);
+    method = "time";
+  }
   if (!actual) return null;
-  return planned.map((p, i) => {
-    const t = targetRange(p.target, maxHr, pool);
-    const a = actual[i];
-    const measured = !t ? null : t.kind === "hr" ? a.avg_hr : t.kind === "pace" ? a.avg_speed : a.avg_power;
-    return { planned: p, actual: a, measured, range: t?.range ?? null, verdict: judge(measured, t?.range ?? null) };
-  });
+  const done = actual;
+  return {
+    method,
+    steps: planned.map((p, i) => {
+      const t = targetRange(p.target, maxHr, pool);
+      const a = done[i];
+      const measured = !t ? null : t.kind === "hr" ? a.avg_hr : t.kind === "pace" ? a.avg_speed : a.avg_power;
+      return { planned: p, actual: a, measured, range: t?.range ?? null, verdict: judge(measured, t?.range ?? null) };
+    }),
+  };
+}
+
+export function compareWorkout(steps: Step[], laps: Lap[], maxHr: number | null, pool: Pool = null, streams: Streams | null = null): ComparedStep[] | null {
+  return compareWorkoutWith(steps, laps, maxHr, pool, streams)?.steps ?? null;
 }
 
 // ---------------------------------------------------------------- how well the plan was followed
