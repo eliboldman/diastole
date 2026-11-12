@@ -215,7 +215,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   const swimSum = pool ? swimSummary(laps, pool.unit, pool) : null;
   // Stroke efficiency (freestyle, per 25 m) and whether form held through the swim.
   const swimEff = swimSum ? swimMetrics(swimSum, { date: "", activity_id: act.id }) : null;
-  const swimFade = swimSum ? fadeOf(swimSum) : null;
+  const swimFade = swimSum ? fadeOf(swimSum, u !== "km") : null;
 
   // Zones: the coach's numbers, otherwise an estimate for max HR.
   const setMax = zonesRow?.max_hr ?? null;
@@ -254,7 +254,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         ["Rest", swimSum?.rest_s ? clock(swimSum.rest_s) : null],
         ["Best rep pace", swimSum?.best_100 && swimSum.reps.length > 1 ? `${swimClock(swimSum.best_100)} /100${unitLabel(swimUnit)}` : null],
         ["Avg SWOLF", swimSum?.swolf ? String(swimSum.swolf) : null],
-        ["Dist / stroke", swimEff ? `${swimEff.dps.toFixed(2)} m` : null],
+        ["Dist / stroke", swimEff ? (u !== "km" ? `${(swimEff.dps / 0.9144).toFixed(2)} yd` : `${swimEff.dps.toFixed(2)} m`) : null],
         ["Stroke rate", whole(swimSum?.stroke_rate ?? act.avg_cadence, "str/min")],
         ["Pool", pool?.length_m ? `${Math.round(pool.length_m / (swimUnit === "YARD" ? 0.9144 : 1))} ${unitLabel(swimUnit)}` : null],
         ["Avg HR", whole(act.avg_hr, "bpm")],

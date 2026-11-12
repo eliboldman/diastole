@@ -51,4 +51,11 @@ t("drills from rules", () => {
   assert.ok(slow.some((s) => s.key === "tempo_up"));
   assert.ok(suggestDrills(ms([1.5, 1.5, 1.5], 18, 42), [fadeF, fadeF]).length <= 4);
 });
+t("mile users read yards", () => {
+  const f = fadeOf(sum([rep(1, 10, 100), rep(2, 10, 101), rep(3, 10, 104), rep(4, 10.2, 106)]), true)!;
+  assert.match(f.text, /s\/100 yd/);
+  assert.match(fadeOf(sum([rep(1, 10, 100), rep(2, 10, 100), rep(3, 11.5, 104), rep(4, 12, 106)]), true)!.text, /per 25 yd/);
+  const short = suggestDrills(ms([1.6, 1.6, 1.6], 16), [], true);
+  assert.match(short.find((x) => x.key === "catch_up")!.why, /per 25 yd \(1\.75 yd per stroke\)/);
+});
 console.log(`${n} passed`);

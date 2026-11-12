@@ -22,6 +22,9 @@ export type Fade = { pace100: number; spl25: number; dpsPct: number; rate: numbe
 const FREE = (s: string | null) => !s || s === "freestyle";
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
+const YD = 0.9144;
+/** Words for one unit system: metrics stay per metre / per 25 m; mile users read them per yard. */
+const unitText = (yd: boolean) => ({ len: yd ? "25 yd" : "25 m", hundred: yd ? "100 yd" : "100 m", per25: (v: number) => (yd ? v * YD : v), dps: (v: number) => (yd ? `${r2(v / YD)} yd` : `${r2(v)} m`), pace: (v: number) => (yd ? v * YD : v) });
 
 type Rep = SwimSummary["reps"][number];
 const usable = (sum: SwimSummary) => sum.reps.filter((r) => FREE(r.stroke) && r.strokes_per_length && r.lengths && r.distance_m >= 20);
@@ -49,7 +52,8 @@ export function swimMetrics(sum: SwimSummary, meta: { date: string; activity_id:
  * Second half vs first half of the swim's freestyle (by distance). Flagged when stroke count
  * climbs 1+ per 25 m or distance per stroke drops 6%+: form slipping with fatigue.
  */
-export function fadeOf(sum: SwimSummary): Fade | null {
+export function fadeOf(sum: SwimSummary, yd = false): Fade | null {
+  const u = unitText(yd);
   const reps = usable(sum);
   const total = reps.reduce((a, r) => a + r.distance_m, 0);
   if (reps.length < 4 || total < 400) return null;
@@ -71,9 +75,9 @@ export function fadeOf(sum: SwimSummary): Fade | null {
   const rate = a.rate && b.rate ? b.rate - a.rate : null;
   const flagged = spl >= 1 || dpsPct <= -6;
   const text = flagged
-    ? `Stroke count crept up ${r1(Math.max(spl, 0))} per 25 m in the second half${pace > 1 ? ` and pace slowed ${Math.round(pace)} s/100 m` : ""}: form slipping as you tire.`
+    ? `Stroke count crept up ${r1(Math.max(u.per25(spl), 0))} per ${u.len} in the second half${pace > 1 ? ` and pace slowed ${Math.round(u.pace(pace))} s/${u.hundred}` : ""}: form slipping as you tire.`
     : pace > 3
-      ? `Pace slowed ${Math.round(pace)} s/100 m late but your stroke held: that's fitness, not form.`
+      ? `Pace slowed ${Math.round(u.pace(pace))} s/${u.hundred} late but your stroke held: that's fitness, not form.`
       : "Stroke held steady start to finish.";
   return { pace100: r1(pace), spl25: r1(spl), dpsPct: r1(dpsPct), rate: rate === null ? null : Math.round(rate), flagged, text };
 }
@@ -102,7 +106,8 @@ export const DRILLS: Record<DrillKey, { name: string; set: string }> = {
 export type Suggestion = { key: DrillKey; why: string };
 
 /** Drill suggestions from recent swims (newest last). The coach approves before the athlete sees any. */
-export function suggestDrills(ms: SwimMetrics[], fades: (Fade | null)[]): Suggestion[] {
+export function suggestDrills(ms: SwimMetrics[], fades: (Fade | null)[], yd = false): Suggestion[] {
+  const u = unitText(yd);
   const out: Suggestion[] = [];
   const add = (key: DrillKey, why: string) => {
     if (!out.some((s) => s.key === key)) out.push({ key, why });
@@ -120,7 +125,7 @@ export function suggestDrills(ms: SwimMetrics[], fades: (Fade | null)[]): Sugges
     add("last_25", "Practises holding length when tired.");
   }
   if (spl > 14 || dps < 1.8) {
-    add("catch_up", `About ${r1(spl)} strokes per 25 m (${r2(dps)} m per stroke): room to lengthen the stroke.`);
+    add("catch_up", `About ${r1(u.per25(spl))} strokes per ${u.len} (${u.dps(dps)} per stroke): room to lengthen the stroke.`);
     add("count_down", "Builds a longer stroke you can hold at speed.");
   }
   if (rate && rate > 38 && dps < 2.1) add("six_kick", `Quick turnover (${Math.round(rate)}/min) with a short stroke: rotation and timing help it grab more water.`);

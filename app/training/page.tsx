@@ -49,7 +49,7 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
       .limit(20),
     getWeek(supabase, me.id, me.timezone, weekStartFrom(weekParam, today)),
     getLoad(supabase, me.id, me.timezone),
-    getSwimView(supabase, me.id),
+    getSwimView(supabase, me.id, me.units !== "km"),
   ]);
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });

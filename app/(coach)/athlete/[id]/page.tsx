@@ -263,7 +263,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           </details>
         </section>
 
-        {await Promise.all([getSwimView(supabase, profile.id), listSwimVideos(profile.id)]).then(([v, videos]) => (v ? <div className="lg:col-span-2"><SwimTechniqueCard view={v} coach athleteId={profile.id} videos={videos} /></div> : null))}
+        {await Promise.all([getSwimView(supabase, profile.id, me.units !== "km"), listSwimVideos(profile.id)]).then(([v, videos]) => (v ? <div className="lg:col-span-2"><SwimTechniqueCard view={v} coach athleteId={profile.id} videos={videos} /></div> : null))}
         <div className="lg:col-span-2">
           <PredictionsCard view={await getPredictions(supabase, profile.id, athleteTz)} coach athleteId={profile.id} firstName={(profile.full_name || "The athlete").split(" ")[0]} />
         </div>

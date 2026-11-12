@@ -15,7 +15,7 @@ function Delta({ t, better, fmt }: { t: Trend | null; better: "up" | "down"; fmt
   return <span className={`text-[11px] ${good ? "text-emerald-200" : "text-amber-200/80"}`}>{good ? "better" : "worse"}: {fmt(t.from)} → {fmt(t.to)}</span>;
 }
 
-function Spark({ values, label }: { values: number[]; label: string }) {
+function Spark({ values, label, unit }: { values: number[]; label: string; unit: string }) {
   if (values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -27,7 +27,7 @@ function Spark({ values, label }: { values: number[]; label: string }) {
       <path d={values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("")} fill="none" strokeWidth={2} strokeLinejoin="round" className="stroke-emerald-300" />
       {values.map((v, i) => (
         <circle key={i} cx={x(i)} cy={y(v)} r={i === values.length - 1 ? 3.5 : 2.5} className="fill-emerald-300">
-          <title>{v.toFixed(2)} m per stroke</title>
+          <title>{v.toFixed(2)} {unit} per stroke</title>
         </circle>
       ))}
     </svg>
@@ -40,6 +40,11 @@ export default function SwimTechniqueCard({ view, coach, athleteId, videos }: { 
   const recent = view.metrics.slice(-5);
   const avg = (k: "dps" | "spl25" | "swolf25") => (recent.length ? recent.reduce((a, m) => a + m[k], 0) / recent.length : 0);
   const rated = recent.filter((m) => m.rate);
+  // Stored per metre / per 25 m; mile users read per yard / per 25 yd.
+  const yd = view.yards;
+  const len = yd ? "25 yd" : "25 m";
+  const dist = (v: number) => (yd ? v / 0.9144 : v);
+  const per25 = (v: number) => (yd ? v * 0.9144 : v);
   return (
     <section id="swim" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
       <h2 className="flex items-center gap-2 text-lg font-medium">
@@ -47,12 +52,12 @@ export default function SwimTechniqueCard({ view, coach, athleteId, videos }: { 
       </h2>
       {last ? (
         <>
-          <p className="mt-1 text-xs text-white/45">Freestyle, {recent.length === 1 ? "your last pool swim" : `last ${recent.length} pool swims`} (per 25 m so pools compare).</p>
+          <p className="mt-1 text-xs text-white/45">Freestyle, {recent.length === 1 ? "your last pool swim" : `last ${recent.length} pool swims`} (per {len} so pools compare).</p>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { label: "Distance / stroke", value: `${avg("dps").toFixed(2)} m`, delta: <Delta t={view.trends.dps} better="up" fmt={(v) => v.toFixed(2)} /> },
-              { label: "Strokes / 25 m", value: avg("spl25").toFixed(1), delta: null },
-              { label: "SWOLF (25 m)", value: String(Math.round(avg("swolf25"))), delta: <Delta t={view.trends.swolf25} better="down" fmt={(v) => String(Math.round(v))} /> },
+              { label: "Distance / stroke", value: `${dist(avg("dps")).toFixed(2)} ${yd ? "yd" : "m"}`, delta: <Delta t={view.trends.dps} better="up" fmt={(v) => dist(v).toFixed(2)} /> },
+              { label: `Strokes / ${len}`, value: per25(avg("spl25")).toFixed(1), delta: null },
+              { label: `SWOLF (${len})`, value: String(Math.round(per25(avg("swolf25")))), delta: <Delta t={view.trends.swolf25} better="down" fmt={(v) => String(Math.round(per25(v)))} /> },
               { label: "Stroke rate", value: rated.length ? `${Math.round(rated.reduce((a, m) => a + m.rate!, 0) / rated.length)}/min` : "–", delta: null },
             ].map((tile) => (
               <div key={tile.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
@@ -62,10 +67,10 @@ export default function SwimTechniqueCard({ view, coach, athleteId, videos }: { 
               </div>
             ))}
           </div>
-          <Spark values={view.metrics.map((m) => m.dps)} label={`Distance per stroke across ${view.metrics.length} swims`} />
+          <Spark unit={yd ? "yd" : "m"} values={view.metrics.map((m) => dist(m.dps))} label={`Distance per stroke across ${view.metrics.length} swims`} />
           {view.trends.pace100 && Math.abs(view.trends.pace100.pct) >= 2 && (
             <p className="mt-1 text-xs text-white/55">
-              Freestyle pace: {mmss(view.trends.pace100.from)} → {mmss(view.trends.pace100.to)} per 100 m over these swims.
+              Freestyle pace: {mmss(per25(view.trends.pace100.from))} → {mmss(per25(view.trends.pace100.to))} per {yd ? "100 yd" : "100 m"} over these swims.
             </p>
           )}
           {view.lastFade && <p className={`mt-2 text-sm ${view.lastFade.flagged ? "text-amber-100/90" : "text-white/60"}`}>Last swim: {view.lastFade.text}</p>}

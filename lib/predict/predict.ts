@@ -11,6 +11,7 @@ export type PredictInput = {
   ftp: number | null; // W
   css: number | null; // s per 100 m
   weightKg: number | null;
+  yards?: boolean; // athlete uses miles: show CSS per 100 yd
 };
 
 export type Range = { mid: number; low: number; high: number };
@@ -64,6 +65,9 @@ function bestEfforts(efforts: RunEffort[], today: string) {
 }
 
 /** Open run time for a distance: weighted blend of each best effort (Riegel) and threshold pace. */
+/** CSS as the athlete reads it: per 100 yd for mile users. */
+const cssText = (inp: Pick<PredictInput, "css" | "yards">) => (inp.yards ? `CSS ${fmt(inp.css! * 0.9144)}/100 yd` : `CSS ${fmt(inp.css!)}/100 m`);
+
 export function predictRun(meters: number, inp: Pick<PredictInput, "today" | "efforts" | "thresholdSpeed">): { range: Range; confidence: "good" | "rough"; drivers: Driver[] } | null {
   const sources: { t: number; w: number }[] = [];
   const drivers: Driver[] = [];
@@ -156,7 +160,7 @@ export function predictTri(tri: Tri, inp: PredictInput): Prediction | null {
     { leg: "t2", range: t2 },
     { leg: "run", range: runOff },
   ];
-  drivers.push({ text: `CSS ${fmt(inp.css!)}/100 m`, kind: "data" }, { text: `FTP ${inp.ftp} W at ${Math.round(tri.bikeIF * 100)}%`, kind: "data" }, ...run.drivers, FLAT_NOTE);
+  drivers.push({ text: cssText(inp), kind: "data" }, { text: `FTP ${inp.ftp} W at ${Math.round(tri.bikeIF * 100)}%`, kind: "data" }, ...run.drivers, FLAT_NOTE);
   return { key: tri.key, label: tri.label, range: add(...splits.map((s) => s.range)), splits, confidence: run.confidence, drivers };
 }
 
@@ -198,7 +202,7 @@ export function predictRace(race: { sport: string; distance_km: number | null },
   }
   if (race.sport === "swim") {
     const r = predictSwim(m, inp.css, m > 1600 ? 1.03 : 1);
-    return r ? { key: "race", label: "Swim", range: r, confidence: "rough", drivers: [{ text: `CSS ${fmt(inp.css!)}/100 m`, kind: "data" }] } : null;
+    return r ? { key: "race", label: "Swim", range: r, confidence: "rough", drivers: [{ text: cssText(inp), kind: "data" }] } : null;
   }
   return null;
 }

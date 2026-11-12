@@ -20,10 +20,11 @@ export type PredictionView = {
 /** Inputs for the estimates: best efforts (last 4 months), zones, weight. Caller's client; row-level security applies. */
 export async function predictInput(supabase: SupabaseClient, athleteId: string, today: string): Promise<PredictInput> {
   const since = new Date(Date.parse(`${addDays(today, -125)}T00:00:00Z`)).toISOString();
-  const [{ data: acts }, { data: zones }, { data: body }] = await Promise.all([
+  const [{ data: acts }, { data: zones }, { data: body }, { data: prof }] = await Promise.all([
     supabase.from("activities").select("id, start_time").eq("athlete_id", athleteId).gte("start_time", since).limit(1500),
     supabase.from("athlete_zones").select("ftp_w, threshold_speed_mps, css_sec_per_100m").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("athlete_body").select("weight_kg").eq("athlete_id", athleteId).maybeSingle(),
+    supabase.from("profiles").select("units").eq("id", athleteId).maybeSingle(),
   ]);
   const dateOf = new Map((acts ?? []).map((a) => [a.id as string, String(a.start_time).slice(0, 10)]));
   const ids = [...dateOf.keys()];
@@ -42,6 +43,7 @@ export async function predictInput(supabase: SupabaseClient, athleteId: string, 
     ftp: zones?.ftp_w ?? null,
     css: zones?.css_sec_per_100m ? Number(zones.css_sec_per_100m) : null,
     weightKg: body?.weight_kg ? Number(body.weight_kg) : null,
+    yards: prof?.units !== "km",
   };
 }
 

@@ -15,10 +15,11 @@ export type SwimView = {
   focus: { key: DrillKey; name: string; set: string }[];
   note: string | null;
   videoAsked: boolean;
+  yards: boolean; // show per-yard numbers (athlete uses miles)
 };
 
 /** Pool swims from the last 12 weeks, analysed. Null when there's nothing to show. Caller's client; RLS applies. */
-export async function getSwimView(supabase: SupabaseClient, athleteId: string): Promise<SwimView | null> {
+export async function getSwimView(supabase: SupabaseClient, athleteId: string, yd = false): Promise<SwimView | null> {
   const [{ data: acts }, { data: coaching }] = await Promise.all([
     supabase.from("activities").select("id, sport, start_time, distance_m").eq("athlete_id", athleteId).ilike("sport", "%swim%").gte("start_time", new Date(Date.now() - 84 * DAY).toISOString()).order("start_time").limit(120),
     supabase.from("swim_coaching").select("focus, dismissed, note, video_asked").eq("athlete_id", athleteId).maybeSingle(),
@@ -40,10 +41,10 @@ export async function getSwimView(supabase: SupabaseClient, athleteId: string): 
     const m = swimMetrics(sum, { date: String(s.start_time).slice(0, 10), activity_id: s.id });
     if (!m) continue;
     metrics.push(m);
-    fades.push(fadeOf(sum));
+    fades.push(fadeOf(sum, yd));
   }
   const dismissed = (coaching?.dismissed ?? {}) as Record<string, string>;
-  const suggestions = suggestDrills(metrics, fades).filter((s) => !focusKeys.includes(s.key) && !dismissed[s.key]);
+  const suggestions = suggestDrills(metrics, fades, yd).filter((s) => !focusKeys.includes(s.key) && !dismissed[s.key]);
   if (!metrics.length && !focusKeys.length) return null;
   return {
     metrics,
@@ -53,5 +54,6 @@ export async function getSwimView(supabase: SupabaseClient, athleteId: string): 
     focus: focusKeys.map((k) => ({ key: k, ...DRILLS[k] })),
     note: coaching?.note ?? null,
     videoAsked: Boolean(coaching?.video_asked),
+    yards: yd,
   };
 }
