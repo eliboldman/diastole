@@ -8,9 +8,9 @@ import { createAdminClient, type Profile } from "@/lib/supabase/server";
 // The device asks for a pairing code, the athlete types it on diastole.app, and the device's next
 // poll gets a bearer token. Only sha256 hashes of secrets and tokens are stored.
 
-export type DeviceKind = "garmin_watch" | "garmin_field" | "apple_tv";
-export const DEVICE_KINDS: DeviceKind[] = ["garmin_watch", "garmin_field", "apple_tv"];
-export const DEVICE_NAMES: Record<DeviceKind, string> = { garmin_watch: "Garmin watch", garmin_field: "Garmin fuel field", apple_tv: "Apple TV" };
+export type DeviceKind = "garmin_watch" | "garmin_field" | "apple_tv" | "apple_watch";
+export const DEVICE_KINDS: DeviceKind[] = ["garmin_watch", "garmin_field", "apple_tv", "apple_watch"];
+export const DEVICE_NAMES: Record<DeviceKind, string> = { garmin_watch: "Garmin watch", garmin_field: "Garmin fuel field", apple_tv: "Apple TV", apple_watch: "Apple Watch" };
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -36,6 +36,19 @@ export async function startPairing(kind: DeviceKind, label: string | null) {
 }
 
 export type PollResult = { status: "waiting" } | { status: "expired" } | { status: "linked"; token: string; name: string | null };
+
+/**
+ * The iPhone app links its Apple Watch for the signed-in athlete: no code, since the phone is
+ * already signed in. One watch link per athlete; linking again replaces the old token.
+ */
+export async function linkAppleWatch(athleteId: string, label: string | null) {
+  const admin = createAdminClient();
+  await admin.from("device_links").delete().eq("athlete_id", athleteId).eq("kind", "apple_watch");
+  const token = secret();
+  const { error } = await admin.from("device_links").insert({ athlete_id: athleteId, kind: "apple_watch", label: label?.slice(0, 60) || null, token_hash: hash(token), last_seen_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
+  return token;
+}
 
 /** The device asks whether its code was typed in yet. On success the pairing becomes a device link. */
 export async function pollPairing(pollSecret: string): Promise<PollResult> {

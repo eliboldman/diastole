@@ -8,7 +8,7 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Watch & TV apps · Diastole" };
 
-const KIND: Record<string, string> = { garmin_watch: "Garmin watch app", garmin_field: "Garmin fuel field", apple_tv: "Apple TV" };
+const KIND: Record<string, string> = { garmin_watch: "Garmin watch app", garmin_field: "Garmin fuel field", apple_tv: "Apple TV", apple_watch: "Apple Watch app" };
 
 function seen(at: string | null, tz: string) {
   if (!at) return "Not used yet";

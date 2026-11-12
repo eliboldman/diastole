@@ -9,6 +9,7 @@ import type { Pool, Step } from "@/lib/workouts/garmin-format";
 import { rideMassKg, rideSeconds, toRideCourses, toRideSteps, type RideCourse, type RidePlan } from "@/lib/workouts/ride";
 import { estimateSession } from "@/lib/fuel/plan";
 import { watchFuel, type WatchFuel } from "@/lib/fuel/watch";
+import { toAppleWorkout, type AppleWorkout } from "@/lib/apple/format";
 
 // What the Garmin watch app (and the Apple TV home screen) shows: today's plan, readiness and last
 // night's numbers. Keys are short and lists capped because a Connect IQ background task can hand
@@ -16,7 +17,8 @@ import { watchFuel, type WatchFuel } from "@/lib/fuel/watch";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-export type TodayWorkout = { id: string; t: string; s: string; why?: string; l: string[]; min?: number; f?: WatchFuel };
+/** ap: the Apple Watch app's copy for the Workout app (mystery: step names left out). sealed: a mystery not yet revealed. */
+export type TodayWorkout = { id: string; t: string; s: string; why?: string; l: string[]; min?: number; f?: WatchFuel; ap?: AppleWorkout; sealed?: 1 };
 /** A finished session waiting for its check-in. q: ask about fuel. */
 export type PendingCheckin = { a: string; t: string; s: string; min: number; q: 0 | 1 };
 export type TodayPayload = {
@@ -39,7 +41,7 @@ function minutes(steps: Step[]): number | undefined {
   return sec > 0 ? Math.round(sec / 60) : undefined;
 }
 
-export async function buildToday(profile: Profile, admin: Admin = createAdminClient()): Promise<TodayPayload> {
+export async function buildToday(profile: Profile, admin: Admin = createAdminClient(), opts: { apple?: boolean } = {}): Promise<TodayPayload> {
   const tz = profile.timezone || "America/Los_Angeles";
   const now = new Date();
   const today = localDate(now, tz);
@@ -48,7 +50,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
   const [workouts, readiness, wellness, recent] = await Promise.all([
     admin
       .from("planned_workouts")
-      .select("id, scheduled_date, title, sport, steps, why, pool_length, pool_unit, mystery, revealed_at")
+      .select("id, scheduled_date, title, sport, steps, why, pool_length, pool_unit, mystery, revealed_at, start_time")
       .eq("athlete_id", profile.id)
       .in("scheduled_date", [today, tomorrow])
       .in("status", ["approved", "sent", "completed"])
@@ -83,6 +85,16 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
       const est = estimateSession(steps, r.sport, null, pool);
       const f = watchFuel(est.minutes ?? min, { hard: est.hard, swim: r.sport === "swim" });
       if (f) out.f = f;
+      if (hide) out.sealed = 1;
+      if (opts.apple) {
+        const ap = toAppleWorkout({ id: r.id, date: r.scheduled_date, title: hide ? sealedTitle(r) : r.title, sport: r.sport, steps, pool, time: r.start_time });
+        if (ap && hide) {
+          const strip = (st: { name?: string }) => delete st.name;
+          [ap.warmup, ap.cooldown].forEach((st) => st && strip(st));
+          ap.blocks.forEach((b) => b.steps.forEach(strip));
+        }
+        if (ap) out.ap = ap;
+      }
       return out;
     });
 
