@@ -81,27 +81,45 @@ class CheckinView extends WatchUi.View {
         dc.clear();
         var w = dc.getWidth();
         var h = dc.getHeight();
-        var title = step == 0 ? "HOW DID IT FEEL?" : (step == 1 ? "HOW HARD? (RPE)" : "DID THE FUEL GO IN?");
-        var ty = Ui.drawWrapped(dc, (h * 0.1).toNumber(), title, Graphics.FONT_XTINY, Ui.GREEN, 2);
-        if (step == 0) {
-            Ui.drawWrapped(dc, ty > h * 0.22 ? ty : (h * 0.22).toNumber(), ck["t"] as String, Graphics.FONT_XTINY, Ui.DIM, 1);
+        // Progress: one short pill per question, the current one bright.
+        var n = lastStep() + 1;
+        var pw = 18;
+        var x0 = w / 2 - (n * pw + (n - 1) * 6) / 2;
+        for (var i = 0; i < n; i++) {
+            dc.setColor(i <= step ? Ui.GREEN : Ui.EDGE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(x0 + i * (pw + 6), h * 0.1, pw, 5, 2);
         }
+        var title = step == 0 ? "How did it feel?" : (step == 1 ? "How hard was it?" : "Did the fuel go in?");
+        var y = Lay.drawFit(dc, (h * 0.17).toNumber(), 0, title, [Graphics.FONT_SMALL, Graphics.FONT_TINY, Graphics.FONT_XTINY], Graphics.COLOR_WHITE, 1);
+        if (step == 0) { y = Lay.drawFit(dc, y, 0, ck["t"] as String, [Graphics.FONT_XTINY], Ui.DIM, 1); }
 
+        // The answer, big, with a colored scale under it.
         var big = step == 0 ? FEEL[feel - 1] : (step == 1 ? rpe.toString() : FUEL[fuel]);
         var small = step == 1 ? RPE[rpe - 1] : "";
+        var color = step == 0 ? [Ui.RED, Ui.AMBER, Ui.DIM, Ui.GREEN, Ui.GREEN][feel - 1] : (step == 1 ? (rpe >= 8 ? Ui.RED : (rpe >= 5 ? Ui.AMBER : Ui.GREEN)) : (fuel == 0 ? Ui.GREEN : (fuel == 1 ? Ui.AMBER : Ui.DIM)));
+        var bigFont = step == 1 ? Graphics.FONT_NUMBER_MEDIUM : Graphics.FONT_MEDIUM;
+        var bh = dc.getFontHeight(bigFont);
+        var vy = y + 6 + bh / 2;
+        if (vy < h * 0.47) { vy = (h * 0.47).toNumber(); }
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 0.48, step == 1 ? Graphics.FONT_NUMBER_MEDIUM : Graphics.FONT_MEDIUM, big, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(w / 2, vy, bigFont, big, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var scaleY = vy + bh / 2 + 6;
+        var count = step == 0 ? 5 : (step == 1 ? 10 : 3);
+        var at = step == 0 ? feel - 1 : (step == 1 ? rpe - 1 : 2 - fuel);
+        var seg = (w * 0.5).toNumber() / count;
+        var sx = w / 2 - (seg * count) / 2;
+        for (var i = 0; i < count; i++) {
+            dc.setColor(i <= at ? color : Ui.EDGE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(sx + i * seg + 1, scaleY, seg - 2, 6, 3);
+        }
         if (small.length() > 0) {
             dc.setColor(Ui.DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, h * 0.63, Graphics.FONT_XTINY, small, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, scaleY + 10, Graphics.FONT_XTINY, small, Graphics.TEXT_JUSTIFY_CENTER);
         }
-        // Up/down hints.
-        dc.setColor(Ui.DIM, Graphics.COLOR_TRANSPARENT);
-        dc.fillPolygon([[w / 2 - 8, h * 0.33], [w / 2 + 8, h * 0.33], [w / 2, h * 0.29]]);
-        dc.fillPolygon([[w / 2 - 8, h * 0.70], [w / 2 + 8, h * 0.70], [w / 2, h * 0.74]]);
 
-        var foot = error != null ? error : (sending ? "Saving…" : (step < lastStep() ? "Start: next" : "Start: save"));
-        Ui.drawWrapped(dc, (h * 0.8).toNumber(), foot, Graphics.FONT_XTINY, error != null ? Ui.AMBER : Ui.DIM, 2);
+        var foot = error != null ? error : (sending ? "Saving…" : (step < lastStep() ? "Next  ›" : "Save"));
+        if (error != null) { Lay.drawFit(dc, (h * 0.8).toNumber(), 0, foot, [Graphics.FONT_XTINY], Ui.AMBER, 2); }
+        else { Lay.pill(dc, w / 2, (h * 0.84).toNumber(), foot, Graphics.FONT_XTINY, Ui.GREEN, Graphics.COLOR_BLACK); }
     }
 }
 

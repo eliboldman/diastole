@@ -11,6 +11,9 @@ module Ui {
     const AMBER = 0xFAC759;
     const RED = 0xFA736B;
     const DIM = 0x8A9590;
+    const FAINT = 0x4F5A56;
+    const CARD = 0x15201C; // the app's frosted cards, on black
+    const EDGE = 0x24332E;
 
     function readinessColor(flag as String?) as Number {
         if (flag == null) { return DIM; }
@@ -66,7 +69,7 @@ module Ui {
         if (d2 > d) { d = d2; }
         if (y < cy && y + lineH > cy) { d = 0; }
         if (d >= r) { return 0; }
-        var chord = 2 * Math.sqrt(r * r - d * d) - 28;
+        var chord = 2 * Math.sqrt(r * r - d * d) - 44; // bezel + page dots
         var cap = w * 0.86;
         return (chord < cap ? chord : cap).toNumber();
     }
@@ -105,4 +108,5 @@ module Ui {
         }
         return y;
     }
+
 }

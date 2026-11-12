@@ -18,19 +18,34 @@ class DiastoleApp extends Application.AppBase {
 
     function onStop(state as Dictionary?) as Void {}
 
+    (:debug)
+    function demo() as Void { Demo.seed(); if (Demo.ON) { Background.deleteTemporalEvent(); } }
+    (:debug)
+    function demoActive() as Boolean { return Demo.ON; }
+    (:release)
+    function demo() as Void {}
+    (:release)
+    function demoActive() as Boolean { return false; }
+
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
+        demo();
         if (Api.token() == null) {
             var pair = new PairView();
             return [pair, new PairDelegate(pair)];
         }
-        scheduleRefresh();
+        if (!demoActive()) { scheduleRefresh(); }
         var today = new TodayView();
         return [today, new TodayDelegate(today)];
     }
 
-    (:glance)
+    (:glance, :release)
     function getGlanceView() as [WatchUi.GlanceView] or [WatchUi.GlanceView, WatchUi.GlanceViewDelegate] or Null {
         return [new DiastoleGlance()];
+    }
+    // Debug builds open straight into the app in the simulator (no glance first).
+    (:glance, :debug)
+    function getGlanceView() as [WatchUi.GlanceView] or [WatchUi.GlanceView, WatchUi.GlanceViewDelegate] or Null {
+        return null;
     }
 
     function getServiceDelegate() as [System.ServiceDelegate] {
@@ -39,6 +54,7 @@ class DiastoleApp extends Application.AppBase {
 
     // The background task hands back the fetched day (or an error code).
     function onBackgroundData(data as Application.PersistableType) as Void {
+        if (demoActive()) { return; }
         if (data instanceof Dictionary) {
             if (data.hasKey("signedOut")) {
                 signOut();

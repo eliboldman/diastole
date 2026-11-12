@@ -24,7 +24,7 @@ class DiastoleGlance extends WatchUi.GlanceView {
                 var r = today["r"];
                 var flag = (r instanceof Dictionary) ? r["o"] as String? : null;
                 color = Ui.readinessColor(flag);
-                top = Ui.readinessText(flag).toUpper();
+                top = flag == null ? "DIASTOLE" : (flag.equals("green") ? "READY" : (flag.equals("yellow") ? "EASE IN" : "RECOVERY"));
                 var w = today["w"];
                 if (w instanceof Array && w.size() > 0 && w[0] instanceof Dictionary) {
                     line = (w[0] as Dictionary)["t"] as String;
