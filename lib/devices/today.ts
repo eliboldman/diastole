@@ -1,5 +1,6 @@
 import "server-only";
 
+import { sealed, sealedTitle, titleFor } from "@/lib/workouts/mystery";
 import { localDate } from "@/lib/readiness/run";
 import type { Profile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -47,7 +48,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
   const [workouts, readiness, wellness, recent] = await Promise.all([
     admin
       .from("planned_workouts")
-      .select("id, scheduled_date, title, sport, steps, why, pool_length, pool_unit")
+      .select("id, scheduled_date, title, sport, steps, why, pool_length, pool_unit, mystery, revealed_at")
       .eq("athlete_id", profile.id)
       .in("scheduled_date", [today, tomorrow])
       .in("status", ["approved", "sent", "completed"])
@@ -73,8 +74,10 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
       const steps = (r.steps ?? []) as Step[];
       const pool: Pool = r.pool_length ? { length: Number(r.pool_length), unit: r.pool_unit === "YARD" ? "YARD" : "METER" } : null;
       const lines = describe(steps, profile.units ?? "mi", pool, r.sport === "swim").filter(Boolean).slice(0, 10).map((l) => cut(l, 72));
-      const out: TodayWorkout = { id: r.id, t: cut(r.title, 40), s: SPORT_SHORT[r.sport] ?? r.sport, l: lines };
-      if (r.why) out.why = cut(r.why, 160);
+      const hide = sealed(r);
+      // Mystery: the watch shows it sealed; Garmin's own player reveals each step as it starts.
+      const out: TodayWorkout = { id: r.id, t: cut(hide ? sealedTitle(r) : r.title, 40), s: SPORT_SHORT[r.sport] ?? r.sport, l: hide ? ["Sealed by your coach.", "Each step shows as it starts.", "Reveal early in the app."] : lines };
+      if (r.why && !hide) out.why = cut(r.why, 160);
       const min = minutes(steps);
       if (min) out.min = min;
       const est = estimateSession(steps, r.sport, null, pool);
@@ -112,7 +115,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
     n: profile.full_name?.split(" ")[0] ?? null,
     r: flag && flag !== "unknown" ? { o: flag, ...(readiness.data?.note ? { t: cut(readiness.data.note, 120) } : {}) } : null,
     w,
-    nx: rows.filter((r) => r.scheduled_date === tomorrow).slice(0, 2).map((r) => ({ t: cut(r.title, 40), s: SPORT_SHORT[r.sport] ?? r.sport, d: r.scheduled_date })),
+    nx: rows.filter((r) => r.scheduled_date === tomorrow).slice(0, 2).map((r) => ({ t: cut(titleFor(r), 40), s: SPORT_SHORT[r.sport] ?? r.sport, d: r.scheduled_date })),
     m,
     ...(ck ? { ck } : {}),
     u: Math.floor(now.getTime() / 1000),
@@ -150,7 +153,7 @@ export async function buildRides(profile: Profile, opts: { id?: string } = {}, a
   const until = localDate(new Date(Date.now() + 6 * 86_400_000), tz);
   let q = admin
     .from("planned_workouts")
-    .select("id, scheduled_date, title, why, steps")
+    .select("id, scheduled_date, title, why, steps, mystery, revealed_at, sport")
     .eq("athlete_id", profile.id)
     .eq("sport", "bike")
     .in("status", ["approved", "sent", "completed"])
@@ -165,7 +168,10 @@ export async function buildRides(profile: Profile, opts: { id?: string } = {}, a
   ]);
   const ftp = zones?.ftp_w ?? null;
   const rides = (data ?? [])
-    .map((r) => ({ id: r.id, date: r.scheduled_date, title: r.title, why: r.why ?? null, ftp, steps: toRideSteps((r.steps ?? []) as Step[]) }))
+    .map((r) => {
+      const hide = sealed(r);
+      return { id: r.id, date: r.scheduled_date, title: hide ? sealedTitle(r) : r.title, why: hide ? null : (r.why ?? null), ftp, steps: toRideSteps((r.steps ?? []) as Step[]), ...(hide ? { mystery: true } : {}) };
+    })
     .filter((r) => r.steps.length)
     // Today first, then upcoming, then yesterday (a missed ride).
     .sort((a, b) => rank(a.date, today) - rank(b.date, today) || a.date.localeCompare(b.date));

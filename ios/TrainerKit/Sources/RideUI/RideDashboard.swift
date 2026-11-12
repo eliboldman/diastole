@@ -42,7 +42,8 @@ struct RideDashboard: View {
           metrics(columns: 3, wide: false)
         }
         if !session.isFreeRide {
-          WorkoutProfile(steps: runner.steps, ftp: ftp, index: runner.index, stepProgress: runner.stepProgress ?? 0)
+          // Mystery: only the steps revealed so far.
+          WorkoutProfile(steps: session.mystery ? Array(runner.steps.prefix(runner.index + 1)) : runner.steps, ftp: ftp, index: runner.index, stepProgress: runner.stepProgress ?? 0)
             .frame(height: wide ? geo.size.height * 0.18 : 72)
         }
         Spacer(minLength: 0)
@@ -128,7 +129,11 @@ struct RideDashboard: View {
         Text("This trainer can't be controlled, so ride to the numbers").font(.subheadline).foregroundStyle(RidePalette.amber)
       }
       if !session.isFreeRide, let next = runner.next {
-        Text("Next: \(intensityName(next.intensity)) · \(stepText(next))").font(.subheadline).foregroundStyle(RidePalette.dim).lineLimit(1)
+        if session.mystery {
+          Text("Next: sealed until it starts 🎁").font(.subheadline).foregroundStyle(RidePalette.dim).lineLimit(1)
+        } else {
+          Text("Next: \(intensityName(next.intensity)) · \(stepText(next))").font(.subheadline).foregroundStyle(RidePalette.dim).lineLimit(1)
+        }
       }
       if runner.bias != 0 {
         Text("\(runner.bias > 0 ? "+" : "")\(Int((runner.bias * 100).rounded()))% on every target").font(.footnote).foregroundStyle(RidePalette.dim)

@@ -91,6 +91,7 @@ public final class RideFlowModel {
   public func start() {
     let s = selectedCourse.map { RideSession(course: $0, massKg: massKg, link: link, rollers: rollers, difficulty: difficulty) }
       ?? RideSession(title: selected?.title ?? "Free ride", steps: selected?.steps ?? [], link: link, rollers: rollers)
+    if selectedCourse == nil { s.mystery = selected?.isMystery ?? false }
     s.onFinish = { [weak self] in self?.end() }
     session = s
     upload = .idle
@@ -232,10 +233,14 @@ public struct RideFlowView: View {
               Spacer()
               Text(dayLabel(plan.date)).font(.subheadline).foregroundStyle(RidePalette.dim)
             }
-            WorkoutProfile(steps: plan.steps, ftp: plan.ftp, index: -1, compact: true).frame(height: 40)
+            if plan.isMystery {
+              Text("Mystery ride: each step reveals itself as it starts.").font(.subheadline).foregroundStyle(RidePalette.amber)
+            } else {
+              WorkoutProfile(steps: plan.steps, ftp: plan.ftp, index: -1, compact: true).frame(height: 40)
+            }
             HStack(spacing: 12) {
               if plan.plannedSeconds > 0 { Text(clock(plan.plannedSeconds) + (plan.hasOpenSteps ? "+" : "")).font(.subheadline.monospacedDigit()) }
-              Text("\(plan.steps.count) steps").font(.subheadline).foregroundStyle(RidePalette.dim)
+              if !plan.isMystery { Text("\(plan.steps.count) steps").font(.subheadline).foregroundStyle(RidePalette.dim) }
             }
             if let why = plan.why { Text(why).font(.footnote).foregroundStyle(RidePalette.dim).lineLimit(3).multilineTextAlignment(.leading) }
           }
@@ -301,7 +306,7 @@ public struct RideFlowView: View {
           .font(.subheadline.monospacedDigit()).foregroundStyle(RidePalette.dim)
         difficultyPicker
       }
-      if let plan = model.selected {
+      if let plan = model.selected, !plan.isMystery {
         WorkoutProfile(steps: plan.steps, ftp: plan.ftp, index: -1).frame(height: 80)
         if !plan.steps.contains(where: { $0.targetWatts != nil }) {
           Text("This workout has no power targets, so the trainer stays in free-ride mode and shows your coach's targets as hints.").font(.footnote).foregroundStyle(RidePalette.dim)

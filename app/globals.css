@@ -1026,3 +1026,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .boss-bob, .boss-wobble, .hp-drain { animation: none; }
 }
+
+/* ---------------------------------------------------------------- Mystery workouts */
+@keyframes letterRise { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.mystery-open .mystery-letter { animation: letterRise 700ms var(--ease-soft) 150ms both; }
+.mystery-open { position: relative; }
+@media (prefers-reduced-motion: reduce) { .mystery-open .mystery-letter { animation: none; } }

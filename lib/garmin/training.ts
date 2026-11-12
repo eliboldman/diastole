@@ -1,5 +1,6 @@
 import "server-only";
 
+import { sealed, sealedTitle } from "@/lib/workouts/mystery";
 import { garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { toGarminWorkout, type Brick, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
@@ -19,7 +20,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
   const admin = createAdminClient();
   const { data: w, error } = await admin
     .from("planned_workouts")
-    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit, brick, strength")
+    .select("id, athlete_id, scheduled_date, sport, title, description, steps, status, approved_at, external_id, pool_length, pool_unit, brick, strength, mystery, revealed_at")
     .eq("id", workoutId)
     .single();
   if (error || !w) throw new Error("Workout not found.");
@@ -31,6 +32,11 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     throw new Error("Workout must be approved by the coach before sending.");
   if (w.external_id) throw new Error("Workout was already sent to Garmin.");
 
+  // Mystery: the watch calendar shows it sealed; each step still shows as it starts.
+  if (sealed(w)) {
+    w.title = sealedTitle(w);
+    w.description = "Sealed by your coach. Each step shows as it starts.";
+  }
   const body = w.sport === "strength" ? toGarminStrength(w.title, (w.strength ?? []) as StrengthItem[], await weightUnit(admin, w.athlete_id), w.description) : toGarminWorkout({
     title: w.title,
     description: w.description,

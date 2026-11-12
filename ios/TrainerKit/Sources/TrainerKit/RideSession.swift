@@ -9,6 +9,8 @@ public final class RideSession {
   public enum Phase: Equatable, Sendable { case ready, riding, paused, finished }
 
   public let title: String
+  /// Mystery workout: the screen only ever shows the current step, never what's next.
+  public var mystery = false
   public private(set) var phase: Phase = .ready
   public private(set) var runner: WorkoutRunner
   public private(set) var samples: [RideSample] = []

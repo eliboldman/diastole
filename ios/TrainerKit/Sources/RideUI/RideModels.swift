@@ -10,7 +10,10 @@ public struct RidePlan: Codable, Identifiable, Hashable, Sendable {
   public let why: String?
   public let ftp: Int?
   public let steps: [RideStep]
+  /// A mystery workout: steps stay sealed until each one starts (older servers don't send this).
+  public let mystery: Bool?
 
+  public var isMystery: Bool { mystery ?? false }
   public var plannedSeconds: Int { WorkoutRunner(steps: steps).plannedSeconds }
   public var hasOpenSteps: Bool { steps.contains { if case .time = $0.length { false } else { true } } }
 

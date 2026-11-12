@@ -1,6 +1,8 @@
 import { Backpack, ChevronRight, CloudSun } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MysteryRevealed, SealedWorkout } from "@/components/workouts/Mystery";
+import { sealed, sealedTitle } from "@/lib/workouts/mystery";
 import { notFound } from "next/navigation";
 
 import SessionFuel from "@/components/fuel/SessionFuel";
@@ -38,7 +40,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
   const [{ data: w }, { data: done }] = await Promise.all([
     supabase
       .from("planned_workouts")
-      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick, start_time, strength")
+      .select("id, athlete_id, title, sport, scheduled_date, description, steps, status, pool_length, pool_unit, why, brick, start_time, strength, mystery, mystery_note, revealed_at")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -73,6 +75,45 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
     ...(weather.day ? weatherPack(weather.day, w.sport, units) : []),
   ];
 
+  // Mystery: sealed for the athlete until it's done (or they reveal it); coaches always see it all.
+  const hidden = w.athlete_id === me.id && sealed(w, Boolean(done));
+  if (hidden)
+    return (
+      <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
+        <BackLink href="/training" label="Training" />
+        <p className="mt-4 text-sm uppercase tracking-[0.25em] text-white/50">{sportLabel(w.sport)}</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{sealedTitle(w)}</h1>
+        <p className="mt-2 text-sm text-white/55">
+          {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          {w.start_time ? ` · ${clock12(String(w.start_time).slice(0, 5))}` : ""}
+        </p>
+        {w.sport === "bike" && !done && <RideButtons workoutId={w.id} />}
+        <SealedWorkout workoutId={w.id} minutes={session.minutes ?? null} steps={w.sport === "strength" ? describeStrength((w.strength ?? []) as StrengthItem[], me.units === "km" ? "kg" : "lb") : [...lines, ...runLines]} note={Boolean(w.mystery_note)} />
+        {pack.length > 0 && (
+          <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
+            <h2 className="flex items-center gap-2 font-medium">
+              <Backpack size={17} className="text-emerald-200" aria-hidden /> What to pack
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {pack.map((p) => (
+                <li key={p.item} className="flex gap-3 text-sm">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" aria-hidden />
+                  <span className="text-white/90">{p.item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+          <h2 className="text-lg font-medium">Fueling</h2>
+          <div className="mt-3">
+            <SessionFuel session={session} mode={mode} />
+          </div>
+          <p className="mt-4 text-xs text-white/45">{FUEL_DISCLAIMER}</p>
+        </section>
+      </DashboardShell>
+    );
+
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
       <BackLink href="/training" label="Training" />
@@ -83,6 +124,7 @@ export default async function AthleteWorkoutPage({ params }: { params: Promise<{
         {w.start_time ? ` · ${clock12(String(w.start_time).slice(0, 5))}` : ""}
         {pool ? ` · ${pool.length} ${pool.unit === "YARD" ? "yd" : "m"} pool` : ""}
       </p>
+      {w.mystery && done && w.athlete_id === me.id && <MysteryRevealed workoutId={w.id} note={w.mystery_note ?? null} />}
       {w.sport !== "strength" && <WorkoutSummary steps={w.steps as Step[]} sport={w.sport} pool={pool} units={units} zones={zones} brick={brick} className="mt-4" />}
       {w.sport === "bike" && w.athlete_id === me.id && !done && <RideButtons workoutId={w.id} />}
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { MysteryToggle } from "@/components/workouts/Mystery";
 
 import VersionHistory, { type Version } from "@/components/coach/VersionHistory";
 import PlanningPanel from "@/components/coach/PlanningPanel";
@@ -18,6 +19,9 @@ export const metadata: Metadata = { title: "Workout · Diastole" };
 
 type Row = {
   id: string;
+  mystery?: boolean | null;
+  mystery_note?: string | null;
+  external_id?: string | null;
   why: string | null;
   brick: Brick | null;
   start_time: string | null;
@@ -66,7 +70,7 @@ export default async function WorkoutPage({
     const [{ data }, { data: v }] = await Promise.all([
       supabase
         .from("planned_workouts")
-        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why, brick, start_time, strength")
+        .select("id, title, sport, scheduled_date, description, steps, status, deleted_at, removal_status, removal_error, pool_length, pool_unit, why, brick, start_time, strength, mystery, mystery_note, external_id")
         .eq("id", workoutId)
         .eq("athlete_id", id)
         .maybeSingle(),
@@ -123,6 +127,7 @@ export default async function WorkoutPage({
           <MessageAbout to={id} name={firstName} workoutId={w.id} />
         </div>
       )}
+      {w && !w.deleted_at && id !== me.id && <MysteryToggle workoutId={w.id} on={Boolean(w.mystery)} note={w.mystery_note ?? null} sent={Boolean(w.external_id)} />}
       {/* Drafts edit the why inside the builder; once sent (builder locked), it's edited here. */}
       {w && !w.deleted_at && w.status !== "draft" && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl sm:p-6">

@@ -34,7 +34,7 @@ export default async function BossReview({ coachId, today, names }: { coachId: s
           ))}
         </ul>
       )}
-      {without.length > 0 && <FindBosses count={without.length} />}
+      {without.length > 0 && !all.length && <FindBosses count={without.length} />}
     </section>
   );
 }

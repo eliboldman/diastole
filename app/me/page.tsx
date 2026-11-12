@@ -32,6 +32,7 @@ import { pullIfStale } from "@/lib/intervals/pull-soon";
 import { after } from "next/server";
 import BedtimeCard from "@/components/sleep/BedtimeCard";
 import GritChip from "@/components/grit/GritChip";
+import { sealed, titleFor } from "@/lib/workouts/mystery";
 import RestQuests from "@/components/quests/RestQuests";
 import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
@@ -55,7 +56,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }, { data: layoutRow }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why, start_time").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
+    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why, start_time, mystery, revealed_at").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
@@ -168,11 +169,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                       {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       {w.start_time ? ` ${clock12(String(w.start_time).slice(0, 5))}` : ""}
                     </span>{" "}
-                    {w.title}
+                    {titleFor(w)}
                   </span>
                   <span className="shrink-0 text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
                 </Link>
-                {i === 0 && w.why && <p className="pb-2 text-sm leading-relaxed text-emerald-50/80">{w.why}</p>}
+                {i === 0 && w.why && !sealed(w) && <p className="pb-2 text-sm leading-relaxed text-emerald-50/80">{w.why}</p>}
               </li>
             ))}
           </ul>
