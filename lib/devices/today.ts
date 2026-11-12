@@ -80,9 +80,10 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
       // Mystery: the watch shows it sealed; Garmin's own player reveals each step as it starts.
       const out: TodayWorkout = { id: r.id, t: cut(hide ? sealedTitle(r) : r.title, 40), s: SPORT_SHORT[r.sport] ?? r.sport, l: hide ? ["Sealed by your coach.", "Each step shows as it starts.", "Reveal early in the app."] : lines };
       if (r.why && !hide) out.why = cut(r.why, 160);
-      const min = minutes(steps);
-      if (min) out.min = min;
       const est = estimateSession(steps, r.sport, null, pool);
+      // Swims and distance steps have no clock time; the fuel estimate knows the usual pace.
+      const min = est.minutes ?? minutes(steps);
+      if (min) out.min = min;
       const f = watchFuel(est.minutes ?? min, { hard: est.hard, swim: r.sport === "swim" });
       if (f) out.f = f;
       if (hide) out.sealed = 1;
