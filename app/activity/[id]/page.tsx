@@ -148,7 +148,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   if (!act) notFound();
 
   const isOwn = act.athlete_id === me.id;
-  const isCoach = me.role === "coach";
+  const isCoach = me.role === "coach" || me.role === "dietitian"; // a team dietitian has the coach's access
   const since = daysBackIso(180);
 
   const [{ data: detail }, { data: zonesRow }, { data: recent }, { data: plan }, { data: owner }] = await Promise.all([
@@ -316,7 +316,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   };
 
   return (
-    <DashboardShell role={isCoach ? "coach" : "athlete"}>
+    <DashboardShell role={me.role === "dietitian" ? "dietitian" : isCoach ? "coach" : "athlete"}>
       <BackLink href={back.href} label={back.label} />
       <p className="mt-4 text-sm uppercase tracking-[0.25em] text-white/50">{sportLabel(act.sport)}</p>
       <div className="mt-2">

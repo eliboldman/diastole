@@ -13,7 +13,8 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
   const coach = await requireCoach();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const fullName = String(form.get("full_name") ?? "").trim();
-  const role = form.get("role") === "coach" ? "coach" : "athlete";
+  const r = form.get("role");
+  const role = r === "coach" || r === "dietitian" ? r : "athlete";
   if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Enter a valid email address." };
 
   // Record the invite first (as the coach, so row-level security applies); the sign-up trigger
@@ -46,7 +47,14 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
   }
 
   revalidatePath("/athletes");
-  return { ok: role === "coach" ? `Coach invite sent to ${email}. They'll get their own roster.` : `Invite sent to ${email}.` };
+  return {
+    ok:
+      role === "coach"
+        ? `Coach invite sent to ${email}. They'll get their own roster.`
+        : role === "dietitian"
+          ? `Dietitian invite sent to ${email}. Once they sign in they'll see all of your athletes.`
+          : `Invite sent to ${email}.`,
+  };
 }
 
 export type RemoveState = { ok: true; message: string } | { ok: false; error: string };
@@ -98,4 +106,27 @@ export async function removeAthlete(athleteId: string, typedName: string): Promi
   revalidatePath("/athletes");
   revalidatePath("/dashboard");
   return { ok: true, message: [`Removed ${name} and all of their data.`, ...notes].join(" ") };
+}
+
+/** Take a team dietitian's access away by deleting their account (they have no data of their own). */
+export async function removeDietitian(dietitianId: string): Promise<RemoveState> {
+  const coach = await requireCoach();
+  const admin = createAdminClient();
+  const { data: d } = await admin.from("profiles").select("id, role, team_coach_id, full_name, email").eq("id", dietitianId).maybeSingle();
+  if (!d || d.role !== "dietitian" || d.team_coach_id !== coach.id) return { ok: false, error: "Dietitian not found." };
+  if (d.email) await admin.from("invites").delete().eq("coach_id", coach.id).eq("email", d.email.toLowerCase());
+  const { error } = await admin.auth.admin.deleteUser(dietitianId);
+  if (error) return { ok: false, error: `Couldn't remove access: ${error.message}` };
+  revalidatePath("/athletes");
+  return { ok: true, message: `${d.full_name || d.email} no longer has access.` };
+}
+
+/** Cancel a dietitian invite that hasn't been accepted yet. */
+export async function cancelInvite(inviteId: string): Promise<RemoveState> {
+  await requireCoach();
+  const supabase = await createClient();
+  const { error } = await supabase.from("invites").delete().eq("id", inviteId).is("accepted_at", null);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/athletes");
+  return { ok: true, message: "Invite cancelled." };
 }

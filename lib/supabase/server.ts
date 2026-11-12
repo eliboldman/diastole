@@ -35,8 +35,9 @@ export function createAdminClient() {
 
 export type Profile = {
   id: string;
-  role: "coach" | "athlete";
+  role: "coach" | "athlete" | "dietitian";
   coach_id: string | null;
+  team_coach_id: string | null; // dietitians: the coach whose team they're on
   full_name: string | null;
   email: string | null;
   timezone: string;
@@ -51,7 +52,7 @@ export async function getProfile(): Promise<Profile | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, coach_id, full_name, email, timezone, units")
+    .select("id, role, coach_id, team_coach_id, full_name, email, timezone, units")
     .eq("id", data.user.id)
     .single();
   return profile;
@@ -65,6 +66,18 @@ export async function requireUser(): Promise<Profile> {
 
 export async function requireCoach(): Promise<Profile> {
   const profile = await requireUser();
-  if (profile.role !== "coach") redirect("/me");
+  if (profile.role !== "coach") redirect(homeFor(profile.role));
   return profile;
+}
+
+/** A coach or a team dietitian: people who see athletes' data. Row-level security decides which athletes. */
+export async function requireStaff(): Promise<Profile> {
+  const profile = await requireUser();
+  if (profile.role === "athlete") redirect("/me");
+  return profile;
+}
+
+/** Where each role lands after signing in. */
+export function homeFor(role: Profile["role"]): string {
+  return role === "coach" ? "/dashboard" : role === "dietitian" ? "/nutrition" : "/me";
 }

@@ -11,17 +11,21 @@ import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
+import DietitianRow from "./DietitianRow";
 import RemoveAthlete from "./RemoveAthlete";
 
 export default async function AthletesPage() {
   const coach = await requireCoach();
   const supabase = await createClient();
 
-  const [{ data: athletes }, { data: connections }, { data: coachInvites }] = await Promise.all([
+  const [{ data: athletes }, { data: connections }, { data: coachInvites }, { data: dietitians }, { data: dietitianInvites }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, created_at").eq("coach_id", coach.id).eq("is_test", false).order("full_name"),
     supabase.from("device_connections").select("athlete_id, source, last_synced_at"),
     supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "coach").order("created_at", { ascending: false }),
+    supabase.from("profiles").select("id, full_name, email, created_at").eq("team_coach_id", coach.id).eq("role", "dietitian").order("full_name"),
+    supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "dietitian").is("accepted_at", null).order("created_at", { ascending: false }),
   ]);
+  const short = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   const deviceFor = (id: string) => connections?.find((c) => c.athlete_id === id);
   const watches = await getWatchStatuses(supabase, (athletes ?? []).map((a) => a.id));
@@ -61,6 +65,24 @@ export default async function AthletesPage() {
                     Invited {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
+          <h2 className="text-lg font-medium">Invite a dietitian</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">
+            A dietitian joins your team with full access to every athlete: meals, nutrition targets, training, readiness, activities and health data. They can set each athlete&apos;s nutrition goals and leave them a note on their Fuel page. Athletes see that their team dietitian can view their data.
+          </p>
+          <InviteForm role="dietitian" />
+          {(!!dietitians?.length || !!dietitianInvites?.length) && (
+            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
+              {(dietitians ?? []).map((d) => (
+                <DietitianRow key={d.id} id={d.id} label={d.full_name || d.email || "Dietitian"} sub={`Joined ${short(d.created_at)}`} />
+              ))}
+              {(dietitianInvites ?? []).map((i) => (
+                <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending />
               ))}
             </ul>
           )}

@@ -20,10 +20,44 @@ export const PER_KG: Record<FuelDay, Record<Macro, [number, number]>> = {
 
 const r5 = (n: number) => Math.round(n / 5) * 5;
 
+/** A dietitian's or coach's per-athlete changes to PER_KG; anything missing uses the default. */
+export type PerKg = Partial<Record<FuelDay, Partial<Record<Macro, [number, number]>>>>;
+
+// Sane bounds per macro (g/kg/day), so a typo can't produce a nonsense target.
+export const PER_KG_LIMITS: Record<Macro, [number, number]> = { carbs: [1, 14], protein: [0.8, 3.5], fat: [0.3, 2.5] };
+const LEVELS_ALL: FuelDay[] = ["low", "medium", "high"];
+const MACROS: Macro[] = ["carbs", "protein", "fat"];
+
+/** Keeps only valid [low, high] pairs inside PER_KG_LIMITS, rounded to 0.1, and drops ones equal to the default. */
+export function cleanPerKg(raw: unknown): PerKg {
+  const out: PerKg = {};
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  for (const level of LEVELS_ALL) {
+    const lv = src[level] && typeof src[level] === "object" ? (src[level] as Record<string, unknown>) : {};
+    for (const m of MACROS) {
+      const v = lv[m];
+      if (!Array.isArray(v) || v.length !== 2) continue;
+      let [a, b] = v.map((x) => Math.round(Number(x) * 10) / 10);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      if (a > b) [a, b] = [b, a];
+      const [lo, hi] = PER_KG_LIMITS[m];
+      if (a < lo || b > hi) continue;
+      if (a === PER_KG[level][m][0] && b === PER_KG[level][m][1]) continue;
+      (out[level] ??= {})[m] = [a, b];
+    }
+  }
+  return out;
+}
+
+/** The g/kg ranges in effect for a day: the athlete's own where set, otherwise the defaults. */
+export function perKgFor(level: FuelDay, custom?: PerKg | null): Record<Macro, [number, number]> {
+  return { ...PER_KG[level], ...(custom?.[level] ?? {}) };
+}
+
 /** The day's targets as ranges, or null without a body weight. */
-export function dailyTargets(weightKg: number | null | undefined, level: FuelDay): Targets | null {
+export function dailyTargets(weightKg: number | null | undefined, level: FuelDay, custom?: PerKg | null): Targets | null {
   if (!weightKg || weightKg < 25 || weightKg > 250) return null;
-  const k = PER_KG[level];
+  const k = perKgFor(level, custom);
   const range = ([a, b]: [number, number]): Range => ({ low: r5(a * weightKg), high: r5(b * weightKg) });
   const carbs = range(k.carbs);
   const protein = range(k.protein);
@@ -150,4 +184,42 @@ export function usualMeals<T extends PastMeal>(meals: T[], slotOf: (m: T) => Slo
     .filter((g) => g.times >= min)
     .map((g) => ({ meal: g.meal, times: g.times, slot: [...g.slots.entries()].sort((a, b) => b[1] - a[1])[0][0] }));
   return out.sort((a, b) => Number(b.slot === slot) - Number(a.slot === slot) || b.times - a.times);
+}
+
+// ---------------------------------------------------------------- reviewing past days (dietitian view)
+
+export type HitDay = { meals: number; eaten: Record<Macro, number> & { kcal: number }; targets: Targets | null };
+export type HitSummary = {
+  days: number; // days in the window
+  logged: number; // days with at least one meal
+  scored: number; // logged days that had targets (a body weight)
+  reached: Record<Macro | "kcal", number>; // scored days at or above the low end
+  inRange: Record<Macro | "kcal", number>; // scored days inside the range
+  avg: Record<Macro, number> & { kcal: number }; // average over logged days
+};
+
+/** How often logged days met their targets. Days with no meals don't count against anyone. */
+export function hitSummary(days: HitDay[]): HitSummary {
+  const keys = ["carbs", "protein", "fat", "kcal"] as const;
+  const zero = () => ({ carbs: 0, protein: 0, fat: 0, kcal: 0 });
+  const reached = zero();
+  const inRange = zero();
+  const sum = zero();
+  let logged = 0;
+  let scored = 0;
+  for (const d of days) {
+    if (d.meals <= 0) continue;
+    logged += 1;
+    for (const k of keys) sum[k] += d.eaten[k];
+    if (!d.targets) continue;
+    scored += 1;
+    for (const k of keys) {
+      const r = d.targets[k];
+      if (d.eaten[k] >= r.low) reached[k] += 1;
+      if (d.eaten[k] >= r.low && d.eaten[k] <= r.high) inRange[k] += 1;
+    }
+  }
+  const avg = zero();
+  if (logged) for (const k of keys) avg[k] = Math.round(sum[k] / logged);
+  return { days: days.length, logged, scored, reached, inRange, avg };
 }

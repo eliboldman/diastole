@@ -1,6 +1,7 @@
 import "server-only";
 
 import { estimateSession, fuelDay, type FuelDay, type Session } from "@/lib/fuel/plan";
+import { cleanPerKg } from "@/lib/fuel/meals";
 import { evaluateSafety, shouldNotifyAgain, type SafetyDay } from "@/lib/fuel/safety";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
@@ -76,8 +77,10 @@ async function checkAthlete(admin: Admin, coachId: string, athlete: { id: string
     return t < weekAgo && t >= weekAgo - 28 * DAY;
   });
 
+  const { data: goals } = await admin.from("nutrition_goals").select("per_kg").eq("athlete_id", athlete.id).maybeSingle();
   const result = evaluateSafety({
     weightKg: Number(body.weight_kg),
+    perKg: cleanPerKg(goals?.per_kg),
     days,
     load: { last7Hours: hours(recent), prior28Hours: hours(prior) },
     readiness: (readiness ?? []).map((r) => r.overall as string),

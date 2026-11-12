@@ -7,7 +7,8 @@ export type SearchHit = { kind: "athlete" | "workout" | "library" | "activity" |
 /** Escape LIKE wildcards so a typed % or _ is matched literally. */
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
-const PAGES: { title: string; href: string; roles: ("coach" | "athlete")[]; words: string }[] = [
+const PAGES: { title: string; href: string; roles: ("coach" | "athlete" | "dietitian")[]; words: string }[] = [
+  { title: "Team fueling", href: "/nutrition", roles: ["coach", "dietitian"], words: "nutrition dietitian fueling meals goals targets protein carbs" },
   { title: "Secrets", href: "/me/secrets", roles: ["coach", "athlete"], words: "secrets easter eggs hidden badges collection" },
   { title: "My setup: closet, gear, numbers, training days", href: "/me/setup", roles: ["coach", "athlete"], words: "closet shoes bikes gear trainer numbers ftp threshold pace heart rate zones week days schedule preferences setup" },
   { title: "Help and walkthrough videos", href: "/help", roles: ["coach", "athlete"], words: "help how to video tour walkthrough guide tutorial" },
@@ -46,7 +47,13 @@ export async function search(raw: string): Promise<SearchHit[]> {
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-  if (me.role === "coach") {
+  if (me.role === "dietitian") {
+    // A team dietitian: the team's athletes, opening on their nutrition review.
+    const { data } = me.team_coach_id
+      ? await supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.team_coach_id).eq("is_test", false).or(`full_name.ilike.${pat},email.ilike.${pat}`).limit(8)
+      : { data: [] };
+    for (const a of data ?? []) hits.push({ kind: "athlete", title: a.full_name || a.email || "Athlete", sub: "Nutrition", href: `/nutrition/${a.id}` });
+  } else if (me.role === "coach") {
     const [athletes, workouts, library, pods, acts] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.id).eq("is_test", false).or(`full_name.ilike.${pat},email.ilike.${pat}`).limit(6),
       supabase

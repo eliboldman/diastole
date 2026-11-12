@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { Apple, BookOpen, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -14,7 +14,7 @@ import { DEFAULT_TABS, TAB_OPTIONS } from "@/lib/tabs";
 import NotificationHost, { NotificationButton } from "@/components/layout/Notifications";
 import SearchHost, { SearchButton } from "@/components/layout/SearchDialog";
 
-export type NavRole = "coach" | "athlete";
+export type NavRole = "coach" | "athlete" | "dietitian";
 // short: bottom-tab label on phones. match: other paths that belong under this tab.
 type Item = { label: string; href: string; icon: LucideIcon; short?: string; match?: RegExp };
 
@@ -35,6 +35,8 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Messages", href: "/messages", icon: MessageCircle },
     { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods)|connect|races|profile)/ },
   ],
+  // A team dietitian: every athlete's nutrition, and from there their full athlete pages.
+  dietitian: [{ label: "Nutrition", href: "/nutrition", icon: Apple, match: /^\/(athlete|activity|profile)\// }],
 };
 
 // Phones: a fixed bar at the bottom with each person's chosen places (Settings → Bottom tabs).
@@ -62,6 +64,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
     { label: "My pods", href: "/me/pods", icon: Orbit },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
+  dietitian: [{ label: "Help", href: "/help", icon: LifeBuoy }],
 };
 
 function isActive(pathname: string, item: Item) {
@@ -74,7 +77,7 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
   const pathname = usePathname();
   const items = NAV[role];
   const shortcuts = SHORTCUTS[role];
-  const home = role === "coach" ? "/dashboard" : "/me";
+  const home = role === "coach" ? "/dashboard" : role === "dietitian" ? "/nutrition" : "/me";
 
   const navLink = (item: Item, active: boolean) => (
     <Link

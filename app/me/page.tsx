@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
@@ -48,6 +49,7 @@ const SHARED_WITH_POD = [
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const me = await requireUser();
+  if (me.role === "dietitian") redirect("/nutrition");
   // Rides from Zwift/Rouvy (via intervals.icu) come in after the page is sent, at most every two hours.
   after(() => pullIfStale(me.id));
   const supabase = await createClient();

@@ -19,8 +19,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   const id = raw === "me" ? me.id : raw;
   if (!UUID.test(id)) notFound();
   return (
-    <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <BackLink href={me.role === "coach" ? "/athletes" : "/me/pods"} label={me.role === "coach" ? "Athletes" : "Pods"} />
+    <DashboardShell role={me.role === "athlete" ? "athlete" : me.role}>
+      <BackLink href={me.role === "coach" ? "/athletes" : me.role === "dietitian" ? `/athlete/${id}` : "/me/pods"} label={me.role === "coach" ? "Athletes" : me.role === "dietitian" ? "Athlete" : "Pods"} />
       <div className="mt-2">
         <ProfileView id={id} me={me} />
       </div>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import PublicShell from "@/components/PublicShell";
-import { getProfile } from "@/lib/supabase/server";
+import { getProfile, homeFor } from "@/lib/supabase/server";
 
 import LoginForm from "./LoginForm";
 
@@ -14,7 +14,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const profile = await getProfile();
-  if (profile) redirect(profile.role === "coach" ? "/dashboard" : "/me");
+  if (profile) redirect(homeFor(profile.role));
 
   const { error } = await searchParams;
 

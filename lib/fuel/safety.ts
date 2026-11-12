@@ -8,12 +8,13 @@
 //  - and low intake alone isn't enough: high training load or poor recovery must show up too.
 // Pure module (type imports only) so it can be tested directly with `node`.
 
-import { dailyTargets, slotFor } from "./meals.ts";
+import { dailyTargets, slotFor, type PerKg } from "./meals.ts";
 import type { FuelDay } from "./plan.ts";
 
 export type SafetyDay = { date: string; level: FuelDay; meals: { hour: number; kcal: number; carbs: number }[] };
 export type SafetyInput = {
   weightKg: number | null;
+  perKg?: PerKg | null; // the athlete's own goals, when a dietitian or coach set them
   days: SafetyDay[]; // the last 7 finished days (not today)
   load: { last7Hours: number; prior28Hours: number };
   readiness: string[]; // overall flag for each of the last 7 days that has one
@@ -58,7 +59,7 @@ export function evaluateSafety(input: SafetyInput): SafetyResult | null {
   const pcts: number[] = [];
   for (const d of input.days) {
     if (!isCompleteDay(d.meals)) continue;
-    const t = dailyTargets(input.weightKg, d.level);
+    const t = dailyTargets(input.weightKg, d.level, input.perKg);
     if (!t) continue;
     complete += 1;
     const kcal = d.meals.reduce((s, m) => s + m.kcal, 0);

@@ -12,7 +12,8 @@ const Block = ({ className = "" }: { className?: string }) => <div className={`s
  * soft placeholders shaped like the content, instead of a blank screen or a spinner.
  */
 export default async function PageSkeleton({ variant = "cards" }: { variant?: Variant }) {
-  const role = (await cookies()).get("d_role")?.value === "coach" ? "coach" : "athlete";
+  const saved = (await cookies()).get("d_role")?.value;
+  const role = saved === "coach" || saved === "dietitian" ? saved : "athlete";
   return (
     <DashboardShell role={role}>
       <div aria-busy="true" aria-label="Loading" className={variant === "chat" || variant === "profile" ? "mx-auto max-w-3xl" : ""}>

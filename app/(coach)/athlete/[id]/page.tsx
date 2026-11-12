@@ -28,7 +28,7 @@ import { paceOf, shortDistance } from "@/lib/activity/format";
 import { FORM, type FormMetric } from "@/lib/activity/form";
 import { daysBackIso, estimateMaxHr } from "@/lib/activity/zones";
 import { getAthleteDetail } from "@/lib/coach-data";
-import { createClient, requireCoach } from "@/lib/supabase/server";
+import { createClient, requireStaff } from "@/lib/supabase/server";
 import type { Flag } from "@/lib/readiness/engine";
 import BackLink from "@/components/layout/BackLink";
 import WeekReview from "@/components/training/WeekReview";
@@ -54,7 +54,8 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
 
   const { profile, device, readiness, trend, activities, workouts, removed } = data;
 
-  const me = await requireCoach();
+  const me = await requireStaff();
+  const dietitian = me.role === "dietitian";
   const supabase = await createClient();
   const [{ data: zones }, { data: recentMax }, { data: insightRows }, fuelMode, { data: gearRow }] = await Promise.all([
     supabase.from("athlete_zones").select("max_hr, threshold_speed_mps, ftp_w, threshold_hr, css_sec_per_100m").eq("athlete_id", id).maybeSingle(),
@@ -104,8 +105,8 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
   const overall: Flag = today?.overall ?? "unknown";
 
   return (
-    <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"}>
-      <BackLink href="/athletes" label="Athletes" />
+    <DashboardShell tone={overall === "red" ? "red" : overall === "yellow" ? "yellow" : "green"} role={dietitian ? "dietitian" : "coach"}>
+      <BackLink href={dietitian ? `/nutrition/${id}` : "/athletes"} label={dietitian ? "Nutrition" : "Athletes"} />
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -117,6 +118,9 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           <span className="mt-1 flex flex-wrap gap-x-4">
             <Link href={`/profile/${profile.id}`} className="inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
               Avatar and metrics →
+            </Link>
+            <Link href={`/nutrition/${profile.id}`} className="inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
+              Nutrition review →
             </Link>
             <Link href={`/athlete/${profile.id}/import`} className="inline-flex min-h-11 items-center text-sm text-emerald-200/90 hover:underline">
               Import Garmin history →

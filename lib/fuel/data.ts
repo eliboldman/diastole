@@ -1,6 +1,6 @@
 import "server-only";
 
-import { dailyTargets, signature, slotFor, usualMeals, type LoggedItem, type Slot, type Targets } from "@/lib/fuel/meals";
+import { cleanPerKg, dailyTargets, hitSummary, signature, slotFor, usualMeals, type HitSummary, type LoggedItem, type PerKg, type Slot, type Targets } from "@/lib/fuel/meals";
 import { asFuelMode, estimateSession, fuelDay, type FuelDay, type FuelMode, type Session } from "@/lib/fuel/plan";
 import { createClient } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
@@ -72,11 +72,12 @@ const LEVELS: FuelDay[] = ["low", "medium", "high"];
 export async function getMealDay(athleteId: string, today: string, timeZone: string, plannedLevel: FuelDay): Promise<MealDay> {
   const supabase = await createClient();
   const since = new Date(Date.now() - 36 * 3_600_000).toISOString();
-  const [{ data: body }, { data: todays }, { data: past }, { data: acts }] = await Promise.all([
+  const [{ data: body }, { data: todays }, { data: past }, { data: acts }, goals] = await Promise.all([
     supabase.from("athlete_body").select("weight_kg").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at").eq("athlete_id", athleteId).eq("local_date", today).order("created_at"),
     supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at").eq("athlete_id", athleteId).lt("local_date", today).order("created_at", { ascending: false }).limit(120),
     supabase.from("activities").select("start_time, duration_s").eq("athlete_id", athleteId).gte("start_time", since),
+    getNutritionGoals(athleteId),
   ]);
 
   // What was actually done today can only raise the fuel level, never lower it.
@@ -109,7 +110,7 @@ export async function getMealDay(athleteId: string, today: string, timeZone: str
   return {
     weightKg,
     level,
-    targets: dailyTargets(weightKg, level),
+    targets: dailyTargets(weightKg, level, goals.perKg),
     eaten: { carbs: sum("carbs_g"), protein: sum("protein_g"), fat: sum("fat_g"), kcal: sum("kcal") },
     meals,
     usual,
@@ -128,4 +129,75 @@ export async function getMealWeek(athleteId: string, today: string, days = 7) {
     const s = (k: "carbs_g" | "protein_g" | "fat_g" | "kcal") => Math.round(rows.reduce((t, r) => t + Number(r[k]), 0));
     return { date, meals: rows.length, carbs: s("carbs_g"), protein: s("protein_g"), fat: s("fat_g"), kcal: s("kcal") };
   });
+}
+
+// ---------------------------------------------------------------- nutrition goals (dietitian view)
+
+export type NutritionGoals = { perKg: PerKg; note: string | null; updatedAt: string | null; updatedBy: string | null };
+
+/** The athlete's own goals (set by their dietitian or coach). Row-level security: the athlete and their staff. */
+export async function getNutritionGoals(athleteId: string): Promise<NutritionGoals> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("nutrition_goals").select("per_kg, note, updated_at, updated_by").eq("athlete_id", athleteId).maybeSingle();
+  if (!data) return { perKg: {}, note: null, updatedAt: null, updatedBy: null };
+  let by: string | null = null;
+  if (data.updated_by) {
+    const { data: who } = await supabase.from("profiles").select("full_name, email").eq("id", data.updated_by).maybeSingle();
+    by = who?.full_name || who?.email || null;
+  }
+  return { perKg: cleanPerKg(data.per_kg), note: data.note, updatedAt: data.updated_at, updatedBy: by };
+}
+
+export type ReviewDay = {
+  date: string;
+  level: FuelDay;
+  workouts: string[]; // planned session titles
+  trained: number; // minutes actually recorded
+  meals: number;
+  eaten: { carbs: number; protein: number; fat: number; kcal: number };
+  targets: Targets | null;
+};
+export type NutritionReview = { weightKg: number | null; weightUpdated: string | null; days: ReviewDay[]; summary: HitSummary };
+
+const localDay = (iso: string, timeZone: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone });
+
+/**
+ * The last `days` days ending today (newest first): each day's training level, its targets (with the
+ * athlete's own goals), and what was logged. A day's level is the planned one, raised by what was done.
+ */
+export async function getNutritionReview(athleteId: string, today: string, timeZone: string, days = 14, perKg: PerKg = {}): Promise<NutritionReview> {
+  const supabase = await createClient();
+  const from = addDays(today, -(days - 1));
+  const [planned, { data: body }, { data: meals }, { data: acts }] = await Promise.all([
+    getFuelDays(athleteId, from, days),
+    supabase.from("athlete_body").select("weight_kg, updated_at").eq("athlete_id", athleteId).maybeSingle(),
+    supabase.from("meal_logs").select("local_date, carbs_g, protein_g, fat_g, kcal").eq("athlete_id", athleteId).gte("local_date", from).lte("local_date", today),
+    supabase
+      .from("activities")
+      .select("start_time, duration_s")
+      .eq("athlete_id", athleteId)
+      .gte("start_time", `${addDays(from, -1)}T00:00:00Z`), // a day early: local dates can trail UTC
+  ]);
+  const weightKg = body?.weight_kg ? Number(body.weight_kg) : null;
+
+  const out: ReviewDay[] = planned.map((p) => {
+    const rows = (meals ?? []).filter((m) => m.local_date === p.date);
+    const sum = (k: "carbs_g" | "protein_g" | "fat_g" | "kcal") => Math.round(rows.reduce((t, r) => t + Number(r[k]), 0));
+    const doneActs = (acts ?? []).filter((a) => a.start_time && localDay(a.start_time, timeZone) === p.date && (a.duration_s ?? 0) >= 300);
+    const done: Session[] = doneActs.map((a) => ({ sport: "", minutes: Math.round((a.duration_s ?? 0) / 60), hardMinutes: 0, hard: false }));
+    const actual = done.length ? fuelDay(done) : "low";
+    const level = LEVELS[Math.max(LEVELS.indexOf(p.level), LEVELS.indexOf(actual))];
+    return {
+      date: p.date,
+      level,
+      workouts: p.workouts.map((w) => w.title),
+      trained: done.reduce((t, d) => t + (d.minutes ?? 0), 0),
+      meals: rows.length,
+      eaten: { carbs: sum("carbs_g"), protein: sum("protein_g"), fat: sum("fat_g"), kcal: sum("kcal") },
+      targets: dailyTargets(weightKg, level, perKg),
+    };
+  });
+  // Today is still in progress: it's shown, but not scored.
+  const finished = out.filter((d) => d.date !== today);
+  return { weightKg, weightUpdated: body?.updated_at ?? null, days: out.reverse(), summary: hitSummary(finished) };
 }

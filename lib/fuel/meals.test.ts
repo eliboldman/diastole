@@ -79,4 +79,27 @@ assert.deepEqual(u.map((x) => [x.meal.id, x.times, x.slot]), [["b", 3, "breakfas
 assert.deepEqual(usualMeals(meals, (m) => m.slot, "lunch").map((x) => x.meal.id), ["g", "b"]);
 assert.equal(usualMeals(meals, (m) => m.slot).length, 2); // toast (once) isn't usual
 
+// Custom goals: valid pairs kept (sorted, rounded), out-of-bounds and default-equal ones dropped.
+{
+  const { cleanPerKg, dailyTargets: dt, hitSummary } = await import("./meals.ts");
+  const c = cleanPerKg({ high: { protein: [2.4, 1.94], carbs: [20, 30] }, low: { protein: [1.6, 2.0], fat: "x" }, bogus: {} });
+  assert.deepEqual(c, { high: { protein: [1.9, 2.4] } });
+  const base = dt(60, "high")!;
+  const mine = dt(60, "high", c)!;
+  assert.deepEqual(mine.protein, { low: 115, high: 145 });
+  assert.deepEqual(mine.carbs, base.carbs); // untouched macros keep the defaults
+  assert.deepEqual(dt(60, "low", c), dt(60, "low")); // other days untouched
+
+  const t = dt(60, "medium")!; // protein 95-120, carbs 300-420
+  const day = (meals: number, carbs: number, protein: number, targets = t) => ({ meals, targets, eaten: { carbs, protein, fat: 60, kcal: carbs * 4 + protein * 4 + 540 } });
+  const s = hitSummary([day(3, 350, 100), day(2, 200, 130), day(0, 0, 0), day(1, 310, 90, null as unknown as typeof t)]);
+  assert.equal(s.days, 4);
+  assert.equal(s.logged, 3); // the empty day doesn't count
+  assert.equal(s.scored, 2); // no targets on the last one
+  assert.equal(s.reached.protein, 2);
+  assert.equal(s.inRange.protein, 1); // 130 is above 120
+  assert.equal(s.reached.carbs, 1);
+  assert.equal(s.avg.protein, Math.round((100 + 130 + 90) / 3));
+}
+
 console.log("meals: all passed");

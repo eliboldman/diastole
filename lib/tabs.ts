@@ -2,7 +2,7 @@
 // tabs). Saved on the account (profiles.tab_bar) and in a cookie so pages draw the right tabs at
 // once. Pure; icons are matched by id in the Sidebar.
 
-export type TabRole = "coach" | "athlete";
+export type TabRole = "coach" | "athlete" | "dietitian";
 export type TabDef = { id: string; label: string; href: string; match?: string };
 
 // match: other paths that light the tab up (a RegExp source).
@@ -36,9 +36,13 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
     { id: "races", label: "Races", href: "/races" },
     { id: "profile", label: "Me", href: "/account" },
   ],
+  dietitian: [
+    { id: "nutrition", label: "Nutrition", href: "/nutrition", match: "^/(athlete|activity|profile)/" },
+    { id: "help", label: "Help", href: "/help" },
+  ],
 };
 
-export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "pods", "training", "fuel"], coach: ["today", "athletes", "lab", "messages"] };
+export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "pods", "training", "fuel"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "help"] };
 export const TABS_COOKIE = "d_tabs";
 export const MIN_TABS = 3;
 export const MAX_TABS = 5;
