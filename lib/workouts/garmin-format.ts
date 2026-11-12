@@ -147,12 +147,16 @@ function swimTarget(t: Target | undefined, pool: Pool) {
   return { ...base, ...NO_SECONDARY };
 }
 
-function duration(d: Duration, swimRest: boolean) {
+// In a yard pool Garmin reads a step's distance as yards (it stores durationValueType "YARD" and keeps
+// the number), so 274.32 m arrived as "274 yd" instead of 300. Send yards there; meters everywhere else.
+function duration(d: Duration, swimRest: boolean, yards = false) {
   switch (d.type) {
     case "time":
       return { durationType: swimRest ? "FIXED_REST" : "TIME", durationValue: d.seconds, durationValueType: null };
     case "distance":
-      return { durationType: "DISTANCE", durationValue: Number(d.meters.toFixed(2)), durationValueType: "METER" };
+      return yards
+        ? { durationType: "DISTANCE", durationValue: Math.round(d.meters / YARD), durationValueType: "YARD" }
+        : { durationType: "DISTANCE", durationValue: Number(d.meters.toFixed(2)), durationValueType: "METER" };
     case "open":
       return { durationType: "OPEN", durationValue: null, durationValueType: null };
     case "sendoff":
@@ -245,7 +249,7 @@ export function toGarminWorkout(w: { title: string; description?: string | null;
       stepOrder: order,
       intensity: s.intensity,
       description: s.note?.slice(0, 512) ?? null,
-      ...duration(s.duration, rest),
+      ...duration(s.duration, rest, swim && pool?.unit === "YARD"),
       ...(swim ? swimTarget(rest ? undefined : s.target, pool) : target(s.target)),
       ...(swim
         ? {

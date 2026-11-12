@@ -64,7 +64,9 @@ assert.equal(sw.poolLengthUnit, "YARD");
 assert.equal(sw.segments[0].poolLengthUnit, "YARD");
 const wu = sw.segments[0].steps[0] as Record<string, unknown>;
 assert.equal(wu.durationType, "DISTANCE");
-assert.equal(wu.durationValue, 365.76, "400 yd in metres");
+// Garmin reads distances in a yard pool as yards (verified 2026-11-12: 274.32 came back as YARD).
+assert.equal(wu.durationValue, 400, "400 yd sent as yards");
+assert.equal(wu.durationValueType, "YARD");
 assert.equal(wu.targetType, null, "swims carry no primary target");
 assert.equal(wu.secondaryTargetType, "SWIM_INSTRUCTION");
 assert.equal(wu.secondaryTargetValueLow, 3);
@@ -73,6 +75,7 @@ const rep = sw.segments[0].steps[1] as { skipLastRestStep: boolean; steps: Recor
 assert.equal(rep.skipLastRestStep, true);
 assert.equal(rep.steps[0].secondaryTargetType, "PACE_ZONE");
 assert.ok(Math.abs((rep.steps[0].secondaryTargetValueLow as number) - 0.9144) < 1e-9, "1:40/100yd = 0.9144 m/s");
+assert.equal(rep.steps[0].durationValue, 100, "100 yd, not 91");
 assert.equal(rep.steps[0].drillType, "KICK");
 assert.equal(rep.steps[0].equipmentType, "SWIM_KICKBOARD");
 assert.equal(rep.steps[1].durationType, "FIXED_REST");
@@ -106,6 +109,9 @@ console.log("garmin-format: all checks passed");
   const g = toGarminWorkout({ title: "Swim", sport: "swim", steps: yd });
   assert.equal(g.poolLength, 25);
   assert.equal(g.poolLengthUnit, "YARD");
+  assert.equal((g.segments[0].steps[0] as Record<string, unknown>).durationValue, 100);
+  const m = toGarminWorkout({ title: "Swim", sport: "swim", steps: [{ kind: "step", intensity: "MAIN", duration: { type: "distance", meters: 100 } }], pool: { length: 25, unit: "METER" } });
+  assert.deepEqual([(m.segments[0].steps[0] as Record<string, unknown>).durationValue, (m.segments[0].steps[0] as Record<string, unknown>).durationValueType], [100, "METER"]);
   console.log("inferPool: passed");
 }
 
