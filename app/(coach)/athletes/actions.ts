@@ -13,14 +13,15 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
   const coach = await requireCoach();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const fullName = String(form.get("full_name") ?? "").trim();
+  const role = form.get("role") === "coach" ? "coach" : "athlete";
   if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Enter a valid email address." };
 
-  // Record the invite first (as the coach, so row-level security applies);
-  // the sign-up trigger uses it to attach the new athlete to this coach.
+  // Record the invite first (as the coach, so row-level security applies); the sign-up trigger
+  // uses it to attach a new athlete to this coach, or to make an invited coach a coach with their own roster.
   const supabase = await createClient();
   const { data: invite, error: inviteError } = await supabase
     .from("invites")
-    .insert({ coach_id: coach.id, email })
+    .insert({ coach_id: coach.id, email, role })
     .select("id")
     .single();
   if (inviteError) {
@@ -45,7 +46,7 @@ export async function inviteAthlete(_prev: InviteState, form: FormData): Promise
   }
 
   revalidatePath("/athletes");
-  return { ok: `Invite sent to ${email}.` };
+  return { ok: role === "coach" ? `Coach invite sent to ${email}. They'll get their own roster.` : `Invite sent to ${email}.` };
 }
 
 export type RemoveState = { ok: true; message: string } | { ok: false; error: string };

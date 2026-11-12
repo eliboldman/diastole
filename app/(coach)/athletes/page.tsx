@@ -17,9 +17,10 @@ export default async function AthletesPage() {
   const coach = await requireCoach();
   const supabase = await createClient();
 
-  const [{ data: athletes }, { data: connections }] = await Promise.all([
+  const [{ data: athletes }, { data: connections }, { data: coachInvites }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, created_at").eq("coach_id", coach.id).eq("is_test", false).order("full_name"),
     supabase.from("device_connections").select("athlete_id, source, last_synced_at"),
+    supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "coach").order("created_at", { ascending: false }),
   ]);
 
   const deviceFor = (id: string) => connections?.find((c) => c.athlete_id === id);
@@ -43,6 +44,26 @@ export default async function AthletesPage() {
         <section className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
           <h2 className="mb-4 text-lg font-medium">Invite an athlete</h2>
           <InviteForm />
+        </section>
+
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
+          <h2 className="text-lg font-medium">Invite a coach</h2>
+          <p className="mb-4 mt-1 text-sm text-white/55">
+            A coach gets their own roster: they invite and plan for their own athletes, and can&apos;t see yours (you can&apos;t see theirs).
+          </p>
+          <InviteForm role="coach" />
+          {!!coachInvites?.length && (
+            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
+              {coachInvites.map((i) => (
+                <li key={i.id} className="flex flex-wrap justify-between gap-x-4 py-2">
+                  <span className="text-white/80">{i.email}</span>
+                  <span className="text-white/50">
+                    Invited {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="mt-6 grid gap-3">
