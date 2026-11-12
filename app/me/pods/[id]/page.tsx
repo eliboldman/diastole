@@ -15,6 +15,8 @@ import RememberPod from "@/components/RememberPod";
 import CampList from "@/components/camp/CampList";
 import { getPodCamps } from "@/lib/camp/data";
 import PodBoosts from "@/components/grit/PodBoosts";
+import PodBaton from "@/components/baton/PodBaton";
+import { TIPS } from "@/lib/discovery";
 
 export default async function AthletePodPage({
   params,
@@ -43,10 +45,11 @@ export default async function AthletePodPage({
   // Avatars the viewer may see (row-level security leaves out anyone else).
   const [{ data: avatars }, { data: mine }, { data: boostRows }, { data: boostItem }] = await Promise.all([
     supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) }),
-    supabase.from("profiles").select("share_workout_details").eq("id", me.id).maybeSingle(),
+    supabase.from("profiles").select("share_workout_details, seen_tips").eq("id", me.id).maybeSingle(),
     supabase.from("pod_boosts").select("id, from_id, to_id, created_at").eq("pod_id", id).gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(20),
     supabase.from("grit_items").select("qty").eq("athlete_id", me.id).eq("item_id", "ability:boost").maybeSingle(),
   ]);
+  const seenTips = ((mine?.seen_tips ?? []) as string[]);
   const firstOf = (pid: string) => feed.members.find((m) => m.id === pid)?.name.split(" ")[0] ?? "Coach";
   const boosts = (boostRows ?? []).map((b) => ({ id: b.id, to_id: b.to_id, from_name: b.from_id === me.id ? "You" : firstOf(b.from_id), to_name: firstOf(b.to_id) }));
 
@@ -81,7 +84,10 @@ export default async function AthletePodPage({
             <PodActivityFeed podId={id} initial={(activities ?? []) as FeedItem[]} timeZone={me.timezone} units={me.units} avatars={(avatars ?? {}) as Record<string, unknown>} iShare={Boolean(mine?.share_workout_details)} />
           </>
         ) : (
+          <>
+          <PodBaton podId={id} meId={me.id} names={Object.fromEntries(feed.members.map((m) => [m.id, m.name.split(" ")[0]]))} tipSeen={seenTips.includes(TIPS.baton.id)} />
           <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} streaks={(streaks ?? {}) as Record<string, number>} />
+          </>
         )}
       </div>
     </AthleteShell>
