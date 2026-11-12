@@ -19,6 +19,7 @@ const KIND_LABEL: Record<string, string> = {
   camp: "Camp",
   challenge: "Pod goal",
   quest: "Rest day quest",
+  boss: "Boss defeated",
   purchase: "Store",
 };
 

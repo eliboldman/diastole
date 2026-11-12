@@ -15,6 +15,7 @@ export async function buyItem(itemId: string): Promise<GritResult> {
   const me = await requireUser();
   const item = ITEM[itemId];
   if (!item) return { ok: false, error: "That item isn't in the store." };
+  if (item.exclusive) return { ok: false, error: "This one is earned by defeating a boss." };
   const { data, error } = await createAdminClient().rpc("grit_buy", {
     p_athlete: me.id,
     p_item: item.id,

@@ -153,6 +153,8 @@ export default function GritStore({ balance, owned, gear, look }: { balance: num
                   <p className="flex min-h-10 items-center justify-center gap-1.5 text-sm text-emerald-200">
                     <Check size={14} aria-hidden /> Yours
                   </p>
+                ) : item.exclusive ? (
+                  <p className="flex min-h-10 items-center justify-center rounded-xl border border-dashed border-amber-300/25 text-center text-xs text-amber-100/80">Boss reward</p>
                 ) : (
                   <button
                     type="button"

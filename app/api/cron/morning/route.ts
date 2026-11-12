@@ -10,6 +10,7 @@ import { pullRides, syncAthlete } from "@/lib/intervals/sync";
 import { runMonthlyRecaps } from "@/lib/recap-job";
 import { createAdminClient } from "@/lib/supabase/server";
 import { settleAllGrit } from "@/lib/grit/settle";
+import { runMonthlyBosses } from "@/lib/bosses/data";
 
 // Vercel Cron calls this once each morning (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
 export const maxDuration = 300;
@@ -60,6 +61,8 @@ export async function GET(request: NextRequest) {
   // Pod challenges that ended yesterday: final standings to everyone who joined (rules only).
   const { data: wrapped, error: wrapError } = await admin.rpc("finish_pod_challenges");
   results.challenges = wrapError ? { status: "error", reason: wrapError.message.slice(0, 200) } : { sent: wrapped };
+  // Bosses: on the 1st, last month's wander off and new suggestions go to coaches (rules only).
+  results.bosses = await runMonthlyBosses(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Grit: pay out yesterday's sessions and check-ins, and pod team goals that were reached (rules only).
   results.grit = await settleAllGrit(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // The 1st of the month: last month's recap for athletes, a team line for coaches.

@@ -1015,3 +1015,14 @@ body {
   .grit-float, .grit-shard, .confetti-bit { display: none; }
   .grit-shine::after { animation: none; display: none; }
 }
+
+/* ---------------------------------------------------------------- Bosses */
+@keyframes bossBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes bossWobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.boss-bob { animation: bossBob 2.8s ease-in-out infinite; }
+.boss-wobble { animation: bossWobble 1.4s ease-in-out infinite; }
+@keyframes hpDrain { from { width: var(--from); } to { width: var(--to); } }
+.hp-drain { animation: hpDrain 1200ms var(--ease-soft) 300ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .boss-bob, .boss-wobble, .hp-drain { animation: none; }
+}

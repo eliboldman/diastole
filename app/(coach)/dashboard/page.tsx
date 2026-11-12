@@ -27,6 +27,7 @@ import MorningBriefs from "@/components/coach/MorningBriefs";
 import MorningReview from "@/components/coach/MorningReview";
 import { getMorningStatus } from "@/lib/ai/morning-status";
 import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
+import BossReview from "@/components/bosses/BossReview";
 import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import SafetyNotes from "@/components/coach/SafetyNotes";
 import WeeklyProgress from "@/components/WeeklyProgress";
@@ -130,6 +131,7 @@ export default async function TodayPage() {
       <SafetyNotes />
       {ai.ai_enabled && <MorningReview status={morning} />}
       <MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} />
+      <BossReview coachId={coach.id} today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} names={Object.fromEntries(roster.map((r) => [r.id, r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete"]))} />
       <ZoneSuggestions units={coach.units === "km" ? "km" : "mi"} rows={roster.filter((r) => zoneSugg.has(r.id)).map((r) => ({ athleteId: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", suggestions: zoneSugg.get(r.id)! }))} />
       <WatchCard rows={roster.map((r) => ({ id: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", status: watches.get(r.id)! })).filter((r) => r.status)} />
       <QuickLinks

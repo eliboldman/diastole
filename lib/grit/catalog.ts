@@ -12,6 +12,7 @@ export type Item = {
   price: number;
   rarity: Rarity;
   max?: number; // abilities: how many you can hold
+  exclusive?: boolean; // boss reward: can't be bought, only earned by defeating a boss
 };
 
 // Jersey: torso colors on the 3D avatar. pattern: solid | band (chest band) | split (top/bottom) | hoops.
@@ -23,6 +24,9 @@ export const JERSEYS: Record<string, JerseyLook> = {
   tidepool: { main: "#0e7490", accent: "#a5f3fc", pattern: "hoops" },
   lilac_split: { main: "#c4b5fd", accent: "#312e81", pattern: "split" },
   ember_hoops: { main: "#1c1917", accent: "#fb923c", pattern: "hoops" },
+  // Boss rewards
+  negative_split: { main: "#111827", accent: "#fde047", pattern: "split" },
+  metronome: { main: "#0f766e", accent: "#f0fdfa", pattern: "hoops" },
 };
 
 // Helmet: shape + colors. glow = it softly lights up.
@@ -32,6 +36,7 @@ export const HELMETS: Record<string, HelmetLook> = {
   aero_slate: { shape: "aero", main: "#1f2937", accent: "#6ee7b7" },
   dome_coral: { shape: "dome", main: "#fb7185", accent: "#fff1f2" },
   glow_mint: { shape: "aero", main: "#064e3b", accent: "#a7f3d0", glow: true },
+  summit: { shape: "vented", main: "#78350f", accent: "#fcd34d", glow: true }, // boss reward
 };
 
 // Aura: the glow behind the avatar (the milestone aura keeps its strength; this changes its color).
@@ -40,6 +45,7 @@ export const AURAS: Record<string, { color: string; ring: string }> = {
   tide: { color: "#38bdf8", ring: "#7dd3fc" },
   bloom: { color: "#f472b6", ring: "#f9a8d4" },
   sunlit: { color: "#fde68a", ring: "#fbbf24" },
+  riptide: { color: "#22d3ee", ring: "#a5f3fc" }, // boss reward
 };
 
 export const ITEMS: Item[] = [
@@ -67,6 +73,11 @@ export const ITEMS: Item[] = [
   { id: "aura:tide", category: "aura", name: "Tide aura", blurb: "Cool water light.", price: 200, rarity: "common" },
   { id: "aura:bloom", category: "aura", name: "Bloom aura", blurb: "Petal pink.", price: 200, rarity: "common" },
   { id: "aura:sunlit", category: "aura", name: "Sunlit aura", blurb: "Golden hour, all day.", price: 450, rarity: "rare" },
+  // Boss rewards: earned by defeating a weakness boss, never sold
+  { id: "jersey:negative_split", category: "jersey", name: "Negative split", blurb: "For beating The Fizzle: faster at the end.", price: 1, rarity: "rare", exclusive: true },
+  { id: "jersey:metronome", category: "jersey", name: "Metronome", blurb: "For beating Snoozlet: steady, week after week.", price: 1, rarity: "rare", exclusive: true },
+  { id: "helmet:summit", category: "helmet", name: "Summit lid", blurb: "For beating Grumblehill. Glows at the top.", price: 1, rarity: "rare", exclusive: true },
+  { id: "aura:riptide", category: "aura", name: "Riptide aura", blurb: "For beating Puddlewump.", price: 1, rarity: "rare", exclusive: true },
   // Themes (pick them in Settings → Appearance once owned)
   { id: "theme:lagoon", category: "theme", name: "Lagoon", blurb: "Clear turquoise water.", price: 250, rarity: "common" },
   { id: "theme:ember", category: "theme", name: "Ember", blurb: "Campfire orange.", price: 250, rarity: "common" },

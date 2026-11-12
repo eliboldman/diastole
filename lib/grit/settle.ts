@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { campAward, allAwards, type Award, type EarnInput, type Flag } from "@/lib/grit/earn";
+import { settleBoss } from "@/lib/bosses/data";
 import { createAdminClient } from "@/lib/supabase/server";
 
 const WINDOW_DAYS = 21; // a new athlete starts with their last three weeks counted
@@ -12,7 +13,7 @@ const DAY = 86_400_000;
  * Settle one athlete's grit. `asUser` (the athlete's own signed-in client) lets camp goals be checked
  * too, since the camp board is only readable by pod members; the cron run skips camps.
  */
-export async function settleGrit(athleteId: string, asUser?: SupabaseClient): Promise<number> {
+export async function settleGrit(athleteId: string, asUser?: SupabaseClient, remeasure = false): Promise<number> {
   const admin = createAdminClient();
   const { data: prof } = await admin.from("profiles").select("timezone, health_pause").eq("id", athleteId).maybeSingle();
   if (!prof) return 0;
@@ -59,6 +60,9 @@ export async function settleGrit(athleteId: string, asUser?: SupabaseClient): Pr
     }
   }
 
+  // This month's boss: damage from finished sessions (defeat pays grit through the ledger itself).
+  await settleBoss(admin, athleteId, remeasure).catch(() => null);
+
   if (!awards.length) return 0;
   const { data: added } = await admin
     .from("grit_ledger")
@@ -74,7 +78,7 @@ export async function settleGrit(athleteId: string, asUser?: SupabaseClient): Pr
 export async function settleAllGrit(admin: SupabaseClient) {
   const { data: people } = await admin.from("profiles").select("id").eq("is_test", false);
   let added = 0;
-  for (const p of people ?? []) added += await settleGrit(p.id).catch(() => 0);
+  for (const p of people ?? []) added += await settleGrit(p.id, undefined, true).catch(() => 0);
   const { data: challenges } = await admin.rpc("grit_award_challenges");
   return { added, challenges: Number(challenges ?? 0) };
 }

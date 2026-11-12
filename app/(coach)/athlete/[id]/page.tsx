@@ -7,6 +7,7 @@ import WorkoutList from "@/components/coach/WorkoutList";
 import FormInsights, { type InsightView } from "@/components/coach/FormInsights";
 import RecentCheckins from "@/components/coach/RecentCheckins";
 import ThresholdTests from "@/components/coach/ThresholdTests";
+import BossCoachPanel from "@/components/bosses/BossCoachPanel";
 import ZonesForm from "@/components/coach/ZonesForm";
 import FuelModePicker from "@/components/coach/FuelModePicker";
 import SafetyNotes from "@/components/coach/SafetyNotes";
@@ -199,6 +200,8 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           <p className="mb-2 mt-1 text-sm text-white/55">How workouts felt, how hard, and anything that hurt. You get a notification when pain is moderate or severe.</p>
           <RecentCheckins athleteId={profile.id} timeZone={me.timezone} />
         </section>
+
+        <BossCoachPanel athleteId={profile.id} today={athleteToday} firstName={(profile.full_name || "This athlete").split(" ")[0]} />
 
         <section id="zones" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2">
           <h2 className="text-lg font-medium">Training zones</h2>

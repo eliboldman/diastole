@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import Avatar from "@/components/avatar/Avatar";
+import BossCard from "@/components/bosses/BossCard";
 import GoalForm from "@/components/avatar/GoalForm";
 import MetricCards from "@/components/avatar/MetricCards";
 import BackLink from "@/components/layout/BackLink";
@@ -275,6 +276,7 @@ export default async function ProfileView({
               {aura > 0 && <span className="rounded-full border border-emerald-200/20 bg-emerald-200/[0.06] px-3 py-1 text-emerald-100">{`✨ Aura level ${aura}`}</span>}
             </p>
           )}
+          {(own || coaching) && <BossCard athleteId={id} viewer={own ? "athlete" : "coach"} />}
           {own && (
             <Link href="/profile/edit" className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-emerald-300 px-6 text-sm font-medium text-black transition active:scale-95 hover:bg-emerald-200">
               <Pencil size={16} /> {look ? "Edit avatar" : "Create your avatar"}
