@@ -1,4 +1,4 @@
-import { Backpack, CalendarDays, Dumbbell, Flag, Footprints, Gauge, Gem, HeartPulse, KeyRound, LifeBuoy, Plug, Settings, Sparkles, Sun, Target, Utensils } from "lucide-react";
+import { Backpack, CalendarDays, Dumbbell, Flag, Footprints, Gauge, Gem, HeartPulse, Image, KeyRound, LifeBuoy, Plug, Settings, Sparkles, Sun, Target, Utensils } from "lucide-react";
 import type { Metadata } from "next";
 
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -95,6 +95,7 @@ export default async function MePage() {
         <MeGroup
           rows={[
             { href: "/me/grit", icon: Gem, title: "Grit", summary: "Your balance, history and the store" },
+            { href: "/me/posters", icon: Image, title: "Poster collection", summary: "Finished race posters you kept" },
             { href: "/me/story", icon: Sparkles, title: "Season story", summary: "Your training in one shareable picture" },
             { href: "/me/secrets", icon: KeyRound, title: "Secrets", summary: "Little surprises hidden around Diastole" },
             { href: "/help", icon: LifeBuoy, title: "Help" },

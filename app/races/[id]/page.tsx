@@ -10,6 +10,8 @@ import { countdown, raceDistance } from "@/components/race/RaceList";
 import RacePlanCard from "@/components/race/RacePlanCard";
 import RaceEstimate from "@/components/predict/RaceEstimate";
 import CourseCard from "@/components/course/CourseCard";
+import RacePoster from "@/components/poster/RacePoster";
+import { getPoster } from "@/lib/poster/data";
 import { getCourseView } from "@/lib/course/data";
 import PackingList from "@/components/pack/PackingList";
 import { getPackView } from "@/lib/pack/data";
@@ -41,11 +43,12 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
   const days = daysUntil(race.race_date, today);
   const plan = planFor(race, tools);
   const supabase = await createClient();
-  const [est, course, { data: tipsRow }, pack] = await Promise.all([
+  const [est, course, { data: tipsRow }, pack, poster] = await Promise.all([
     days >= 0 ? getRacePrediction(supabase, race, tz) : Promise.resolve(null),
     getCourseView(supabase, race.id, tz),
     supabase.from("profiles").select("seen_tips").eq("id", me.id).maybeSingle(),
     days >= 0 ? getPackView(supabase, race, me.units) : Promise.resolve(null),
+    race.priority === "A" ? getPoster(supabase, { athlete_id: race.athlete_id, race_date: race.race_date, created_at: race.created_at ?? new Date().toISOString() }, today) : Promise.resolve(null),
   ]);
   const showEst = est && !(own && est.hidden);
   const phase = days >= 0 && days <= RACE_WEEK_DAYS ? raceWeekChecklist(days, plan) : null;
@@ -70,6 +73,18 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         </div>
       )}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        {poster && (
+          <RacePoster
+            raceId={race.id}
+            sport={race.sport as "run" | "bike" | "swim" | "tri" | "other"}
+            name={race.name}
+            date={new Date(`${race.race_date}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            line={[SPORT[race.sport], raceDistance(race.distance_km, me.units)].filter(Boolean).join(" · ")}
+            state={poster}
+            own={own}
+            kept={Boolean(race.poster_kept)}
+          />
+        )}
         {phase && (
           <section className="rounded-[28px] border border-emerald-300/25 bg-emerald-300/[0.06] p-6">
             <h2 className="text-lg font-medium">{days === 0 ? "Race morning" : `Race week: ${phase.title.toLowerCase()}`}</h2>

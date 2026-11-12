@@ -12,6 +12,8 @@ export type RaceRow = {
   distance_km: number | null;
   goal_seconds: number | null;
   priority: "A" | "B" | "C";
+  created_at?: string;
+  poster_kept?: boolean;
   notes: string | null;
   checklist: Record<string, boolean>;
   pack?: unknown; // packing list state (lib/pack)
@@ -19,7 +21,7 @@ export type RaceRow = {
 export type SweatRow = { id: string; tested_on: string; sweat_rate_ml_h: number; minutes: number; temp_c: number | null; sport: string | null };
 export type GutRow = { id: string; on_date: string; carbs_g_per_h: number; minutes: number | null; comfort: number; products: string | null; note: string | null };
 
-const RACE_COLS = "id, athlete_id, name, race_date, sport, distance_km, goal_seconds, priority, notes, checklist, pack";
+const RACE_COLS = "id, athlete_id, name, race_date, sport, distance_km, goal_seconds, priority, notes, checklist, pack, created_at, poster_kept";
 
 /** An athlete's races (row-level security: themself or their coach), soonest first. */
 export async function getRaces(athleteId: string, opts: { from?: string; limit?: number } = {}): Promise<RaceRow[]> {
