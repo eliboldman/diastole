@@ -22,6 +22,7 @@ import { asTheme } from "@/lib/themes";
 import { asPlace } from "@/lib/weather";
 import { DEFAULT_SETTINGS, monthToDateSpend } from "@/lib/ai/coach";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import { ownedThemes } from "@/lib/grit/data";
 
 export const metadata: Metadata = { title: "Settings · Diastole" };
 
@@ -130,7 +131,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <section id="appearance" className={card}>
             <h2 className="mb-1 text-lg font-medium">Appearance</h2>
             <p className="mb-4 text-sm text-white/55">Make Diastole yours: color, background, text size and more. Saved to your account, so it follows you to every device.</p>
-            <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} unlock={secret === "icarus" ? "icarus" : undefined} />
+            <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} unlock={secret === "icarus" ? "icarus" : undefined} owned={await ownedThemes(me.id)} />
           </section>
 
           <section className={card}>

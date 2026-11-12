@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { checkinStreak, planStreak, weekStreak, type ActForStreak } from "./streaks.ts";
+import { checkinStreak, planStreak, planStreakDetail, weekStreak, type ActForStreak } from "./streaks.ts";
 
 const tz = "America/Chicago";
 const now = new Date("2026-11-11T18:00:00Z"); // Wednesday
@@ -29,3 +29,17 @@ assert.equal(checkinStreak(all, new Set(["a1", "a2", "a3"]), now), 3, "today's u
 assert.equal(checkinStreak(all, new Set(["a1", "a3"]), now), 1, "a skipped check-in breaks it");
 assert.equal(checkinStreak(all, new Set(["a2", "a3", "t"]), now), 3);
 console.log("streaks: all passed");
+
+// Excused days (shield, sick mode, Life happened) don't break the plan streak.
+{
+  const ps = [
+    { id: "e1", date: "2026-11-03", sport: "run" },
+    { id: "e2", date: "2026-11-05", sport: "run" },
+    { id: "e3", date: "2026-11-07", sport: "run" },
+  ];
+  const as = [act("x1", "2026-11-03"), act("x3", "2026-11-07")];
+  const d = planStreakDetail(ps, as, tz, "2026-11-08");
+  assert.equal(d.n, 1);
+  assert.equal(d.brokeOn, "2026-11-05", "the miss is reported");
+  assert.equal(planStreak(ps, as, tz, "2026-11-08", new Set(["2026-11-05"])), 2, "a shielded miss passes");
+}

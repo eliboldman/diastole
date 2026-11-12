@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from "react-dom";
 
 import { useToast } from "@/components/coach/Toast";
+import StickerGlyph from "@/components/grit/StickerGlyph";
+import { myStoreStickers } from "@/lib/grit/sticker-actions";
 import { hasSecret } from "@/lib/secrets-local";
 import { hideOneProp, hideProps, sendProps } from "@/lib/pod-props-actions";
 import {
@@ -50,7 +52,7 @@ const HOLD_MS = 400; // shorter than this is a tap (exactly one); longer starts 
 const MOVE_PX = 12; // a finger that slides further than this is scrolling, not tapping
 const SEND_DELAY_MS = 2000; // time to keep tapping, or undo, before props go out
 
-type Burst = { id: number; emoji: string; n: number };
+type Burst = { id: number; sticker: Sticker; n: number };
 const QUICK = ALL_STICKERS.clap;
 
 export default function PodProps({
@@ -104,6 +106,7 @@ export default function PodProps({
   }, [totals, extra, member.id]);
 
   const [open, setOpen] = useState(false);
+  const [mine, setMine] = useState<Sticker[] | null>(null); // Grit store stickers the sender owns
   const [note, setNote] = useState("");
   const noteRef = useRef("");
   const [peek, setPeek] = useState<string | null>(null);
@@ -148,7 +151,7 @@ export default function PodProps({
     setCombo(null);
     if (!c) return;
     const id = clock();
-    setBursts((b) => [...b, { id, emoji: c.sticker.emoji, n: Math.min(28, 6 + Math.round(Math.log10(c.n) * 5)) }]);
+    setBursts((b) => [...b, { id, sticker: c.sticker, n: Math.min(28, 6 + Math.round(Math.log10(c.n) * 5)) }]);
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 1400);
     bump(c.sticker.key, c.n);
     const sentNote = noteRef.current.trim();
@@ -282,6 +285,7 @@ export default function PodProps({
       return;
     }
     setOpen(true);
+    if (!mine) void myStoreStickers().then(setMine);
   }
 
   async function hideNote(id: string) {
@@ -317,7 +321,7 @@ export default function PodProps({
       } ${big ? "col-span-2" : ""}`}
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
     >
-      <span className="text-2xl leading-none">{s.emoji}</span>
+      <StickerGlyph s={s} className="text-2xl leading-none" />
       <span className="min-w-0">
         <span className="block text-sm font-medium">{s.label}</span>
         {s.line && <span className="block text-xs text-white/55">{s.line}</span>}
@@ -342,13 +346,13 @@ export default function PodProps({
                     t.hidden ? "border-dashed border-white/15 opacity-50" : s.tone === "props" ? "border-emerald-300/20 bg-emerald-300/[0.07]" : "border-amber-300/20 bg-amber-300/[0.06]"
                   }`}
                 >
-                  <span>{s.emoji}</span>
+                  <StickerGlyph s={s} />
                   <span className="tabular-nums text-white/80">{fmt(t.total)}</span>
                 </button>
                 {peek === t.sticker && (
                   <span className="toast-in absolute bottom-full left-0 z-20 mb-2 w-56 rounded-2xl border border-white/10 bg-panel/95 p-3 text-xs text-white/70 shadow-2xl backdrop-blur-xl">
                     <span className="block text-sm font-medium text-white">
-                      {s.emoji} {s.label}
+                      <StickerGlyph s={s} /> {s.label}
                     </span>
                     {`${t.total.toLocaleString()} ${activity ? "" : "today "}from ${t.senders} ${t.senders === 1 ? (t.from_me ? "person (you)" : "person") : "people"}`}
                     {t.all_time && t.all_time > t.total ? <span className="block text-white/50">{t.all_time.toLocaleString()} all-time</span> : null}
@@ -370,7 +374,7 @@ export default function PodProps({
         <ul className="mb-3 grid gap-1.5">
           {notes.slice(0, 3).map((n) => (
             <li key={n.id} className={`flex items-start gap-2 rounded-2xl bg-white/[0.04] px-3 py-2 text-sm ${n.hidden ? "opacity-45" : ""}`}>
-              <span aria-hidden>{ALL_STICKERS[n.sticker]?.emoji}</span>
+              <span aria-hidden>{ALL_STICKERS[n.sticker] && <StickerGlyph s={ALL_STICKERS[n.sticker]} />}</span>
               <span className="min-w-0 flex-1 break-words text-white/75">
                 &ldquo;{n.note}&rdquo; <span className="text-white/45">— {n.from_me ? "you" : n.from_name}</span>
               </span>
@@ -424,7 +428,7 @@ export default function PodProps({
           {combo && !open && (
             <span key={milestone(combo.n) ?? "x"} className="success-pop pointer-events-none flex items-baseline gap-2 tabular-nums" aria-live="polite">
               <span className="text-lg font-semibold">
-                {combo.sticker.emoji} ×{combo.n.toLocaleString()}
+                <StickerGlyph s={combo.sticker} /> ×{combo.n.toLocaleString()}
               </span>
               {milestone(combo.n) && <span className="text-[11px] uppercase tracking-[0.2em] text-amber-200/80">{milestone(combo.n)}</span>}
             </span>
@@ -463,7 +467,7 @@ export default function PodProps({
                 } as CSSProperties
               }
             >
-              {b.emoji}
+              <StickerGlyph s={b.sticker} />
             </span>
           ))}
         </span>
@@ -509,7 +513,7 @@ export default function PodProps({
               {combo ? (
                 <>
                   <span key={milestone(combo.n) ?? "x"} className="success-pop text-3xl font-semibold tabular-nums">
-                    {combo.sticker.emoji} ×{combo.n.toLocaleString()}
+                    <StickerGlyph s={combo.sticker} /> ×{combo.n.toLocaleString()}
                   </span>
                   <span className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-amber-200/80">
                     {milestone(combo.n) ?? "\u00a0"}
@@ -535,6 +539,12 @@ export default function PodProps({
               <section className="mb-4">
                 <p className="mb-2 text-xs uppercase tracking-[0.15em] text-sky-200/75">{activity!.label}</p>
                 <div className="grid grid-cols-2 gap-2">{sportSet.map((s) => stickerButton(s))}</div>
+              </section>
+            )}
+            {mine && mine.length > 0 && (
+              <section className="mb-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-emerald-200/70">Yours, from the Grit store</p>
+                <div className="grid grid-cols-2 gap-2">{mine.map((s) => stickerButton(s))}</div>
               </section>
             )}
             <section className="mb-4">

@@ -5,6 +5,7 @@ import { FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
 import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
 import AvatarCircle from "@/components/avatar/AvatarCircle";
 import PodProps, { type PropSend, type PropTotal } from "@/components/PodProps";
+import StickerGlyph from "@/components/grit/StickerGlyph";
 import { ALL_STICKERS, podAwards } from "@/lib/pod-stickers";
 import type { Flag } from "@/lib/readiness/engine";
 
@@ -134,7 +135,7 @@ export default function PodFeed({
                       <span className="tabular-nums">
                         {r.count.toLocaleString()}
                       </span>{" "}
-                      {ALL_STICKERS[r.sticker].emoji}
+                      <StickerGlyph s={ALL_STICKERS[r.sticker]} />
                       <span className="text-white/50"> to </span>
                       {firstName(r.to_id)}
                       {r.activity_id && <span className="text-white/50">{` for their ${(r.activity_sport ?? "workout").replaceAll("_", " ")}`}</span>}

@@ -31,6 +31,9 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 import { pullIfStale } from "@/lib/intervals/pull-soon";
 import { after } from "next/server";
 import BedtimeCard from "@/components/sleep/BedtimeCard";
+import GritChip from "@/components/grit/GritChip";
+import { getGrit } from "@/lib/grit/data";
+import { settleGrit } from "@/lib/grit/settle";
 import { clock12 } from "@/lib/week-prefs";
 
 export const metadata: Metadata = { title: "My Diastole" };
@@ -46,6 +49,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   after(() => pullIfStale(me.id));
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  // Pay out any grit earned since last time (bounded, so a slow moment never holds the page).
+  const settled = settleGrit(me.id, supabase).catch(() => 0);
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }, { data: layoutRow }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
@@ -56,7 +61,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
     supabase.from("profiles").select("welcomed_at").eq("id", me.id).maybeSingle(),
     searchParams,
-    supabase.from("profiles").select("layout, health_pause, seen_tips").eq("id", me.id).maybeSingle(),
+    supabase.from("profiles").select("layout, health_pause, seen_tips, grit_seen_at").eq("id", me.id).maybeSingle(),
   ]);
   // "Life happened": yesterday's session if it wasn't done, and sick/injured mode.
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
@@ -228,14 +233,21 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     ),
   };
   const layout = resolveLayout("today", layoutRow?.layout);
+  await Promise.race([settled, new Promise((r) => setTimeout(r, 1500))]);
+  const grit = await getGrit(supabase, me.id, layoutRow?.grit_seen_at ?? null, 1);
+  const freshGrit = grit.fresh.reduce((n, r) => n + r.amount, 0);
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
       <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">{firstName ? `Hi, ${firstName}` : "Welcome"}</p>
       <div className="mt-3 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{me.role === "coach" ? "My day" : "Today"}</h1>
-        <LayoutCustomizer page="today" initial={layout} />
+        <div className="flex items-center gap-1">
+          <GritChip balance={grit.balance} fresh={freshGrit} reason={grit.fresh.length === 1 ? grit.fresh[0].reason : grit.fresh.length > 1 ? `${grit.fresh.length} new awards` : null} />
+          <LayoutCustomizer page="today" initial={layout} />
+        </div>
       </div>
+      {grit.balance > 0 && !showWelcome && <Spotlight tip={TIPS.grit} seen={seen(seenTips, TIPS.grit.id)} />}
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
 

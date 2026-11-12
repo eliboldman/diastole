@@ -6,6 +6,7 @@
 import * as THREE from "three";
 
 import { accentHex } from "@/lib/accent";
+import { AURAS, HELMETS, JERSEYS, type Gear } from "@/lib/grit/catalog";
 import type { Look } from "./look";
 import { PAIN_COLOR, type Pain, type PainLevel, type Spot } from "./pain";
 import { REGIONS, type Level, type Region, type Strain } from "./strain";
@@ -21,6 +22,7 @@ export type SceneOpts = {
   variant?: "full" | "bust";
   view?: "front" | "back"; // still images
   blocks?: boolean;
+  gear?: Gear; // Grit store gear: jersey, helmet, aura color
 };
 
 // ---------------------------------------------------------------- colors
@@ -150,6 +152,7 @@ function segment(mesh: THREE.Mesh, classify: Classify, spotOf?: ClassifySpot) {
   const faces = pos.count / 3;
   const regions: (Region | null)[] = new Array(faces);
   const spots: (Spot | null)[] = new Array(faces);
+  const ys: number[] = new Array(faces);
   const c = new THREE.Vector3();
   const v = new THREE.Vector3();
   for (let f = 0; f < faces; f++) {
@@ -158,13 +161,34 @@ function segment(mesh: THREE.Mesh, classify: Classify, spotOf?: ClassifySpot) {
     c.multiplyScalar(1 / 3).applyMatrix4(mesh.matrix); // into the parent's space (blocks boxes are offset)
     regions[f] = classify(c);
     spots[f] = spotOf ? spotOf(c) : null;
+    ys[f] = c.y;
   }
   g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
   mesh.userData.faceRegions = regions;
   mesh.userData.faceSpots = spots;
+  mesh.userData.faceY = ys;
 }
 
-type Paint = { mode: "strain" | "pain"; strain: Strain; pain: Pain };
+type Paint = { mode: "strain" | "pain"; strain: Strain; pain: Pain; jersey?: string };
+
+// Jersey: the torso (and shoulders) take the kit's colors wherever no muscle is highlighted.
+const KIT: ReadonlySet<Region> = new Set(["traps", "shoulders", "chest", "upper_back", "lats", "abs", "obliques", "lower_back"]);
+function kitColor(jersey: string, y: number): THREE.Color | null {
+  const k = JERSEYS[jersey];
+  if (!k) return null;
+  const main = new THREE.Color(k.main);
+  const accent = new THREE.Color(k.accent);
+  switch (k.pattern) {
+    case "band":
+      return y > 1.24 && y < 1.32 ? accent : main;
+    case "split":
+      return y > 1.22 ? main : accent;
+    case "hoops":
+      return Math.floor((y - 0.9) / 0.075) % 2 === 0 ? main : accent;
+    default:
+      return y > 1.44 ? accent : main;
+  }
+}
 
 function paint(meshes: THREE.Mesh[], p: Paint) {
   for (const m of meshes) {
@@ -180,7 +204,8 @@ function paint(meshes: THREE.Mesh[], p: Paint) {
         color = lvl ? PAIN[lvl] : MUTED;
       } else {
         const lvl = r ? p.strain[r] : undefined;
-        color = lvl ? STRAIN[lvl] : r ? REGION_SHADE[r] : UNSEG;
+        const kit = !lvl && r && p.jersey && KIT.has(r) ? kitColor(p.jersey, (m.userData.faceY as number[])[f] ?? 0) : null;
+        color = lvl ? STRAIN[lvl] : kit ? kit : r ? REGION_SHADE[r] : UNSEG;
       }
       for (let k = 0; k < 3; k++) col.setXYZ(f * 3 + k, color.r, color.g, color.b);
     }
@@ -299,7 +324,11 @@ function buildFigure(o: SceneOpts): Built {
   if (o.mood === "tired") head.rotation.x = 0.16;
   root.add(head);
 
-  paint(meshes, { mode: o.mode ?? "strain", strain: o.strain ?? {}, pain: o.pain ?? {} });
+  paint(meshes, { mode: o.mode ?? "strain", strain: o.strain ?? {}, pain: o.pain ?? {}, jersey: o.gear?.jersey });
+
+  // Helmet (Grit store): sits on the head, never painted or tapped.
+  const lid = o.gear?.helmet ? HELMETS[o.gear.helmet] : undefined;
+  if (lid && !blocks) head.add(helmet(lid));
 
   let sparkles: THREE.Group | null = null;
   if (o.mood === "fresh") {
@@ -318,22 +347,24 @@ function buildFigure(o: SceneOpts): Built {
   }
 
   let orbit: THREE.Group | null = null;
-  const level = Math.max(0, Math.min(4, Math.round(o.aura ?? 0)));
+  const tint = o.gear?.aura ? AURAS[o.gear.aura] : undefined;
+  // A store aura shows even before milestones (at the first level); milestones still grow it.
+  const level = Math.max(tint ? 1 : 0, Math.min(4, Math.round(o.aura ?? 0)));
   if (level > 0) {
-    const gold = level >= 4;
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(gold ? "#fde68a" : accentHex()), transparent: true, opacity: 0.18 + level * 0.07, depthWrite: false }));
+    const gold = level >= 4 && !tint;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(tint ? tint.color : gold ? "#fde68a" : accentHex()), transparent: true, opacity: 0.18 + level * 0.07 + (tint ? 0.08 : 0), depthWrite: false }));
     halo.scale.set(1.5 + level * 0.12, 2.3 + level * 0.12, 1);
     halo.position.set(0, 0.95 * height, -0.4);
     root.add(halo);
     if (level >= 2) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.006, 8, 64), new THREE.MeshBasicMaterial({ color: gold ? 0xfbbf24 : 0x6ee7b7, transparent: true, opacity: 0.55 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.006, 8, 64), new THREE.MeshBasicMaterial({ color: tint ? tint.ring : gold ? 0xfbbf24 : 0x6ee7b7, transparent: true, opacity: 0.55 }));
       ring.rotation.x = Math.PI / 2;
       ring.position.y = 0.01;
       root.add(ring);
     }
     if (level >= 3) {
       orbit = new THREE.Group();
-      const m = new THREE.MeshBasicMaterial({ color: gold ? 0xfde68a : 0xa7f3d0 });
+      const m = new THREE.MeshBasicMaterial({ color: tint ? tint.ring : gold ? 0xfde68a : 0xa7f3d0 });
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
         const p = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), m);
@@ -351,6 +382,41 @@ function buildFigure(o: SceneOpts): Built {
   root.add(shadow);
 
   return { root, meshes, sparkles, orbit };
+}
+
+/** A bike helmet in the head's space (skull radius 0.1, stretched 1.25 tall). Built from code like the rest. */
+function helmet(h: { shape: "dome" | "aero" | "vented"; main: string; accent: string; glow?: boolean }) {
+  const g = new THREE.Group();
+  const shell = new THREE.MeshStandardMaterial({ color: h.main, roughness: 0.35, metalness: 0.1, emissive: h.glow ? new THREE.Color(h.accent) : new THREE.Color(0), emissiveIntensity: h.glow ? 0.35 : 0 });
+  const trim = new THREE.MeshStandardMaterial({ color: h.accent, roughness: 0.4, emissive: h.glow ? new THREE.Color(h.accent) : new THREE.Color(0), emissiveIntensity: h.glow ? 0.9 : 0 });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.112, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.52), shell);
+  dome.scale.set(1.0, 1.05, 1.12);
+  dome.position.set(0, 0.125, 0.0);
+  dome.rotation.x = -0.12;
+  g.add(dome);
+  if (h.shape === "aero") {
+    // A tail that sweeps back over the neck.
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.2, 24), shell);
+    tail.rotation.x = -Math.PI / 2 - 0.5;
+    tail.position.set(0, 0.11, -0.15);
+    tail.scale.set(1, 1, 0.55);
+    g.add(tail);
+  }
+  if (h.shape === "vented") {
+    for (const x of [-0.045, 0, 0.045]) {
+      const vent = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.012, 0.15), trim);
+      vent.position.set(x, 0.24, -0.005);
+      vent.rotation.x = -0.12;
+      g.add(vent);
+    }
+  }
+  // A stripe front to back on every helmet.
+  const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.113, 0.006, 6, 40, Math.PI), trim);
+  stripe.rotation.y = Math.PI / 2;
+  stripe.scale.set(1, 1.05, 1.12);
+  stripe.position.set(0, 0.125, 0);
+  g.add(stripe);
+  return g;
 }
 
 const textures = new Map<string, THREE.Texture>();
@@ -428,6 +494,7 @@ export function createStage(canvas: HTMLCanvasElement, o: SceneOpts): Stage {
   const scene = new THREE.Scene();
   lights(scene);
   let fig = buildFigure(o);
+  let gearNow = o.gear;
   scene.add(fig.root);
   let cam = camera(o.variant ?? "full", canvas.clientWidth / Math.max(1, canvas.clientHeight), o.look.height);
   const ray = new THREE.Raycaster();
@@ -437,12 +504,13 @@ export function createStage(canvas: HTMLCanvasElement, o: SceneOpts): Stage {
       scene.remove(fig.root);
       free(fig.root);
       fig = buildFigure(next);
+      gearNow = next.gear;
       scene.add(fig.root);
       stage.animated = Boolean(fig.sparkles) || Boolean(fig.orbit);
       cam = camera(next.variant ?? "full", cam.aspect, next.look.height);
     },
     setPaint(p) {
-      paint(fig.meshes, { mode: p.mode ?? "strain", strain: p.strain ?? {}, pain: p.pain ?? {} });
+      paint(fig.meshes, { mode: p.mode ?? "strain", strain: p.strain ?? {}, pain: p.pain ?? {}, jersey: gearNow?.jersey });
     },
     pick(x, y) {
       const r = canvas.getBoundingClientRect();
@@ -482,7 +550,7 @@ let shared: { renderer: THREE.WebGLRenderer; canvas: HTMLCanvasElement } | null 
 const snaps = new Map<string, Promise<string>>();
 
 export function snapshot(o: SceneOpts, px = 192): Promise<string> {
-  const key = JSON.stringify([o.look, o.mood ?? null, o.strain ?? null, o.pain ?? null, o.mode ?? "strain", o.aura ?? 0, o.variant ?? "full", o.view ?? null, Boolean(o.blocks), px]);
+  const key = JSON.stringify([o.look, o.mood ?? null, o.strain ?? null, o.pain ?? null, o.mode ?? "strain", o.aura ?? 0, o.variant ?? "full", o.view ?? null, Boolean(o.blocks), o.gear ?? null, px]);
   const hit = snaps.get(key);
   if (hit) return hit;
   const p = new Promise<string>((resolve) => {

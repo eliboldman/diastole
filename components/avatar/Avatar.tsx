@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { normalizeLook } from "@/lib/avatar/look";
+import { gearOf } from "@/lib/grit/catalog";
 import type { Mood, SceneOpts, Stage } from "@/lib/avatar/mannequin";
 import type { Pain, Spot } from "@/lib/avatar/pain";
 import type { Region, Strain } from "@/lib/avatar/strain";
@@ -212,7 +213,8 @@ function Still({ opts, className, title }: { opts: SceneOpts; className: string;
 }
 
 export default function Avatar({ look, mood = null, strain, pain, mode, aura = 0, badges = [], variant = "full", view, blocks = false, onPick, still = false, className = "", title }: Props) {
-  const opts: SceneOpts = { look: normalizeLook(look), mood, strain, pain, mode, aura, variant, blocks, view };
+  const gear = gearOf(look);
+  const opts: SceneOpts = { look: normalizeLook(look), mood, strain, pain, mode, aura, variant, blocks, view, ...(Object.keys(gear).length ? { gear } : {}) };
   if (variant === "bust" || still) return <Still opts={opts} className={className} title={title} />;
   return (
     <span className="relative inline-flex flex-col items-center">

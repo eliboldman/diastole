@@ -25,17 +25,29 @@ export function weekStreak(starts: string[], tz: string, now = new Date()) {
 export type PlanForStreak = { id: string; date: string; sport: string | null };
 export type ActForStreak = { id: string; start_time: string; sport: string | null; duration_s: number | null; planned_workout_id: string | null };
 
-/** Planned workouts done in a row, newest first. Today's only counts once it's done (it isn't a miss yet). */
-export function planStreak(plans: PlanForStreak[], acts: ActForStreak[], tz: string, today: string) {
+/**
+ * Planned workouts done in a row, newest first. Today's only counts once it's done (it isn't a miss yet).
+ * Excused days (a streak shield, sick/injured mode, a "Life happened" skip) pass without breaking it.
+ */
+export function planStreak(plans: PlanForStreak[], acts: ActForStreak[], tz: string, today: string, excused: Set<string> = new Set()) {
+  return planStreakDetail(plans, acts, tz, today, excused).n;
+}
+
+/** The streak, plus the missed day that ended it (what a streak shield could cover). */
+export function planStreakDetail(plans: PlanForStreak[], acts: ActForStreak[], tz: string, today: string, excused: Set<string> = new Set()) {
   const days = acts.map((a) => ({ ...a, day: localDay(a.start_time, tz), fam: family(a.sport) }));
   const done = (p: PlanForStreak) => days.some((a) => a.planned_workout_id === p.id || (a.day === p.date && a.fam === family(p.sport)));
   let n = 0;
+  let brokeOn: string | null = null;
   for (const p of [...plans].filter((p) => p.date <= today).sort((a, b) => b.date.localeCompare(a.date))) {
     if (done(p)) n++;
-    else if (p.date === today) continue;
-    else break;
+    else if (p.date === today || excused.has(p.date)) continue;
+    else {
+      brokeOn = p.date;
+      break;
+    }
   }
-  return n;
+  return { n, brokeOn };
 }
 
 /** Workouts (10+ min) in a row with a check-in. The last day's workouts get a grace period. */

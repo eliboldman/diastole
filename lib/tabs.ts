@@ -8,7 +8,7 @@ export type TabDef = { id: string; label: string; href: string; match?: string }
 // match: other paths that light the tab up (a RegExp source).
 export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
   athlete: [
-    { id: "me", label: "Me", href: "/me", match: "^/me$|^/me/(story|setup)|^/(account|connect|races)(/|$)" },
+    { id: "me", label: "Me", href: "/me", match: "^/me$|^/me/(story|setup|grit)|^/(account|connect|races)(/|$)" },
     { id: "pods", label: "Pods", href: "/me/pods" },
     { id: "training", label: "Training", href: "/training", match: "^/(calendar|activity)(/|$)" },
     { id: "fuel", label: "Fuel", href: "/fuel" },

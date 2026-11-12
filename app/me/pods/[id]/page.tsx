@@ -14,6 +14,7 @@ import Link from "next/link";
 import RememberPod from "@/components/RememberPod";
 import CampList from "@/components/camp/CampList";
 import { getPodCamps } from "@/lib/camp/data";
+import PodBoosts from "@/components/grit/PodBoosts";
 
 export default async function AthletePodPage({
   params,
@@ -40,10 +41,14 @@ export default async function AthletePodPage({
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
   const camps = view === "challenges" ? await getPodCamps(supabase, id, me.id, today) : [];
   // Avatars the viewer may see (row-level security leaves out anyone else).
-  const [{ data: avatars }, { data: mine }] = await Promise.all([
+  const [{ data: avatars }, { data: mine }, { data: boostRows }, { data: boostItem }] = await Promise.all([
     supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) }),
     supabase.from("profiles").select("share_workout_details").eq("id", me.id).maybeSingle(),
+    supabase.from("pod_boosts").select("id, from_id, to_id, created_at").eq("pod_id", id).gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(20),
+    supabase.from("grit_items").select("qty").eq("athlete_id", me.id).eq("item_id", "ability:boost").maybeSingle(),
   ]);
+  const firstOf = (pid: string) => feed.members.find((m) => m.id === pid)?.name.split(" ")[0] ?? "Coach";
+  const boosts = (boostRows ?? []).map((b) => ({ id: b.id, to_id: b.to_id, from_name: b.from_id === me.id ? "You" : firstOf(b.from_id), to_name: firstOf(b.to_id) }));
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
@@ -55,6 +60,7 @@ export default async function AthletePodPage({
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{feed.pod.name}</h1>
         <LeavePod podId={id} name={feed.pod.name} />
       </div>
+      <PodBoosts podId={id} boosts={boosts} members={feed.members.map((m) => ({ id: m.id, name: m.name }))} meId={me.id} owned={boostItem?.qty ?? 0} />
       <div className="mt-6">
         <PodTabs base={`/me/pods/${id}`} view={view} />
       </div>

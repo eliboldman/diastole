@@ -3,7 +3,8 @@
 import { cookies } from "next/headers";
 
 import { asLook, LOOK_COOKIE, lookCookie } from "@/lib/appearance";
-import { asTheme, THEME_COOKIE } from "@/lib/themes";
+import { ownedThemes } from "@/lib/grit/data";
+import { asTheme, THEME_COOKIE, THEMES } from "@/lib/themes";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 const YEAR = 60 * 60 * 24 * 400;
@@ -17,6 +18,8 @@ export async function setTheme(theme: string) {
 export async function saveAppearance(theme: string, look: unknown) {
   const me = await requireUser();
   const t = asTheme(theme);
+  // Grit store themes: only once owned.
+  if (THEMES.some((x) => x.id === t && "store" in x) && !(await ownedThemes(me.id)).includes(t)) return { ok: false as const };
   const l = look === undefined ? undefined : asLook(look);
   const supabase = await createClient();
   const { error } = await supabase

@@ -12,6 +12,7 @@ import { clock, distance, speedText, sportLabel, whole, type Units } from "@/lib
 import { swimDist, swimPace, swimPool } from "@/lib/activity/swim";
 import { FEED_PAGE, type FeedComment, type FeedItem } from "@/lib/pod-feed-types";
 import { deleteComment, hideOneProp, loadPodActivities, sendComment } from "@/lib/pod-props-actions";
+import StickerGlyph from "@/components/grit/StickerGlyph";
 import { ALL_STICKERS, NOTE_MAX, sportGroup, type SportGroup } from "@/lib/pod-stickers";
 import { PR_LABEL } from "@/lib/avatar/pr-labels";
 import Link from "next/link";
@@ -180,7 +181,7 @@ function Comments({
               <li key={c.id} className={`row-in group flex items-start gap-2 text-sm ${c.hidden ? "opacity-45" : ""} ${c.pending ? "opacity-70" : ""}`}>
                 <span className="min-w-0 flex-1 break-words">
                   <span className="font-medium text-white/90">{c.from_me ? "You" : c.from_name}</span>{" "}
-                  {sticker && <span aria-label={sticker.label}>{sticker.emoji} </span>}
+                  {sticker && <span aria-label={sticker.label}><StickerGlyph s={sticker} /> </span>}
                   <span className="text-white/75">{c.note}</span>
                   <span className="ml-2 text-xs text-white/35">{c.pending ? "sending…" : ago(c.created_at)}</span>
                 </span>

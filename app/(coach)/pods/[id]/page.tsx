@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import PodBoosts from "@/components/grit/PodBoosts";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PodActivityFeed from "@/components/PodActivityFeed";
@@ -38,13 +39,19 @@ export default async function CoachPodFeedPage({
   const [camps, { data: templates }] =
     view === "challenges" ? await Promise.all([getPodCamps(supabase, id, coach.id, today), supabase.from("plan_templates").select("id, name, weeks").lte("weeks", 4).order("name")]) : [[], { data: [] }];
   // Avatars the viewer may see (row-level security leaves out anyone else).
-  const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) });
+  const [{ data: avatars }, { data: boostRows }] = await Promise.all([
+    supabase.rpc("get_avatars", { p_ids: feed.members.map((m) => m.id) }),
+    supabase.from("pod_boosts").select("id, from_id, to_id").eq("pod_id", id).gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(20),
+  ]);
+  const firstOf = (pid: string) => feed.members.find((m) => m.id === pid)?.name.split(" ")[0] ?? "You";
+  const boosts = (boostRows ?? []).map((b) => ({ id: b.id, to_id: b.to_id, from_name: firstOf(b.from_id), to_name: firstOf(b.to_id) }));
 
   return (
     <DashboardShell>
       <BackLink href="/pods" label="Pods" />
       <h1 className="mt-4 text-4xl font-bold tracking-tight">{feed.pod.name}</h1>
       <p className="mt-2 text-sm text-white/55">This is what members who have accepted see of each other.</p>
+      <PodBoosts podId={id} boosts={boosts} members={[]} meId={coach.id} owned={0} />
       <div className="mt-6">
         <PodTabs base={`/pods/${id}`} view={view} />
       </div>

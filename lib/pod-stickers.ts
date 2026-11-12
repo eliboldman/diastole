@@ -2,7 +2,7 @@
 // Secret stickers only appear when the recipient's own numbers earn them.
 
 export type Tone = "props" | "heckle";
-export type Sticker = { key: string; emoji: string; label: string; tone: Tone; line?: string; secret?: boolean };
+export type Sticker = { key: string; emoji: string; label: string; tone: Tone; line?: string; secret?: boolean; art?: boolean };
 
 export type MemberData = {
   readiness: { overall: string } | null;
@@ -105,8 +105,23 @@ const SECRETS: Record<string, Sticker> = Object.fromEntries(
   ).map(([key, emoji, label, tone]) => [key, { key, emoji, label, tone, secret: true }]),
 );
 
+// Grit store stickers: drawn art (components/grit/Art.tsx); the emoji is only for plain-text spots
+// like push notifications. Only owners can send them (checked by the database too).
+export const STORE_STICKERS: Sticker[] = (
+  [
+    ["g_sprout", "🌱", "Little sprout"],
+    ["g_pulse", "💚", "Steady pulse"],
+    ["g_wave", "🌊", "Good wave"],
+    ["g_pebble", "🪨", "Pebble power"],
+    ["g_spark", "⚡", "Spark plug"],
+    ["g_comet", "☄️", "Comet tail"],
+    ["g_aurora", "🌌", "Northern lights"],
+    ["g_laurel", "🏅", "Laurels"],
+  ] as const
+).map(([key, emoji, label]) => ({ key, emoji, label, tone: "props" as const, art: true }));
+
 export const ALL_STICKERS: Record<string, Sticker> = {
-  ...Object.fromEntries([...ALWAYS, ...Object.values(SPORT).flat()].map((s) => [s.key, s])),
+  ...Object.fromEntries([...ALWAYS, ...Object.values(SPORT).flat(), ...STORE_STICKERS].map((s) => [s.key, s])),
   ...SECRETS,
 };
 export const isSticker = (key: string) => key in ALL_STICKERS;

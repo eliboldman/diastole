@@ -823,8 +823,12 @@ body {
 :root[data-theme="sunset"] { --accent-h: 55; --accent-c: 0.145; }
 :root[data-theme="rose"] { --accent-h: 350; }
 :root[data-theme="gold"] { --accent-h: 88; --accent-c: 0.155; }
+/* Grit store themes */
+:root[data-theme="lagoon"] { --accent-h: 185; --accent-c: 0.12; }
+:root[data-theme="ember"] { --accent-h: 45; --accent-c: 0.15; }
+:root[data-theme="aurora"] { --accent-h: 162; --accent-c: 0.14; }
 :root[data-theme="custom"] { --accent-h: var(--custom-h, 165); }
-:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"]) {
+:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"], [data-theme="lagoon"], [data-theme="ember"], [data-theme="aurora"]) {
   --color-emerald-50: oklch(97.5% 0.02 var(--accent-h, 165));
   --color-emerald-100: oklch(95% 0.045 var(--accent-h, 165));
   --color-emerald-200: oklch(90% calc(var(--accent-c, 0.13) * 0.65) var(--accent-h, 165));
@@ -833,8 +837,12 @@ body {
   --color-emerald-950: oklch(28% 0.07 var(--accent-h, 165));
   --color-canvas: oklch(17.5% 0.014 var(--accent-h, 165));
 }
-:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"]) .app-canvas {
+:root:is([data-theme="custom"], [data-theme="sunset"], [data-theme="rose"], [data-theme="gold"], [data-theme="lagoon"], [data-theme="ember"]) .app-canvas {
   background-image: radial-gradient(1100px 520px at 50% -8%, color-mix(in oklab, var(--color-emerald-300) 12%, transparent), transparent 70%);
+}
+:root[data-theme="aurora"] { --color-canvas: oklch(16.5% 0.03 285); }
+:root[data-theme="aurora"] .app-canvas {
+  background-image: radial-gradient(900px 420px at 20% -10%, rgba(110, 231, 183, 0.16), transparent 70%), radial-gradient(900px 480px at 85% -5%, rgba(167, 139, 250, 0.16), transparent 70%);
 }
 
 /* Cards follow the background: a little lighter than the canvas. Diastole's own pair stays as designed. */
@@ -962,4 +970,48 @@ body {
 }
 @media print {
   body[data-printing="pack"] section:not(#packing):not(#packing section) { display: none !important; }
+}
+
+/* ---------------------------------------------------------------- Grit
+   Earned: the chip bounces, a "+N" floats up, and a few shards fly off. */
+@keyframes gritBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.18); }
+  55% { transform: scale(0.94); }
+  80% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes gritFloat {
+  0% { transform: translate(-50%, 6px) scale(0.6); opacity: 0; }
+  20% { transform: translate(-50%, -4px) scale(1.1); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(-50%, -34px) scale(1); opacity: 0; }
+}
+@keyframes gritShard {
+  0% { transform: translate(0, 0) rotate(0) scale(0.4); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1); opacity: 0; }
+}
+@keyframes gritShine {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(220%) skewX(-20deg); }
+}
+.grit-bounce { animation: gritBounce 700ms var(--ease-soft) both; }
+.grit-float { animation: gritFloat 1600ms var(--ease-soft) both; }
+.grit-shard { animation: gritShard 900ms cubic-bezier(.2,.7,.3,1) both; }
+.grit-shine::after {
+  content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  animation: gritShine 900ms ease-out 200ms both;
+}
+@keyframes confettiFall {
+  0% { transform: translate(0, -10vh) rotate(0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(var(--dx), 105vh) rotate(var(--r)); opacity: 0.9; }
+}
+.confetti-bit { animation: confettiFall var(--t, 3.2s) cubic-bezier(.25,.6,.4,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .grit-bounce, .grit-float, .grit-shard, .confetti-bit { animation: none; }
+  .grit-float, .grit-shard, .confetti-bit { display: none; }
+  .grit-shine::after { animation: none; display: none; }
 }

@@ -173,11 +173,26 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
             FuelShare.save(snapshot)
             return
         }
+        if type == "haptic" {
+            Haptics.play(body["style"] as? String)
+            return
+        }
         if type == "shareImage", let b64 = body["data"] as? String {
             ShareSheet.present(base64PNG: b64)
             return
         }
         HealthSync.shared.handle(type)
+    }
+}
+
+/// A little tap from the page (grit earned, a purchase): success, light or rigid.
+enum Haptics {
+    static func play(_ style: String?) {
+        switch style {
+        case "success": UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "rigid": UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        default: UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
     }
 }
 

@@ -54,7 +54,7 @@ const Group = ({ title, children }: { title: string; children: ReactNode }) => (
 );
 
 /** Color theme plus background, glow, text size, corners, spacing and motion. Changes show right away and save on their own. */
-export default function AppearanceSettings({ initialTheme, initialLook, unlock }: { initialTheme: ThemeId; initialLook: Look; unlock?: string }) {
+export default function AppearanceSettings({ initialTheme, initialLook, unlock, owned = [] }: { initialTheme: ThemeId; initialLook: Look; unlock?: string; owned?: string[] }) {
   const [theme, setThemeState] = useState<ThemeId>(initialTheme);
   const [look, setLook] = useState<Look>(initialLook);
   const [found, setFound] = useState(initialTheme === "blocks");
@@ -162,7 +162,7 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
 
       <Group title="Color">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEMES.filter((t) => !("hidden" in t) || (t.id === "blocks" ? found : icarus)).map((t) => (
+          {THEMES.filter((t) => ("store" in t ? owned.includes(t.id) : !("hidden" in t) || (t.id === "blocks" ? found : icarus))).map((t) => (
             <button
               key={t.id}
               type="button"
@@ -194,7 +194,7 @@ export default function AppearanceSettings({ initialTheme, initialLook, unlock }
             <span className="mt-1 block text-xs text-white/50">Slide to pick any color.</span>
           </label>
         )}
-        <p className="mt-2 text-xs text-white/45">Readiness colors (green, yellow, red) stay the same in every theme.</p>
+        <p className="mt-2 text-xs text-white/45">Readiness colors (green, yellow, red) stay the same in every theme. More themes are in the Grit store.</p>
       </Group>
 
       <Group title="Background">
