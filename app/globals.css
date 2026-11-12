@@ -1032,3 +1032,11 @@ body {
 .mystery-open .mystery-letter { animation: letterRise 700ms var(--ease-soft) 150ms both; }
 .mystery-open { position: relative; }
 @media (prefers-reduced-motion: reduce) { .mystery-open .mystery-letter { animation: none; } }
+
+/* ---------------------------------------------------------------- Pod campfire */
+.campfire-night { background: radial-gradient(120% 80% at 50% 0%, rgba(251, 191, 36, 0.10), transparent 60%), linear-gradient(180deg, #120d1c, #0b0a12); }
+@keyframes flicker { 0%, 100% { transform: scale(1) skewX(0); } 25% { transform: scale(1.03, 0.97) skewX(1.5deg); } 50% { transform: scale(0.98, 1.04) skewX(-1deg); } 75% { transform: scale(1.02, 0.99) skewX(1deg); } }
+.fire-flicker > * { animation: flicker 1.8s ease-in-out infinite; transform-origin: 100px 132px; }
+@keyframes ember { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--dx), -50px); opacity: 0; } }
+.ember { animation: ember 2.7s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .fire-flicker > *, .ember { animation: none; } .ember { display: none; } }

@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { processAllBatons } from "@/lib/baton/run";
+import { lightCampfires } from "@/lib/campfire/data";
 import { runEvening } from "@/lib/evening";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
   const result = await runEvening().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Pod batons get a second look each day, so passes and nudges keep up across time zones.
   const batons = await processAllBatons(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
-  console.info("Evening run", result, batons);
-  return NextResponse.json({ ok: true, result, batons });
+  // Sunday evenings: light each pod's campfire.
+  const campfires = await lightCampfires(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+  console.info("Evening run", result, batons, campfires);
+  return NextResponse.json({ ok: true, result, batons, campfires });
 }

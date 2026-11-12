@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import PodBoosts from "@/components/grit/PodBoosts";
+import Campfire from "@/components/campfire/Campfire";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PodActivityFeed from "@/components/PodActivityFeed";
@@ -52,6 +53,7 @@ export default async function CoachPodFeedPage({
       <h1 className="mt-4 text-4xl font-bold tracking-tight">{feed.pod.name}</h1>
       <p className="mt-2 text-sm text-white/55">This is what members who have accepted see of each other.</p>
       <PodBoosts podId={id} boosts={boosts} members={[]} meId={coach.id} owned={0} />
+      <Campfire podId={id} meId={coach.id} coach names={{ ...Object.fromEntries(feed.members.map((m) => [m.id, m.name.split(" ")[0]])), [coach.id]: (coach.full_name || "Coach").split(" ")[0] }} members={feed.members.length} />
       <div className="mt-6">
         <PodTabs base={`/pods/${id}`} view={view} />
       </div>

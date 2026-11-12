@@ -9,6 +9,7 @@ export const TIPS = {
   gear: { id: "tip:gear", title: "Keep your shoe miles right", body: "One tap tells Diastole which pair (or bike) you used, so you know when they're worn." },
   changeOfPlans: { id: "tip:change-of-plans", title: "Plans changed? Just say it.", body: "Type something like “easy long run instead of the bike today” and approve the swap in one tap." },
   myWorkouts: { id: "tip:my-workouts", title: "Build your own sessions", body: "Make workouts or import a set, then ask your coach to add one to your calendar." },
+  campfire: { id: "tip:campfire", title: "Sunday campfire", body: "Every Sunday evening the pod gathers here. Add one highlight and one struggle from your week, in words, a voice note or a photo. It closes Monday morning." },
   baton: { id: "tip:baton", title: "Pass the baton", body: "Opt in and an invisible baton travels around the pod: each workout you finish hands it to the next person. Rest days pass it on without breaking the chain." },
   quests: { id: "tip:quests", title: "Rest day, with a few side quests", body: "Small, optional ways to recover: a walk, an early night, time with friends. Each earns grit. Skip them and nothing happens." },
   grit: { id: "tip:grit", title: "You've been earning grit", body: "Sessions, check-ins and smart rest days earn grit, and a planned session on a rough-readiness day earns extra. Spend it on stickers, avatar gear and themes. It can't be bought and never changes your training." },

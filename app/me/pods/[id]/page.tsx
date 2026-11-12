@@ -16,6 +16,7 @@ import CampList from "@/components/camp/CampList";
 import { getPodCamps } from "@/lib/camp/data";
 import PodBoosts from "@/components/grit/PodBoosts";
 import PodBaton from "@/components/baton/PodBaton";
+import Campfire from "@/components/campfire/Campfire";
 import { TIPS } from "@/lib/discovery";
 
 export default async function AthletePodPage({
@@ -85,6 +86,7 @@ export default async function AthletePodPage({
           </>
         ) : (
           <>
+          <Campfire podId={id} meId={me.id} coach={false} names={Object.fromEntries(feed.members.map((m) => [m.id, m.name.split(" ")[0]]))} members={feed.members.length} tipSeen={seenTips.includes(TIPS.campfire.id)} />
           <PodBaton podId={id} meId={me.id} names={Object.fromEntries(feed.members.map((m) => [m.id, m.name.split(" ")[0]]))} tipSeen={seenTips.includes(TIPS.baton.id)} />
           <PodFeed feed={feed} timeZone={me.timezone} units={me.units} props={props as PodPropsData | null} avatars={(avatars ?? {}) as Record<string, unknown>} streaks={(streaks ?? {}) as Record<string, number>} />
           </>
