@@ -37,8 +37,12 @@ struct RootView: View {
             if let href = DeepLink.href(for: url) { PushCenter.shared.open(href) }
         }
         .onChange(of: session.state, initial: true) { _, state in
-            if case .signedIn = state { PushCenter.shared.signedInChanged(true) } else if state == .signedOut {
+            if case .signedIn = state {
+                PushCenter.shared.signedInChanged(true)
+                WatchLink.shared.start()
+            } else if state == .signedOut {
                 PushCenter.shared.signedInChanged(false)
+                WatchLink.shared.signedOut()
                 HealthSync.shared.signedOut()
                 BedtimeNudges.shared.signedOut()
             }
