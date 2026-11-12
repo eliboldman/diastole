@@ -1311,5 +1311,33 @@ check("a coach reply notifies the athlete", (await db.query(`select id from publ
   check("nudge log is server-only", r.rows?.length === 0);
 }
 
+// Dietitian workout alerts.
+{
+  const D1 = "00000000-0000-0000-0000-0000000000d1";
+  const D2 = "00000000-0000-0000-0000-0000000000d2";
+  const act = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A2}', 'garmin', 'nudge-staff', 'running', now() - interval '70 minutes', 3600) returning id`)).rows[0].id;
+  r = await as(D1, `select public.notify_refuel_staff('${A2}', '${act}', 't', 'b')`);
+  check("dietitians can't trigger workout alerts", !!r.error);
+  await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+  // D1 limited to A1 only; D2 sees all.
+  await db.query(`update public.profiles set dietitian_all = false where id = '${D1}'`);
+  await db.query(`delete from public.dietitian_athletes where dietitian_id = '${D1}'`);
+  await db.query(`insert into public.dietitian_athletes (dietitian_id, athlete_id) values ('${D1}', '${A1}')`);
+  const n = (await db.query(`select public.notify_refuel_staff('${A2}', '${act}', 'Ana finished a run', 'Protein: nothing logged yet.') as n`)).rows[0].n;
+  check("alert goes only to dietitians who can see the athlete", n === 1);
+  r = await as(D2, `select kind, href from public.notifications where kind = 'refuel_staff'`);
+  check("dietitian with access gets it, linking to the refuel section", r.rows?.length === 1 && r.rows[0].href === `/nutrition/${A2}#refuel`);
+  r = await as(D1, `select * from public.notifications where kind = 'refuel_staff'`);
+  check("dietitian without access gets nothing", r.rows?.length === 0);
+  r = await as(COACH, `select * from public.notifications where kind = 'refuel_staff'`);
+  check("coach doesn't get dietitian alerts", r.rows?.length === 0);
+  await db.query(`update public.profiles set notify_prefs = '{"fuel": false}' where id = '${D2}'`);
+  await db.query(`delete from public.notifications where kind = 'refuel_staff'`);
+  await db.query(`select public.notify_refuel_staff('${A2}', '${act}', 'x', 'y')`);
+  check("dietitian who turned alerts off gets nothing", (await db.query(`select count(*)::int as n from public.notifications where kind = 'refuel_staff'`)).rows[0].n === 0);
+  await db.query(`insert into public.refuel_nudges (activity_id, athlete_id, outcome) values ('${act}', '${A2}', 'quiet')`);
+  check("'quiet' outcome is allowed", true);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

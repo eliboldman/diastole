@@ -42,3 +42,4 @@ for (const id of ["quack", "heartbeat", "chime", "pop", "tone", "tick"]) {
 }
 console.log("push sounds: all passed");
 assert.equal(groupOf("refuel", {}), "fuel");
+assert.equal(groupOf("refuel_staff", {}), "fuel");

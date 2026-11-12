@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 async function run() {
   const result = await runProteinNudges().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
-  if (result.status !== "ok" || ("sent" in result && (result.sent || result.ate))) console.info("Protein nudges", result);
+  if (result.status !== "ok" || ("sent" in result && (result.sent || result.ate || result.staff))) console.info("Protein nudges", result);
   return NextResponse.json({ ok: result.status === "ok" });
 }
 

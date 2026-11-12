@@ -46,3 +46,22 @@ for (let i = 0; i < 200; i++) {
   }
 }
 console.log("protein-nudge: all checks pass");
+
+// Dietitian alert.
+{
+  const { staffMessage, proteinSince } = await import("./protein-nudge.ts");
+  const nowS = Date.parse("2026-11-12T14:36:00Z");
+  const none = staffMessage(act(), "Walker", "mi", [], nowS, "sent");
+  assert.equal(none.title, "Walker finished a run");
+  assert.ok(none.body.startsWith("7.5 mi · 60 min, ended 36 min ago."), none.body);
+  assert.ok(none.body.includes("nothing logged yet. They've been reminded"));
+  const ate = staffMessage(act(), "Walker", "mi", [{ eaten_at: "2026-11-12T14:12:00Z", protein_g: 25 }, { eaten_at: "2026-11-12T14:20:00Z", protein_g: 6 }], nowS, "sent");
+  assert.ok(ate.body.endsWith("Protein: 31 g logged since, first 12 min after finishing."), ate.body);
+  const little = staffMessage(act(), "Walker", "km", [{ eaten_at: "2026-11-12T14:12:00Z", protein_g: 3 }], nowS, "off");
+  assert.ok(little.body.startsWith("12 km") && little.body.endsWith("only 3 g logged since."), little.body);
+  const off = staffMessage(act({ sport: "strength_training", distance_m: null }), "Walker", "mi", [], nowS, "off");
+  assert.equal(off.title, "Walker finished a strength session");
+  assert.ok(off.body.startsWith("60 min, ended") && off.body.includes("turned off"), off.body);
+  assert.deepEqual(proteinSince(act(), [{ eaten_at: "2026-11-12T12:00:00Z", protein_g: 40 }], nowS), { grams: 0, firstMin: null }, "pre-workout meal not counted");
+  console.log("protein-nudge staff: all checks pass");
+}

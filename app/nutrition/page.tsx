@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 import DashboardShell from "@/components/layout/DashboardShell";
+import WorkoutAlerts from "@/components/nutrition/WorkoutAlerts";
 import { getNutritionGoals, getNutritionReview, getRefuel } from "@/lib/fuel/data";
 import { createClient, requireStaff } from "@/lib/supabase/server";
 
@@ -19,6 +20,8 @@ export default async function NutritionPage() {
   const { data: athletes } = teamCoach
     ? await supabase.from("profiles").select("id, full_name, email, timezone").eq("coach_id", teamCoach).eq("is_test", false).order("full_name")
     : { data: [] };
+
+  const { data: mine } = me.role === "dietitian" ? await supabase.from("profiles").select("notify_prefs").eq("id", me.id).maybeSingle() : { data: null };
 
   const rows = await Promise.all(
     (athletes ?? []).map(async (a) => {
@@ -52,6 +55,7 @@ export default async function NutritionPage() {
       <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/55">
         The last 7 finished days for each athlete: how many days they logged, and on logged days how often they reached the low end of their targets. Open an athlete to see every day and meal, and to set their goals.
       </p>
+      {me.role === "dietitian" && <WorkoutAlerts initial={(mine?.notify_prefs ?? {}) as Record<string, boolean>} />}
 
       {!rows.length ? (
         <div className="mt-10">

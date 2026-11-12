@@ -93,7 +93,7 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
       </section>
 
       {/* Post-workout refuel */}
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+      <section id="refuel" className="scroll-mt-24 mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
         <h2 className="text-lg font-medium">Refuel after workouts</h2>
         <p className="mt-1 text-sm text-white/55">
           The first food eaten after each session of 20+ minutes. Times are when the athlete says they ate it; if they logged it later without changing the time, it shows when it was logged.

@@ -137,3 +137,37 @@ export function nudgeMessage(a: NudgeActivity, units: "mi" | "km"): { title: str
   const line = pick(pool, a.id, 7).replaceAll("{d}", d).replaceAll("{t}", t);
   return { title: pick(TITLES, a.id, 3), body: `${line} ${PROTEIN_LINE}` };
 }
+
+/** Protein logged since the workout ended (same window as decideNudge): total grams and minutes to the first. */
+export function proteinSince(a: NudgeActivity, meals: NudgeMeal[], nowMs: number): { grams: number; firstMin: number | null } {
+  const endMs = endOf(a);
+  const hits = meals
+    .filter((m) => m.protein_g > 0 && Date.parse(m.eaten_at) >= endMs - NUDGE.earlyMin * MIN && Date.parse(m.eaten_at) <= nowMs)
+    .sort((x, y) => Date.parse(x.eaten_at) - Date.parse(y.eaten_at));
+  const grams = Math.round(hits.reduce((t, m) => t + m.protein_g, 0));
+  const first = hits.find((m) => m.protein_g >= NUDGE.proteinG);
+  return { grams, firstMin: first ? Math.max(0, Math.round((Date.parse(first.eaten_at) - endMs) / MIN)) : null };
+}
+
+const NOUN: Record<Kind, string> = { run: "run", bike: "ride", swim: "swim", strength: "strength session", other: "workout" };
+
+/**
+ * For the athlete's dietitians: what they did, and whether protein has been logged since.
+ * reminder: "sent" (the athlete just got the 30 g nudge) or "off" (they turned their reminder off).
+ */
+export function staffMessage(a: NudgeActivity, firstName: string, units: "mi" | "km", meals: NudgeMeal[], nowMs: number, reminder: "sent" | "off"): { title: string; body: string } {
+  const kind = kindOf(a.sport);
+  const secs = a.duration_s ?? 0;
+  const t = duration(secs).replace(" minutes", " min");
+  const d = distance(kind, a.distance_m, units);
+  const ago = Math.max(0, Math.round((nowMs - endOf(a)) / MIN));
+  const p = proteinSince(a, meals, nowMs);
+  let protein: string;
+  if (p.firstMin !== null) protein = `Protein: ${p.grams} g logged since, first ${p.firstMin} min after finishing.`;
+  else if (p.grams > 0) protein = `Protein: only ${p.grams} g logged since.${reminder === "sent" ? " They've been reminded to get about 30 g." : ""}`;
+  else protein = reminder === "sent" ? "Protein: nothing logged yet. They've been reminded to get about 30 g in the next 30 min." : "Protein: nothing logged yet (their own reminder is turned off).";
+  return {
+    title: `${firstName} finished a ${NOUN[kind]}`,
+    body: `${d ? `${d} · ` : ""}${t}, ended ${ago} min ago. ${protein}`,
+  };
+}

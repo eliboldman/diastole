@@ -39,7 +39,7 @@ export function groupOf(kind: string, meta: Record<string, unknown> | null): Pus
   if (kind === "pod_invite" || kind === "pod_answer" || kind === "pod_challenge") return "pods";
   if (["ai_suggestion", "form_insight", "athlete_joined", "checkin_pain", "briefs_ready", "safety_note", "zones_updated", "weekly_digest", "monthly_digest", "workout_request", "plan_change", "zone_suggestion", "session_missed"].includes(kind)) return "coaching";
   if (kind === "bedtime_recap") return "sleep";
-  if (kind === "refuel") return "fuel";
+  if (kind === "refuel" || kind === "refuel_staff") return "fuel";
   if (kind.startsWith("workout_")) return "workouts";
   return null;
 }
