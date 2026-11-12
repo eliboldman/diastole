@@ -98,7 +98,9 @@ export function sessionAwards(input: EarnInput): Award[] {
 }
 
 export function checkinAwards(input: EarnInput): Award[] {
-  return input.checkins.filter((c) => c.rpe != null || Object.keys(c.pain ?? {}).length > 0).map((c) => ({ kind: "checkin", ref: c.activity_id, amount: CHECKIN_GRIT, reason: "Workout check-in" }));
+  return input.checkins
+    .filter((c) => c.rpe != null || Object.keys(c.pain ?? {}).length > 0)
+    .map((c) => ({ kind: "checkin", ref: c.activity_id, amount: CHECKIN_GRIT, reason: "Workout check-in", detail: { day: localDay(c.created_at || new Date().toISOString(), input.tz) } }));
 }
 
 /** Backing off on a yellow or red readiness day (one a day): a smart call. Sick/injured mode earns nothing and costs nothing. */
@@ -109,7 +111,7 @@ export function smartRestAwards(input: EarnInput): Award[] {
     const flag = dayFlag(input.readiness[b.date]);
     if ((flag === "yellow" || flag === "red") && !days.has(b.date)) {
       days.add(b.date);
-      out.push({ kind: "smart_rest", ref: `day:${b.date}`, amount: SMART_REST_GRIT, reason: "Smart call: eased off on a low-readiness day" });
+      out.push({ kind: "smart_rest", ref: `day:${b.date}`, amount: SMART_REST_GRIT, reason: "Smart call: eased off on a low-readiness day", detail: { day: b.date } });
     }
   }
   return out;
@@ -123,7 +125,7 @@ export function allAwards(input: EarnInput): Award[] {
 export const CAMP_GRIT = 50;
 export function campAward(camp: { id: string; title: string; goal_value: number; ends_on: string }, total: number, tookPart: boolean, today: string): Award | null {
   if (!tookPart || today <= camp.ends_on || total < camp.goal_value) return null;
-  return { kind: "camp", ref: camp.id, amount: CAMP_GRIT, reason: `Camp goal: ${camp.title}`.slice(0, 120) };
+  return { kind: "camp", ref: camp.id, amount: CAMP_GRIT, reason: `Camp goal: ${camp.title}`.slice(0, 120), detail: { day: camp.ends_on } };
 }
 
 export const balanceOf = (rows: { amount: number }[]) => rows.reduce((s, r) => s + r.amount, 0);

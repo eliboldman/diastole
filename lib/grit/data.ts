@@ -12,7 +12,9 @@ export async function getGrit(supabase: SupabaseClient, athleteId: string, seenA
     supabase.from("grit_ledger").select("id, amount, kind, reason, detail, created_at").eq("athlete_id", athleteId).order("created_at", { ascending: false }).limit(5000),
     supabase.from("grit_items").select("item_id, qty").eq("athlete_id", athleteId),
   ]);
-  const rows = (all ?? []) as LedgerRow[];
+  // Newest first by the day it was earned (a session's own date), not when it was paid out.
+  const dayOf = (r: LedgerRow) => (typeof r.detail?.day === "string" ? r.detail.day : r.created_at.slice(0, 10));
+  const rows = ((all ?? []) as LedgerRow[]).sort((a, b) => dayOf(b).localeCompare(dayOf(a)) || b.created_at.localeCompare(a.created_at) || b.id - a.id);
   const balance = rows.reduce((s, r) => s + r.amount, 0);
   const fresh = rows.filter((r) => r.amount > 0 && (!seenAt || r.created_at > seenAt));
   return { balance, history: rows.slice(0, historyLimit), owned: Object.fromEntries((items ?? []).map((i) => [i.item_id, i.qty])), fresh };

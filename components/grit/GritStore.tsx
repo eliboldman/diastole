@@ -88,7 +88,7 @@ export default function GritStore({ balance, owned, gear, look }: { balance: num
 
       {isGear(tab) && (
         <div className="row-in mt-4 flex items-center gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-          <Avatar look={previewLook} variant="full" aura={0} className="h-44 w-28 shrink-0" title="Your avatar with this gear" />
+          <Avatar look={previewLook} variant="full" aura={0} className="h-60 w-36 shrink-0 sm:h-72 sm:w-44" title="Your avatar with this gear" />
           <div className="min-w-0 text-sm text-white/60">
             <p className="font-medium text-white">Try it on</p>
             <p className="mt-1">Tap any {SHORT[tab].toLowerCase().replace(/s$/, "")} to see it on you. Your pods see what you wear.</p>
@@ -122,9 +122,9 @@ export default function GritStore({ balance, owned, gear, look }: { balance: num
                 onClick={() => slot && setTrying((g) => ({ ...g, [slot]: keyOf(item.id) }))}
                 disabled={!slot}
                 aria-label={slot ? `Try on ${item.name}` : undefined}
-                className="flex aspect-square items-center justify-center rounded-2xl bg-black/20 disabled:cursor-default"
+                className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-black/20 disabled:cursor-default"
               >
-                <ItemArt item={item} size={64} />
+                <ItemArt item={item} size={84} />
               </button>
               <p className="mt-2 flex items-center gap-1.5 text-sm font-medium">
                 <span className="min-w-0 truncate">{item.name}</span>

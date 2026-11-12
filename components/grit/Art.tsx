@@ -143,7 +143,7 @@ function HelmetArt({ k, size }: { k: string; size: number }) {
   return (
     <S size={size}>
       {h.glow && <ellipse cx="24" cy="26" rx="20" ry="13" fill={h.accent} opacity=".25" />}
-      <path d={shell} fill={h.main} />
+      <path d={shell} fill={h.main} stroke="rgba(255,255,255,.35)" strokeWidth="1" />
       {h.shape === "vented" && [16, 23, 30].map((x) => <path key={x} d={`M${x} 18q1 4 0 9`} stroke={h.accent} strokeWidth="2.6" strokeLinecap="round" fill="none" />)}
       <path d={h.shape === "aero" ? "M9 27c6-9 18-12 30-3" : "M10 27c6-8 22-8 28 0"} stroke={h.accent} strokeWidth="2.4" fill="none" strokeLinecap="round" />
       <path d="M12 33h22" stroke="rgba(255,255,255,.35)" strokeWidth="2" strokeLinecap="round" />

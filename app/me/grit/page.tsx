@@ -32,6 +32,8 @@ export default async function GritPage() {
   ]);
   const grit = await getGrit(supabase, me.id, prof?.grit_seen_at ?? null, 60);
   const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: me.timezone });
+  const earnedOn = (r: { created_at: string; detail: Record<string, unknown> | null }) =>
+    typeof r.detail?.day === "string" ? new Date(`${r.detail.day}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : day(r.created_at);
   const monthAgo = new Date(Date.parse(`${new Date().toLocaleDateString("en-CA", { timeZone: me.timezone })}T12:00:00Z`) - 30 * 86_400_000).toISOString();
   const earned30 = grit.history.filter((r) => r.amount > 0 && r.created_at >= monthAgo).reduce((s, r) => s + r.amount, 0);
 
@@ -72,7 +74,7 @@ export default async function GritPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{r.kind === "purchase" ? `Bought ${ITEM[r.reason ?? ""]?.name ?? "an item"}` : (r.reason ?? KIND_LABEL[r.kind] ?? "Grit")}</span>
                   <span className="block text-xs text-white/50">
-                    {KIND_LABEL[r.kind] ?? r.kind} · {day(r.created_at)}
+                    {KIND_LABEL[r.kind] ?? r.kind} · {earnedOn(r)}
                     {r.detail?.mult && Number(r.detail.mult) > 1 ? " · low-readiness bonus" : ""}
                   </span>
                 </span>
