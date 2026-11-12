@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import GoalsEditor from "@/components/nutrition/GoalsEditor";
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { getFuelMode, getNutritionGoals, getNutritionReview, type ReviewDay } from "@/lib/fuel/data";
+import { getFuelMode, getNutritionGoals, getNutritionReview, getRefuel, type ReviewDay } from "@/lib/fuel/data";
+import type { RefuelRow, RefuelStatus } from "@/lib/fuel/refuel";
 import { PER_KG, type LoggedItem, type Macro, type Range } from "@/lib/fuel/meals";
 import { FUEL_MODES, type FuelDay } from "@/lib/fuel/plan";
 import { createClient, requireStaff } from "@/lib/supabase/server";
@@ -35,10 +36,11 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
   const fromDate = new Date(`${today}T12:00:00Z`);
   fromDate.setUTCDate(fromDate.getUTCDate() - (span - 1));
   const from = fromDate.toISOString().slice(0, 10);
-  const [review, mode, { data: mealRows }] = await Promise.all([
+  const [review, mode, { data: mealRows }, refuel] = await Promise.all([
     getNutritionReview(id, today, tz, span, goals.perKg),
     getFuelMode(id),
     supabase.from("meal_logs").select("id, local_date, eaten_at, label, items, carbs_g, protein_g, fat_g, kcal, note").eq("athlete_id", id).gte("local_date", from).order("eaten_at", { ascending: false }).limit(200),
+    getRefuel(id, from, tz),
   ]);
   const s = review.summary;
   const w = review.weightKg;
@@ -90,6 +92,31 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
         </dl>
       </section>
 
+      {/* Post-workout refuel */}
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
+        <h2 className="text-lg font-medium">Refuel after workouts</h2>
+        <p className="mt-1 text-sm text-white/55">
+          The first food logged after each session of 20+ minutes. Times are when the meal was logged, so a snack eaten on time but logged later shows as late.
+        </p>
+        {refuel.summary.scored > 0 ? (
+          <p className="mt-4 text-2xl font-semibold tabular-nums">
+            {refuel.summary.within60}/{refuel.summary.scored}
+            <span className="ml-2 text-base font-normal text-white/60">
+              sessions refueled within 60 min ({refuel.summary.within30} within 30)
+            </span>
+          </p>
+        ) : (
+          <p className="mt-4 text-sm text-white/55">{refuel.rows.length ? "No sessions on days with meals logged yet." : "No sessions of 20+ minutes recorded in this period."}</p>
+        )}
+        {refuel.rows.length > 0 && (
+          <ul className="mt-4 divide-y divide-white/[0.06] border-t border-white/[0.08] text-sm">
+            {refuel.rows.map((r) => (
+              <RefuelLine key={r.activity.id} r={r} today={today} time={time} />
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Goals */}
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
         <h2 className="text-lg font-medium">Goals</h2>
@@ -114,6 +141,41 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+const REFUEL_BADGE: Record<RefuelStatus, { label: string; tone: string }> = {
+  within30: { label: "Within 30 min", tone: "border-emerald-300/40 text-emerald-200" },
+  within60: { label: "Within 60 min", tone: "border-emerald-300/25 text-emerald-200/80" },
+  late: { label: "Later", tone: "border-amber-300/35 text-amber-200" },
+  none: { label: "Nothing logged after", tone: "border-amber-300/35 text-amber-200" },
+  notLogged: { label: "No meals logged that day", tone: "border-white/15 text-white/50" },
+  pending: { label: "Window still open", tone: "border-sky-300/30 text-sky-200" },
+};
+
+function RefuelLine({ r, today, time }: { r: RefuelRow; today: string; time: (iso: string) => string }) {
+  const b = REFUEL_BADGE[r.status];
+  const mins = Math.round((r.activity.duration_s ?? 0) / 60);
+  const what = r.activity.name || (r.activity.sport ? cap(r.activity.sport.replace(/_/g, " ").toLowerCase()) : "Workout");
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+      <span className="min-w-0 flex-1">
+        <Link href={`/activity/${r.activity.id}`} className="text-white/85 hover:underline">
+          {what}
+        </Link>
+        <span className="block text-white/45">
+          {dayLabel(r.localDate, today)} · {mins} min · finished {time(r.end)}
+        </span>
+      </span>
+      <span className="text-right">
+        <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] ${b.tone}`}>{b.label}</span>
+        {r.meal && (
+          <span className="block text-xs text-white/55">
+            {r.minutes === 0 ? "Right away" : `${r.minutes} min after`}: {r.meal.label || "Meal"} · {Math.round(r.meal.carbs_g)} g carbs, {Math.round(r.meal.protein_g)} g protein
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
 
 function Big({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 import DashboardShell from "@/components/layout/DashboardShell";
-import { getNutritionGoals, getNutritionReview } from "@/lib/fuel/data";
+import { getNutritionGoals, getNutritionReview, getRefuel } from "@/lib/fuel/data";
 import { createClient, requireStaff } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Nutrition · Diastole" };
@@ -25,16 +25,23 @@ export default async function NutritionPage() {
       const tz = a.timezone || "America/Chicago";
       const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
       const goals = await getNutritionGoals(a.id);
-      const review = await getNutritionReview(a.id, today, tz, 8, goals.perKg); // today + 7 finished days
+      const weekAgo = new Date(`${today}T12:00:00Z`);
+      weekAgo.setUTCDate(weekAgo.getUTCDate() - 7);
+      const [review, refuel] = await Promise.all([
+        getNutritionReview(a.id, today, tz, 8, goals.perKg), // today + 7 finished days
+        getRefuel(a.id, weekAgo.toISOString().slice(0, 10), tz),
+      ]);
       const s = review.summary;
       const flags: string[] = [];
       if (!review.weightKg) flags.push("No body weight, so no gram targets");
       if (!s.logged) flags.push("Nothing logged this week");
       else if (s.scored >= 3 && s.reached.kcal / s.scored < 0.5) flags.push("Under energy target most logged days");
       else if (s.scored >= 3 && s.reached.carbs / s.scored < 0.5) flags.push("Under carb target most logged days");
+      const rf = refuel.summary;
+      if (rf.scored >= 3 && rf.within60 / rf.scored < 0.5) flags.push("Often no food logged within an hour of finishing");
       const custom = Object.keys(goals.perKg).length > 0;
       const todayMeals = review.days[0]?.meals ?? 0;
-      return { a, s, flags, custom, todayMeals, note: !!goals.note };
+      return { a, s, rf, flags, custom, todayMeals, note: !!goals.note };
     }),
   );
 
@@ -52,7 +59,7 @@ export default async function NutritionPage() {
         </div>
       ) : (
         <ul className="mt-10 grid gap-3">
-          {rows.map(({ a, s, flags, custom, todayMeals, note }) => (
+          {rows.map(({ a, s, rf, flags, custom, todayMeals, note }) => (
             <li key={a.id}>
               <Link href={`/nutrition/${a.id}`} className="lift flex items-center gap-4 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
                 <div className="min-w-0 flex-1">
@@ -61,11 +68,12 @@ export default async function NutritionPage() {
                     {custom && <span className="rounded-full border border-emerald-300/25 px-2 py-0.5 text-[11px] text-emerald-200/90">Custom goals</span>}
                     {note && <span className="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/60">Note shared</span>}
                   </p>
-                  <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-5">
+                  <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-6">
                     <Stat label="Days logged" value={pct(s.logged, s.days)} />
                     <Stat label="Energy reached" value={pct(s.reached.kcal, s.scored)} />
                     <Stat label="Carbs reached" value={pct(s.reached.carbs, s.scored)} />
                     <Stat label="Protein reached" value={pct(s.reached.protein, s.scored)} />
+                    <Stat label="Refuel ≤60 min" value={pct(rf.within60, rf.scored)} />
                     <Stat label="Meals today" value={String(todayMeals)} />
                   </dl>
                   {flags.length > 0 && <p className="mt-3 text-sm text-amber-200/90">{flags.join(" · ")}</p>}

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cleanPerKg, dailyTargets, hitSummary, signature, slotFor, usualMeals, type HitSummary, type LoggedItem, type PerKg, type Slot, type Targets } from "@/lib/fuel/meals";
+import { refuelRows, refuelSummary, type RefuelRow, type RefuelSummary } from "@/lib/fuel/refuel";
 import { asFuelMode, estimateSession, fuelDay, type FuelDay, type FuelMode, type Session } from "@/lib/fuel/plan";
 import { createClient } from "@/lib/supabase/server";
 import type { Pool, PoolUnit, Step } from "@/lib/workouts/garmin-format";
@@ -200,4 +201,22 @@ export async function getNutritionReview(athleteId: string, today: string, timeZ
   // Today is still in progress: it's shown, but not scored.
   const finished = out.filter((d) => d.date !== today);
   return { weightKg, weightUpdated: body?.updated_at ?? null, days: out.reverse(), summary: hitSummary(finished) };
+}
+
+/** Each session of 20+ min since `from` (local date) and the first intake logged after it. */
+export async function getRefuel(athleteId: string, from: string, timeZone: string): Promise<{ rows: RefuelRow[]; summary: RefuelSummary }> {
+  const supabase = await createClient();
+  const since = `${addDays(from, -1)}T00:00:00Z`;
+  const [{ data: acts }, { data: meals }] = await Promise.all([
+    supabase.from("activities").select("id, sport, name, start_time, duration_s").eq("athlete_id", athleteId).gte("start_time", since).order("start_time", { ascending: false }).limit(200),
+    supabase.from("meal_logs").select("id, eaten_at, local_date, label, carbs_g, protein_g, kcal").eq("athlete_id", athleteId).gte("eaten_at", since).limit(500),
+  ]);
+  const all = refuelRows(
+    acts ?? [],
+    (meals ?? []).map((m) => ({ ...m, carbs_g: Number(m.carbs_g), protein_g: Number(m.protein_g), kcal: Number(m.kcal) })),
+    timeZone,
+    Date.now(),
+  );
+  const rows = all.filter((r) => r.localDate >= from);
+  return { rows, summary: refuelSummary(rows) };
 }
