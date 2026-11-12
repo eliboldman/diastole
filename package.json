@@ -50,7 +50,7 @@
     "test:appearance": "node lib/appearance.test.ts",
     "test:weather": "node lib/weather.test.ts && node lib/race-pack.test.ts",
     "test:streaks": "node lib/streaks.test.ts",
-    "test:grit": "node lib/grit/earn.test.ts",
+    "test:grit": "node lib/grit/earn.test.ts && node lib/quests/quests.test.ts",
     "test:recovery": "node lib/recovery/catalog.test.ts",
     "test:pace": "node lib/activity/pace-input.test.ts",
     "test:tabs": "node lib/tabs.test.ts",

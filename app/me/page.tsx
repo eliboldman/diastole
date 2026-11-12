@@ -32,6 +32,7 @@ import { pullIfStale } from "@/lib/intervals/pull-soon";
 import { after } from "next/server";
 import BedtimeCard from "@/components/sleep/BedtimeCard";
 import GritChip from "@/components/grit/GritChip";
+import RestQuests from "@/components/quests/RestQuests";
 import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
 import { clock12 } from "@/lib/week-prefs";
@@ -124,6 +125,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     ),
     recovery: (
       <>
+      <RestQuests athleteId={me.id} today={today} timeZone={me.timezone} tipSeen={seen(seenTips, TIPS.quests.id)} />
       <RecoveryCard athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.recovery.id)} />
       </>
     ),

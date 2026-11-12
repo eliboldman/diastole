@@ -9,6 +9,7 @@ export const TIPS = {
   gear: { id: "tip:gear", title: "Keep your shoe miles right", body: "One tap tells Diastole which pair (or bike) you used, so you know when they're worn." },
   changeOfPlans: { id: "tip:change-of-plans", title: "Plans changed? Just say it.", body: "Type something like “easy long run instead of the bike today” and approve the swap in one tap." },
   myWorkouts: { id: "tip:my-workouts", title: "Build your own sessions", body: "Make workouts or import a set, then ask your coach to add one to your calendar." },
+  quests: { id: "tip:quests", title: "Rest day, with a few side quests", body: "Small, optional ways to recover: a walk, an early night, time with friends. Each earns grit. Skip them and nothing happens." },
   grit: { id: "tip:grit", title: "You've been earning grit", body: "Sessions, check-ins and smart rest days earn grit, and a planned session on a rough-readiness day earns extra. Spend it on stickers, avatar gear and themes. It can't be bought and never changes your training." },
   bedtime: { id: "tip:bedtime", title: "A bedtime that fits tomorrow", body: "Today works back from your next session to the time you'd want lights out. In the iPhone app you can get a gentle nudge or two in the evening; turn them off anytime in My setup." },
   predictions: { id: "tip:predictions", title: "What your training says you could run", body: "Estimates come from your recent best efforts, threshold pace, FTP and CSS, and move as you get fitter. Hide them anytime." },

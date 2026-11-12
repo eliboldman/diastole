@@ -41,6 +41,10 @@ export async function settleGrit(athleteId: string, asUser?: SupabaseClient): Pr
   };
   const awards: Award[] = allAwards(input);
 
+  // Rest day quests ticked off (by the athlete, or by their watch / a recovery routine).
+  const { data: quests } = await admin.from("quest_completions").select("date, quest_key, title, grit").eq("athlete_id", athleteId).gte("date", sinceDate);
+  for (const q of quests ?? []) awards.push({ kind: "quest", ref: `${q.date}:${q.quest_key}`, amount: q.grit, reason: `Rest day quest: ${q.title}`.slice(0, 120), detail: { day: q.date } });
+
   if (asUser) {
     const { data: mine } = await admin.from("camp_members").select("camp_id, status, pod_camps(id, title, goal_value, ends_on)").eq("athlete_id", athleteId).in("status", ["joined", "left"]);
     for (const m of mine ?? []) {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CoachQuests from "@/components/quests/CoachQuests";
 import { ChevronRight } from "lucide-react";
 
 import BackLink from "@/components/layout/BackLink";
@@ -24,6 +25,13 @@ export default async function RecoveryPage() {
     supabase.from("readiness_scores").select("overall").eq("athlete_id", me.id).eq("date", today).maybeSingle(),
   ]);
   const spots = (checks ?? []).flatMap((c) => Object.keys((c.pain ?? {}) as Record<string, number>));
+  const [{ data: myQuests }, { data: roster }] =
+    me.role === "coach"
+      ? await Promise.all([
+          supabase.from("rest_quests").select("id, title, blurb, grit, athlete_id").eq("coach_id", me.id).eq("active", true).order("created_at", { ascending: false }),
+          supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.id).eq("is_test", false).order("full_name"),
+        ])
+      : [{ data: null }, { data: null }];
   const tip = suggestRoutine({ spots, readiness: (ready?.overall as string) ?? null });
   const when = (d: string) => (d === today ? "Today" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }));
 
@@ -63,6 +71,7 @@ export default async function RecoveryPage() {
         <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">All routines</h2>
         <ul className="space-y-2">{routines.map((r) => row(`/recovery/${r.id}?from=/recovery`, r.title, `${minutesLabel(routineSeconds(r.items))}${r.description ? ` · ${r.description}` : ""}`))}</ul>
       </section>
+      {me.role === "coach" && <CoachQuests quests={myQuests ?? []} athletes={(roster ?? []).map((r) => ({ id: r.id, name: r.id === me.id ? "Me" : r.full_name || r.email || "Athlete" }))} />}
     </DashboardShell>
   );
 }
