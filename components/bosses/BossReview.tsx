@@ -11,8 +11,8 @@ export default async function BossReview({ coachId, today, names }: { coachId: s
   const all = rows ?? [];
   const pending = all.filter((b) => b.status === "suggested");
   const without = Object.keys(names).filter((id) => !all.some((b) => b.athlete_id === id));
-  // Show the card when there's something to decide, or early in the month when bosses haven't been looked for.
-  if (!pending.length && !(without.length && Number(today.slice(8, 10)) <= 10 && !all.length)) return null;
+  // Show the card when there's something to decide, or when nobody has a boss yet this month.
+  if (!pending.length && !(without.length && !all.length)) return null;
 
   return (
     <section id="bosses" className="row-in mt-6 scroll-mt-6 rounded-[28px] border border-amber-200/15 bg-gradient-to-br from-amber-200/[0.06] to-white/[0.02] p-5 sm:p-6">
