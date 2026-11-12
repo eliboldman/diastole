@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { campAward, allAwards, type Award, type EarnInput, type Flag } from "@/lib/grit/earn";
 import { settleBoss } from "@/lib/bosses/data";
+import { refreshBank } from "@/lib/confidence/data";
 import { createAdminClient } from "@/lib/supabase/server";
 
 const WINDOW_DAYS = 21; // a new athlete starts with their last three weeks counted
@@ -62,6 +63,8 @@ export async function settleGrit(athleteId: string, asUser?: SupabaseClient, rem
 
   // This month's boss: damage from finished sessions (defeat pays grit through the ledger itself).
   await settleBoss(admin, athleteId, remeasure).catch(() => null);
+  // Once a day (cron): new proof moments for the confidence bank.
+  if (remeasure) await refreshBank(admin, athleteId).catch(() => 0);
 
   if (!awards.length) return 0;
   const { data: added } = await admin

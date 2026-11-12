@@ -12,6 +12,7 @@ import RaceEstimate from "@/components/predict/RaceEstimate";
 import CourseCard from "@/components/course/CourseCard";
 import RacePoster from "@/components/poster/RacePoster";
 import { getPoster } from "@/lib/poster/data";
+import { windowStart } from "@/lib/poster/poster";
 import { getCourseView } from "@/lib/course/data";
 import PackingList from "@/components/pack/PackingList";
 import { getPackView } from "@/lib/pack/data";
@@ -73,6 +74,13 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         </div>
       )}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        {own && days >= 0 && days <= 7 && (
+          <Link href={`/me/confidence?race=${race.id}`} className="lift rounded-[28px] border border-emerald-300/25 bg-gradient-to-br from-emerald-300/[0.09] to-white/[0.02] p-6 transition hover:bg-emerald-300/[0.12]">
+            <h2 className="text-lg font-medium">You&apos;re ready</h2>
+            <p className="mt-1 text-sm text-white/65">Your long sessions, PRs, tough days and your coach&apos;s words, all in one place before the start.</p>
+            <p className="mt-3 text-sm font-medium text-emerald-200">Open your confidence bank →</p>
+          </Link>
+        )}
         {poster && (
           <RacePoster
             raceId={race.id}
@@ -83,6 +91,10 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
             state={poster}
             own={own}
             kept={Boolean(race.poster_kept)}
+            startsLabel={(() => {
+              const w = windowStart(race.race_date, race.created_at ?? today);
+              return w > today ? new Date(`${w}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : null;
+            })()}
           />
         )}
         {phase && (

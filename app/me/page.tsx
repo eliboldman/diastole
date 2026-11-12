@@ -34,6 +34,7 @@ import BedtimeCard from "@/components/sleep/BedtimeCard";
 import GritChip from "@/components/grit/GritChip";
 import { sealed, titleFor } from "@/lib/workouts/mystery";
 import RestQuests from "@/components/quests/RestQuests";
+import ReadyOffer from "@/components/confidence/ReadyOffer";
 import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
 import { clock12 } from "@/lib/week-prefs";
@@ -282,6 +283,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </Link>
         </section>
       )}
+
+      {!pause && <ReadyOffer athleteId={me.id} today={today} />}
 
       {visibleSections(layout).map((k) => (
         <Fragment key={k}>{blocks[k]}</Fragment>

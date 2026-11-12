@@ -83,7 +83,7 @@ export function PosterArt({ sport, name, date, line, state, onPick, picked, svgR
 type Bridge = { webkit?: { messageHandlers?: { diastole?: { postMessage: (m: unknown) => void } } } };
 
 /** The poster card: tap a part to see which sessions colored it; share it as an image; keep finished ones. */
-export default function RacePoster({ raceId, sport, name, date, line, state, own, kept }: { raceId: string; sport: Sport; name: string; date: string; line: string; state: PosterState; own: boolean; kept: boolean }) {
+export default function RacePoster({ raceId, sport, name, date, line, state, own, kept, startsLabel }: { raceId: string; sport: Sport; name: string; date: string; line: string; state: PosterState; own: boolean; kept: boolean; startsLabel?: string | null }) {
   const [picked, setPicked] = useState<number | null>(null);
   const [keep, setKeep] = useState(kept);
   const [msg, setMsg] = useState<string | null>(null);
@@ -121,7 +121,7 @@ export default function RacePoster({ raceId, sport, name, date, line, state, own
         <span className="text-sm tabular-nums text-white/55">{state.finished ? "Complete" : `${state.colored} of 12 in color`}</span>
       </div>
       <p className="mt-1 text-sm text-white/55">
-        {state.finished ? "Fully colored. It's race time." : state.keys ? "Each key session you finish brings a part to life. Tap a part to see which sessions colored it." : "Key sessions on your plan will color this in. It's fully colored on race day either way."}
+        {state.finished ? "Fully colored. It's race time." : state.keys ? "Each key session you finish brings a part to life. Tap a part to see which sessions colored it." : startsLabel ? `Coloring starts ${startsLabel}, 16 weeks out: each key session from then brings a part to life.` : "Key sessions on your plan will color this in. It's fully colored on race day either way."}
       </p>
       <div className="mx-auto mt-4 max-w-sm">
         <PosterArt sport={sport} name={name} date={date} line={line} state={state} onPick={(i) => setPicked(picked === i ? null : i)} picked={picked} svgRef={svg} />

@@ -50,7 +50,7 @@
     "test:appearance": "node lib/appearance.test.ts",
     "test:weather": "node lib/weather.test.ts && node lib/race-pack.test.ts",
     "test:streaks": "node lib/streaks.test.ts",
-    "test:grit": "node lib/workouts/mystery.test.ts && node lib/grit/earn.test.ts && node lib/quests/quests.test.ts && node lib/bosses/bosses.test.ts && node lib/baton/baton.test.ts && node lib/campfire/campfire.test.ts && node lib/stories/shape.test.ts && node lib/poster/poster.test.ts",
+    "test:grit": "node lib/workouts/mystery.test.ts && node lib/grit/earn.test.ts && node lib/quests/quests.test.ts && node lib/bosses/bosses.test.ts && node lib/baton/baton.test.ts && node lib/campfire/campfire.test.ts && node lib/stories/shape.test.ts && node lib/poster/poster.test.ts && node lib/confidence/collect.test.ts",
     "test:recovery": "node lib/recovery/catalog.test.ts",
     "test:pace": "node lib/activity/pace-input.test.ts",
     "test:tabs": "node lib/tabs.test.ts",
