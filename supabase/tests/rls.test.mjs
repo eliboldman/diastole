@@ -1228,5 +1228,57 @@ await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false)
 await db.query(`update public.swim_videos set coach_note = 'Reach longer before the catch.' where athlete_id = '${A1}'`);
 check("a coach reply notifies the athlete", (await db.query(`select id from public.notifications where user_id = '${A1}' and kind = 'swim_video'`)).rows.length === 1);
 
+// ---------------------------------------------------------------- team dietitians and who they can see
+{
+  const D1 = "00000000-0000-0000-0000-0000000000d1";
+  const D2 = "00000000-0000-0000-0000-0000000000d2";
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+  await db.query(`insert into public.invites (coach_id, email, role) values ('${COACH}', 'd1@x.com', 'dietitian')`);
+  const inv2 = (await db.query(`insert into public.invites (coach_id, email, role) values ('${COACH}', 'd2@x.com', 'dietitian') returning id`)).rows[0].id;
+  // The coach limits the second invite to A1 before she signs up.
+  r = await as(COACH, `select public.set_dietitian_invite_access('${inv2}', false, array['${A1}'::uuid, '${STRANGER}'::uuid]) as e`);
+  check("coach limits a pending dietitian invite", r.rows?.[0]?.e === null);
+  r = await as(A1, `select public.set_dietitian_invite_access('${inv2}', true, '{}') as e`);
+  check("an athlete can't change a dietitian invite", r.rows?.[0]?.e === "Invite not found.");
+  await db.exec(`reset role; insert into auth.users (id, email) values ('${D1}', 'd1@x.com'), ('${D2}', 'd2@x.com');`);
+  const dp = (await db.query(`select id, role, coach_id, team_coach_id, dietitian_all from public.profiles where id in ('${D1}', '${D2}') order by email`)).rows;
+  check("dietitian invite makes a dietitian on the coach's team, outside the roster", dp[0].role === "dietitian" && dp[0].team_coach_id === COACH && dp[0].coach_id === null);
+  check("invite choice carries over at sign-up", dp[0].dietitian_all === true && dp[1].dietitian_all === false);
+
+  r = await as(D1, "select distinct athlete_id from public.daily_wellness");
+  check("dietitian with all access sees the whole team's wellness", r.rows?.length === 3);
+  r = await as(D2, "select distinct athlete_id from public.daily_wellness");
+  check("limited dietitian sees only picked athletes (stranger not added)", r.rows?.length === 1 && r.rows[0].athlete_id === A1);
+  r = await as(D2, `select id from public.profiles where coach_id = '${COACH}'`);
+  check("limited dietitian's roster is only picked athletes", r.rows?.length === 1 && r.rows[0].id === A1);
+  r = await as(D2, `insert into public.nutrition_goals (athlete_id, per_kg) values ('${A1}', '{}')`);
+  check("dietitian sets goals for a picked athlete", !r.error);
+  r = await as(D2, `insert into public.nutrition_goals (athlete_id, per_kg) values ('${A2}', '{}')`);
+  check("dietitian can't set goals for an athlete not picked", !!r.error);
+  r = await as(COACH, `insert into public.nutrition_goals (athlete_id, per_kg) values ('${A2}', '{}')`);
+  check("coach sets nutrition goals", !r.error);
+  r = await as(A1, "select athlete_id from public.nutrition_goals");
+  check("athlete reads only own goals", r.rows?.length === 1 && r.rows[0].athlete_id === A1);
+  r = await as(A1, `update public.nutrition_goals set note = 'x' where athlete_id = '${A1}' returning athlete_id`);
+  check("athlete can't edit own goals", !r.rows?.length);
+
+  // The coach widens and narrows access after sign-up.
+  r = await as(COACH, `select public.set_dietitian_access('${D2}', false, array['${A2}'::uuid]) as e`);
+  check("coach changes a dietitian's athletes", r.rows?.[0]?.e === null);
+  r = await as(D2, "select distinct athlete_id from public.daily_wellness");
+  check("access follows the change", r.rows?.length === 1 && r.rows[0].athlete_id === A2);
+  r = await as(D1, `select public.set_dietitian_access('${D2}', true, '{}') as e`);
+  check("a dietitian can't change access", r.rows?.[0]?.e === "Dietitian not found.");
+  r = await as(D2, `select * from public.dietitian_athletes`);
+  check("dietitian reads own access list", r.rows?.length === 1);
+  r = await as(A1, `select * from public.dietitian_athletes`);
+  check("athletes can't read access lists", r.rows?.length === 0);
+  r = await as(COACH, `select public.set_dietitian_access('${D2}', true, '{}') as e`);
+  r = await as(D2, "select distinct athlete_id from public.daily_wellness");
+  check("back to all athletes", r.rows?.length === 3);
+  r = await as(COACH, `select id from public.profiles where team_coach_id = '${COACH}'`);
+  check("coach sees their dietitians", r.rows?.length === 2);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

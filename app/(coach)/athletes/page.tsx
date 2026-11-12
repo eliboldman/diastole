@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { CalendarRange, Orbit } from "lucide-react";
+import { Apple, CalendarRange, Orbit } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import QuickLinks from "@/components/layout/QuickLinks";
@@ -11,6 +11,7 @@ import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
+import DietitianAccess from "./DietitianAccess";
 import DietitianRow from "./DietitianRow";
 import RemoveAthlete from "./RemoveAthlete";
 
@@ -22,9 +23,13 @@ export default async function AthletesPage() {
     supabase.from("profiles").select("id, full_name, email, created_at").eq("coach_id", coach.id).eq("is_test", false).order("full_name"),
     supabase.from("device_connections").select("athlete_id, source, last_synced_at"),
     supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "coach").order("created_at", { ascending: false }),
-    supabase.from("profiles").select("id, full_name, email, created_at").eq("team_coach_id", coach.id).eq("role", "dietitian").order("full_name"),
-    supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "dietitian").is("accepted_at", null).order("created_at", { ascending: false }),
+    supabase.from("profiles").select("id, full_name, email, created_at, dietitian_all").eq("team_coach_id", coach.id).eq("role", "dietitian").order("full_name"),
+    supabase.from("invites").select("id, email, created_at, dietitian_all, dietitian_athletes").eq("coach_id", coach.id).eq("role", "dietitian").is("accepted_at", null).order("created_at", { ascending: false }),
   ]);
+  const { data: access } = dietitians?.length
+    ? await supabase.from("dietitian_athletes").select("dietitian_id, athlete_id").in("dietitian_id", dietitians.map((d) => d.id))
+    : { data: [] };
+  const roster = (athletes ?? []).map((a) => ({ id: a.id, name: a.id === coach.id ? `${a.full_name || a.email} (you)` : a.full_name || a.email || "Athlete" }));
   const short = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   const deviceFor = (id: string) => connections?.find((c) => c.athlete_id === id);
@@ -39,6 +44,7 @@ export default async function AthletesPage() {
           links={[
             { href: "/pods", label: "Pods", icon: <Orbit size={16} aria-hidden /> },
             { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
+            { href: "/nutrition", label: "Team fueling", icon: <Apple size={16} aria-hidden /> },
           ]}
         />
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/55">
@@ -73,16 +79,25 @@ export default async function AthletesPage() {
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
           <h2 className="text-lg font-medium">Invite a dietitian</h2>
           <p className="mb-4 mt-1 text-sm text-white/55">
-            A dietitian joins your team with full access to every athlete: meals, nutrition targets, training, readiness, activities and health data. They can set each athlete&apos;s nutrition goals and leave them a note on their Fuel page. Athletes see that their team dietitian can view their data.
+            A dietitian joins your team with full access to the athletes you choose: meals, nutrition targets, training, readiness, activities and health data. By default they see every athlete; use “change” under their name to limit them to the athletes you pick. They can set each athlete&apos;s nutrition goals and leave them a note on their Fuel page. Athletes see which dietitians can view their data.
           </p>
           <InviteForm role="dietitian" />
           {(!!dietitians?.length || !!dietitianInvites?.length) && (
             <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
               {(dietitians ?? []).map((d) => (
-                <DietitianRow key={d.id} id={d.id} label={d.full_name || d.email || "Dietitian"} sub={`Joined ${short(d.created_at)}`} />
+                <DietitianRow key={d.id} id={d.id} label={d.full_name || d.email || "Dietitian"} sub={`Joined ${short(d.created_at)}`}>
+                  <DietitianAccess
+                    target={{ dietitian: d.id }}
+                    roster={roster}
+                    all={d.dietitian_all}
+                    picked={(access ?? []).filter((x) => x.dietitian_id === d.id).map((x) => x.athlete_id)}
+                  />
+                </DietitianRow>
               ))}
               {(dietitianInvites ?? []).map((i) => (
-                <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending />
+                <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending>
+                  <DietitianAccess target={{ invite: i.id }} roster={roster} all={i.dietitian_all} picked={(i.dietitian_athletes ?? []) as string[]} />
+                </DietitianRow>
               ))}
             </ul>
           )}

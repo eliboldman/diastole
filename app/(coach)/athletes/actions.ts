@@ -130,3 +130,17 @@ export async function cancelInvite(inviteId: string): Promise<RemoveState> {
   revalidatePath("/athletes");
   return { ok: true, message: "Invite cancelled." };
 }
+
+/** Which athletes a dietitian (or a pending dietitian invite) can see: everyone, or only those picked. */
+export async function setDietitianAccess(target: { dietitian: string } | { invite: string }, all: boolean, athletes: string[]): Promise<RemoveState> {
+  await requireCoach();
+  const supabase = await createClient();
+  const ids = [...new Set(athletes.filter((a) => /^[0-9a-f-]{36}$/i.test(a)))];
+  const { data, error } =
+    "dietitian" in target
+      ? await supabase.rpc("set_dietitian_access", { p_dietitian: target.dietitian, p_all: all, p_athletes: ids })
+      : await supabase.rpc("set_dietitian_invite_access", { p_invite: target.invite, p_all: all, p_athletes: ids });
+  if (error || data) return { ok: false, error: (data as string | null) ?? error?.message ?? "Couldn't save." };
+  revalidatePath("/athletes");
+  return { ok: true, message: all ? "Saved: sees all athletes." : `Saved: sees ${ids.length} athlete${ids.length === 1 ? "" : "s"}.` };
+}

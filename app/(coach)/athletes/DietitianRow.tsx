@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { cancelInvite, removeDietitian } from "./actions";
 
 /** One dietitian (or pending invite) with a two-tap remove. */
-export default function DietitianRow({ id, label, sub, pending: isInvite }: { id: string; label: string; sub: string; pending?: boolean }) {
+export default function DietitianRow({ id, label, sub, pending: isInvite, children }: { id: string; label: string; sub: string; pending?: boolean; children?: ReactNode }) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export default function DietitianRow({ id, label, sub, pending: isInvite }: { id
           </button>
         )}
       </span>
+      {children}
     </li>
   );
 }

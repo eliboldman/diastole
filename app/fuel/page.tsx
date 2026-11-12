@@ -18,7 +18,7 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
   const { log, via } = await searchParams;
   const start = via === "photo" || via === "scan" || via === "describe" ? via : undefined;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
-  const [mode, days, goals, dietitians] = await Promise.all([getFuelMode(me.id), getFuelDays(me.id, today, 7), getNutritionGoals(me.id), teamDietitians(me.coach_id)]);
+  const [mode, days, goals, dietitians] = await Promise.all([getFuelMode(me.id), getFuelDays(me.id, today, 7), getNutritionGoals(me.id), teamDietitians(me.coach_id, me.id)]);
   const meals = mode === "workout" ? null : await getMealDay(me.id, today, me.timezone, days[0].level);
   const r = (n: number) => Math.round(n);
   const show = mode === "full" && meals?.targets;
@@ -69,9 +69,14 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
   );
 }
 
-/** Names of the dietitians on this athlete's team (profiles aren't visible to athletes, so read server-side). */
-async function teamDietitians(coachId: string | null): Promise<string[]> {
+/** Names of the team dietitians who can see this athlete (profiles aren't visible to athletes, so read server-side). */
+async function teamDietitians(coachId: string | null, athleteId: string): Promise<string[]> {
   if (!coachId) return [];
-  const { data } = await createAdminClient().from("profiles").select("full_name, email").eq("team_coach_id", coachId).eq("role", "dietitian");
-  return (data ?? []).map((d) => d.full_name || d.email || "A dietitian");
+  const admin = createAdminClient();
+  const [{ data }, { data: picked }] = await Promise.all([
+    admin.from("profiles").select("id, full_name, email, dietitian_all").eq("team_coach_id", coachId).eq("role", "dietitian"),
+    admin.from("dietitian_athletes").select("dietitian_id").eq("athlete_id", athleteId),
+  ]);
+  const mine = new Set((picked ?? []).map((p) => p.dietitian_id));
+  return (data ?? []).filter((d) => d.dietitian_all || mine.has(d.id)).map((d) => d.full_name || d.email || "A dietitian");
 }
