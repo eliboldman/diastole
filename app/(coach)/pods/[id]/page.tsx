@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import PodBoosts from "@/components/grit/PodBoosts";
 import Campfire from "@/components/campfire/Campfire";
+import EpisodeEditor from "@/components/stories/EpisodeEditor";
+import { recapWeekFor } from "@/lib/stories/draft";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PodActivityFeed from "@/components/PodActivityFeed";
@@ -45,6 +48,12 @@ export default async function CoachPodFeedPage({
     supabase.from("pod_boosts").select("id, from_id, to_id").eq("pod_id", id).gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(20),
   ]);
   const firstOf = (pid: string) => feed.members.find((m) => m.id === pid)?.name.split(" ")[0] ?? "You";
+  const recapWeek = recapWeekFor(today);
+  const { data: eps } = await supabase.from("storylines").select("id, title, body, season, episode, week, status").eq("pod_id", id).in("status", ["draft", "posted"]).order("week", { ascending: false }).limit(60);
+  const d = (eps ?? []).find((e) => e.status === "draft" && e.week === recapWeek) ?? null;
+  const episodeDraft = d ? { id: d.id, title: d.title, body: d.body, episode: d.episode, season: d.season, week: d.week } : null;
+  const episodePosted = (eps ?? []).some((e) => e.status === "posted" && e.week === recapWeek);
+  const episodeCount = (eps ?? []).filter((e) => e.status === "posted").length;
   const boosts = (boostRows ?? []).map((b) => ({ id: b.id, to_id: b.to_id, from_name: firstOf(b.from_id), to_name: firstOf(b.to_id) }));
 
   return (
@@ -54,6 +63,12 @@ export default async function CoachPodFeedPage({
       <p className="mt-2 text-sm text-white/55">This is what members who have accepted see of each other.</p>
       <PodBoosts podId={id} boosts={boosts} members={[]} meId={coach.id} owned={0} />
       <Campfire podId={id} meId={coach.id} coach names={{ ...Object.fromEntries(feed.members.map((m) => [m.id, m.name.split(" ")[0]])), [coach.id]: (coach.full_name || "Coach").split(" ")[0] }} members={feed.members.length} />
+      <EpisodeEditor podId={id} draft={episodeDraft} posted={episodePosted} />
+      {episodeCount > 0 && (
+        <Link href={`/me/pods/${id}/episodes`} className="mt-2 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
+          Season archive ({episodeCount}) →
+        </Link>
+      )}
       <div className="mt-6">
         <PodTabs base={`/pods/${id}`} view={view} />
       </div>

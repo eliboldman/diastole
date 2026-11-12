@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { processAllBatons } from "@/lib/baton/run";
 import { lightCampfires } from "@/lib/campfire/data";
+import { draftWeeklyEpisodes } from "@/lib/stories/draft";
 import { runEvening } from "@/lib/evening";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
   const batons = await processAllBatons(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Sunday evenings: light each pod's campfire.
   const campfires = await lightCampfires(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
-  console.info("Evening run", result, batons, campfires);
-  return NextResponse.json({ ok: true, result, batons, campfires });
+  // Monday evenings: draft last week's pod episodes for the coach to review (never posted automatically).
+  const stories = await draftWeeklyEpisodes(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+  console.info("Evening run", result, batons, campfires, stories);
+  return NextResponse.json({ ok: true, result, batons, campfires, stories });
 }
