@@ -56,7 +56,7 @@ export async function getFuelDays(athleteId: string, from: string, days = 7): Pr
 
 // ---------------------------------------------------------------- meals and targets (Phase 9b)
 
-export type MealRow = { id: string; label: string | null; items: LoggedItem[]; carbs_g: number; protein_g: number; fat_g: number; kcal: number; source: string; created_at: string };
+export type MealRow = { id: string; label: string | null; items: LoggedItem[]; carbs_g: number; protein_g: number; fat_g: number; kcal: number; source: string; created_at: string; eaten_at: string };
 export type MealDay = {
   weightKg: number | null;
   level: FuelDay; // planned training, raised by what was actually done today
@@ -75,8 +75,8 @@ export async function getMealDay(athleteId: string, today: string, timeZone: str
   const since = new Date(Date.now() - 36 * 3_600_000).toISOString();
   const [{ data: body }, { data: todays }, { data: past }, { data: acts }, goals] = await Promise.all([
     supabase.from("athlete_body").select("weight_kg").eq("athlete_id", athleteId).maybeSingle(),
-    supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at").eq("athlete_id", athleteId).eq("local_date", today).order("created_at"),
-    supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at").eq("athlete_id", athleteId).lt("local_date", today).order("created_at", { ascending: false }).limit(120),
+    supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at, eaten_at").eq("athlete_id", athleteId).eq("local_date", today).order("eaten_at"),
+    supabase.from("meal_logs").select("id, label, items, carbs_g, protein_g, fat_g, kcal, source, created_at, eaten_at").eq("athlete_id", athleteId).lt("local_date", today).order("created_at", { ascending: false }).limit(120),
     supabase.from("activities").select("start_time, duration_s").eq("athlete_id", athleteId).gte("start_time", since),
     getNutritionGoals(athleteId),
   ]);
@@ -98,7 +98,7 @@ export async function getMealDay(athleteId: string, today: string, timeZone: str
     return h + mi / 60;
   };
   const nowSlot = slotFor(hour(new Date().toISOString()));
-  const usual = usualMeals(history, (m) => slotFor(hour(m.created_at)), nowSlot).slice(0, 3);
+  const usual = usualMeals(history, (m) => slotFor(hour(m.eaten_at ?? m.created_at)), nowSlot).slice(0, 3);
   const usualSigs = new Set(usual.map((u) => signature(u.meal.items)));
   const seen = new Set<string>();
   const recent = history.filter((m) => {

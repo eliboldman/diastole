@@ -42,7 +42,7 @@ export default function FuelLog({
             {`Targets for a ${FUEL_DAYS[day.level].label.toLowerCase()}`}
           </p>
         </div>
-        {athlete && <MealLogger numbers={numbers} autoOpen={autoOpen} start={start} />}
+        {athlete && <MealLogger numbers={numbers} autoOpen={autoOpen} start={start} timeZone={timeZone} />}
       </div>
 
       <div className="mt-5">

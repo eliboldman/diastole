@@ -1,7 +1,7 @@
 // Post-workout refuel (dietitian view): did the athlete take something in within 30-60 minutes of
 // finishing a session? Pure module so it can be tested directly with `node`.
 //
-// Meal times are when the meal was logged (meal_logs.eaten_at), so a meal logged late looks late.
+// Meal times are meal_logs.eaten_at: when the athlete says they ate it (the log time unless they changed it).
 
 export type RefuelActivity = { id: string; sport: string | null; name: string | null; start_time: string; duration_s: number | null };
 export type RefuelMeal = { id: string; eaten_at: string; local_date: string; label: string | null; carbs_g: number; protein_g: number; kcal: number };

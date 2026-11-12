@@ -96,7 +96,7 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
       <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6">
         <h2 className="text-lg font-medium">Refuel after workouts</h2>
         <p className="mt-1 text-sm text-white/55">
-          The first food logged after each session of 20+ minutes. Times are when the meal was logged, so a snack eaten on time but logged later shows as late.
+          The first food eaten after each session of 20+ minutes. Times are when the athlete says they ate it; if they logged it later without changing the time, it shows when it was logged.
         </p>
         {refuel.summary.scored > 0 ? (
           <p className="mt-4 text-2xl font-semibold tabular-nums">

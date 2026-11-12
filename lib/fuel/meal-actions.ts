@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { cleanEstimate, confirmItem, SCALES, totals, type LoggedItem } from "@/lib/fuel/meals";
+import { localDateOf, resolveEatenAt, type EatenAt } from "@/lib/fuel/eaten";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
@@ -28,17 +29,21 @@ export async function saveMeal(input: {
   items: { name: string; portion: string; carbs: [number, number]; protein: [number, number]; fat: [number, number]; scale: number }[];
   source: "photo" | "text" | "barcode";
   note?: string;
+  eaten?: EatenAt; // when it was eaten, for meals logged afterwards; now when missing
 }): Promise<Result> {
   const me = await requireUser();
   const items = confirmed(input.items ?? []);
   if (!items.length) return { ok: false, error: "Keep at least one food." };
+  const when = resolveEatenAt(input.eaten, me.timezone, Date.now());
+  if (!when.ok) return { ok: false, error: when.error };
   const t = totals(items);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meal_logs")
     .insert({
       athlete_id: me.id,
-      local_date: new Date().toLocaleDateString("en-CA", { timeZone: me.timezone }),
+      local_date: localDateOf(when.ms, me.timezone),
+      eaten_at: new Date(when.ms).toISOString(),
       label: input.label.replace(/\s+/g, " ").trim().slice(0, 60) || null,
       items,
       carbs_g: t.carbs_g,
@@ -78,6 +83,25 @@ export async function relogMeal(id: string): Promise<Result> {
   if (error) return { ok: false, error: "Couldn't log that meal." };
   refresh();
   return { ok: true, id: data.id };
+}
+
+/** Move a logged meal to when it was actually eaten (its day follows the new time). */
+export async function setMealTime(id: string, eaten: EatenAt): Promise<Result> {
+  const me = await requireUser();
+  if (!UUID.test(id)) return { ok: false, error: "Unknown meal." };
+  const when = resolveEatenAt(eaten, me.timezone, Date.now());
+  if (!when.ok) return { ok: false, error: when.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meal_logs")
+    .update({ eaten_at: new Date(when.ms).toISOString(), local_date: localDateOf(when.ms, me.timezone) })
+    .eq("id", id)
+    .eq("athlete_id", me.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: "Couldn't change the time." };
+  refresh();
+  return { ok: true, id };
 }
 
 export async function deleteMeal(id: string): Promise<Result> {

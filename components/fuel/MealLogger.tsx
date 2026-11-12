@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 
+import EatenPicker from "@/components/fuel/EatenPicker";
+import type { EatenAt } from "@/lib/fuel/eaten";
 import { saveMeal } from "@/lib/fuel/meal-actions";
 import { confirmItem, rangeText, scaleLabel, stepScale, totals, type EstimateItem } from "@/lib/fuel/meals";
 import { FUEL_DISCLAIMER } from "@/lib/fuel/plan";
@@ -36,7 +38,7 @@ async function shrink(file: File): Promise<string> {
 }
 
 /** "Log a meal": photo and/or words -> Claude's estimate -> one confirm card -> saved. The photo never leaves this sheet except for the estimate. */
-export default function MealLogger({ numbers = true, autoOpen = false, compact = false, start }: { numbers?: boolean; autoOpen?: boolean; compact?: boolean; start?: "photo" | "scan" | "describe" }) {
+export default function MealLogger({ numbers = true, autoOpen = false, compact = false, start, timeZone }: { numbers?: boolean; autoOpen?: boolean; compact?: boolean; start?: "photo" | "scan" | "describe"; timeZone: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: "capture" });
@@ -50,6 +52,7 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
   const [inApp, setInApp] = useState(false);
   const [typing, setTyping] = useState(false);
   const [code, setCode] = useState("");
+  const [eaten, setEaten] = useState<EatenAt>({ ago: 0 }); // when it was eaten (meals logged afterwards)
 
   // Drop the photo from memory when the sheet closes (after confirming, or cancelling).
   const reset = () => {
@@ -58,6 +61,7 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
     setText("");
     setError(null);
     setStage({ kind: "capture" });
+    setEaten({ ago: 0 });
   };
   const close = () => {
     reset();
@@ -164,7 +168,7 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
   function confirm() {
     if (stage.kind !== "confirm") return;
     startSaving(async () => {
-      const r = await saveMeal({ label: stage.label, items: stage.items, source: stage.source, note: stage.note });
+      const r = await saveMeal({ label: stage.label, items: stage.items, source: stage.source, note: stage.note, eaten });
       if (!r.ok) return setError(r.error);
       close();
       router.refresh();
@@ -325,6 +329,10 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
                 <span className="text-amber-200">{Math.round(sum.fat_g)} g fat</span> · {sum.kcal} kcal
               </p>
             )}
+            <div>
+              <p className="mb-2 text-sm text-white/60">When did you eat it?</p>
+              <EatenPicker timeZone={timeZone} value={eaten} onChange={setEaten} />
+            </div>
             {error && <p className="text-sm text-amber-100/90">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setStage({ kind: "capture" })} className="min-h-12 rounded-2xl border border-white/15 px-5 text-sm text-white/75">
