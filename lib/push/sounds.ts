@@ -3,7 +3,7 @@
 
 export type SoundId = "quack" | "walker" | "heartbeat" | "chime" | "pop" | "tone" | "tick" | "default" | "none";
 // "coach" isn't a notification group: it's the sound for anything the athlete's own coach sends.
-export type PushGroup = "coach" | "messages" | "comments" | "props" | "workouts" | "pods" | "coaching" | "sleep";
+export type PushGroup = "coach" | "messages" | "comments" | "props" | "workouts" | "pods" | "coaching" | "sleep" | "fuel";
 
 export const SOUNDS: { id: SoundId; label: string }[] = [
   { id: "quack", label: "Duck quack" },
@@ -26,6 +26,7 @@ export const DEFAULT_SOUND: Record<PushGroup, SoundId> = {
   pods: "tick",
   coaching: "tone",
   sleep: "chime",
+  fuel: "pop",
 };
 
 const IDS = new Set(SOUNDS.map((s) => s.id));
@@ -38,6 +39,7 @@ export function groupOf(kind: string, meta: Record<string, unknown> | null): Pus
   if (kind === "pod_invite" || kind === "pod_answer" || kind === "pod_challenge") return "pods";
   if (["ai_suggestion", "form_insight", "athlete_joined", "checkin_pain", "briefs_ready", "safety_note", "zones_updated", "weekly_digest", "monthly_digest", "workout_request", "plan_change", "zone_suggestion", "session_missed"].includes(kind)) return "coaching";
   if (kind === "bedtime_recap") return "sleep";
+  if (kind === "refuel") return "fuel";
   if (kind.startsWith("workout_")) return "workouts";
   return null;
 }

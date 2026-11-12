@@ -5,7 +5,9 @@ const db = new PGlite();
 const migration = readdirSync(new URL("../migrations/", import.meta.url)).sort()
   .map((f) => readFileSync(new URL(`../migrations/${f}`, import.meta.url), "utf8")).join("\n")
   // PGlite has no pg_net; a stub below records the pings instead.
-  .replace(/create extension if not exists pg_net[^;]*;/g, "");
+  .replace(/create extension if not exists pg_net[^;]*;/g, "")
+  // ...nor pg_cron; a stub schema records scheduled jobs.
+  .replace(/create extension if not exists pg_cron[^;]*;/g, "");
 
 // Minimal stand-in for Supabase's auth schema and roles.
 await db.exec(`
@@ -23,6 +25,10 @@ await db.exec(`
   grant usage on schema storage to authenticated;
   grant select, insert, delete on storage.objects to authenticated;
   grant execute on function auth.uid() to authenticated;
+  create schema cron;
+  create table cron.job (jobname text primary key, schedule text, command text);
+  create function cron.schedule(n text, s text, c text) returns bigint language sql as
+    $$ insert into cron.job values (n, s, c) on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command returning 1::bigint $$;
   create schema net;
   create table net.pings (id bigint generated always as identity, url text, body jsonb);
   create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
@@ -992,7 +998,7 @@ await db.exec(`insert into public.pod_challenge_entries (challenge_id, athlete_i
 r = await as(A1, `select public.finish_pod_challenges()`);
 check("signed-in users can't run the wrap-up", !!r.error);
 // The morning job runs with nobody signed in.
-await db.exec(`select set_config('request.jwt.claim.sub', '', false)`);
+await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
 r = await db.query(`select public.finish_pod_challenges() as n`);
 const wrap = (await db.query(`select user_id, title, body from public.notifications where dedupe_key = 'challenge_end:${CH3}'`)).rows;
 const wrapFor = (u) => wrap.find((x) => x.user_id === u);
@@ -1278,6 +1284,31 @@ check("a coach reply notifies the athlete", (await db.query(`select id from publ
   check("back to all athletes", r.rows?.length === 3);
   r = await as(COACH, `select id from public.profiles where team_coach_id = '${COACH}'`);
   check("coach sees their dietitians", r.rows?.length === 2);
+}
+
+// Post-workout protein nudge.
+{
+  const act = (await db.query(`insert into public.activities (athlete_id, source, external_id, sport, start_time, duration_s) values ('${A1}', 'garmin', 'nudge-1', 'running', now() - interval '70 minutes', 3600) returning id`)).rows[0].id;
+  check("the scheduler job is registered every 5 minutes", (await db.query(`select schedule, command from cron.job where jobname = 'refuel-nudges'`)).rows[0]?.schedule === "*/5 * * * *");
+  r = await as(A1, `select public.notify_refuel('${A1}', '${act}', 't', 'b')`);
+  check("athletes can't send themselves a nudge", !!r.error);
+  await db.query(`select set_config('request.jwt.claim.sub', '', false)`); // the server has no signed-in user
+  await db.query(`select public.notify_refuel('${A1}', '${act}', 'Protein o''clock', 'Grab about 30 g')`);
+  await db.query(`select public.notify_refuel('${A1}', '${act}', 'Protein o''clock', 'Grab about 30 g')`);
+  r = await as(A1, `select kind, href from public.notifications where kind = 'refuel'`);
+  check("the server's nudge lands once in the athlete's bell", r.rows?.length === 1 && r.rows[0].href === "/fuel");
+  await as(A1, `select public.set_notify_prefs('{"fuel": false}'::jsonb)`);
+  check("fuel setting saves", (await db.query(`select notify_prefs ->> 'fuel' as f from public.profiles where id = '${A1}'`)).rows[0].f === "false");
+  await db.query(`delete from public.notifications where kind = 'refuel'`);
+  await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+  await db.query(`select public.notify_refuel('${A1}', '${act}', 'x', 'y')`);
+  check("turned off: no nudge", (await db.query(`select count(*)::int as n from public.notifications where kind = 'refuel'`)).rows[0].n === 0);
+  await as(A1, `select public.set_notify_prefs('{}'::jsonb)`);
+  r = await as(A1, `select public.set_push_sound('fuel', 'pop') as e`);
+  check("fuel sound can be picked", r.rows?.[0]?.e === null);
+  await db.query(`insert into public.refuel_nudges (activity_id, athlete_id, outcome) values ('${act}', '${A1}', 'sent')`);
+  r = await as(A1, `select * from public.refuel_nudges`);
+  check("nudge log is server-only", r.rows?.length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -77,7 +77,7 @@ export async function setPodSharing(s: PodSharing) {
   revalidatePath("/account/settings");
 }
 
-export type NotifyPrefs = Partial<Record<"props" | "comments" | "messages" | "pods" | "workouts" | "coaching" | "sleep", boolean>>;
+export type NotifyPrefs = Partial<Record<"props" | "comments" | "messages" | "pods" | "workouts" | "coaching" | "sleep" | "fuel", boolean>>;
 
 export async function setNotifyPrefs(prefs: NotifyPrefs) {
   await requireUser();

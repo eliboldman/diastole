@@ -41,3 +41,4 @@ for (const id of ["quack", "heartbeat", "chime", "pop", "tone", "tick"]) {
   readFileSync(new URL(`../../public/sounds/${id}.m4a`, import.meta.url));
 }
 console.log("push sounds: all passed");
+assert.equal(groupOf("refuel", {}), "fuel");
