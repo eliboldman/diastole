@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     .in("athlete_id", ids)
     .eq("sport", "swim")
     .not("external_id", "is", null)
+    .neq("status", "completed")
     .is("deleted_at", null)
     .gte("scheduled_date", today)
     .order("scheduled_date");
