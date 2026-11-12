@@ -1,7 +1,8 @@
 #!/bin/zsh
-# Archive the iPhone app (with the widget) and upload it to TestFlight.
+# Archive the iPhone app (with the widget), or the Apple TV app, and upload it to TestFlight.
 #
-#   ios/testflight.sh                         archive + upload
+#   ios/testflight.sh                         iPhone: archive + upload
+#   ios/testflight.sh tv                      Apple TV: archive + upload (same app record, tvOS platform)
 #   ios/testflight.sh setup <AuthKey.p8> <issuer-id>   one-time: install an App Store Connect API key
 #
 # With an API key installed, uploads don't depend on Xcode's Apple ID sign-in. Without one, it falls
@@ -38,11 +39,16 @@ else
   echo "No API key installed; using Xcode's signed-in account"
 fi
 
-OUT="${TMPDIR:-/tmp}/diastole-testflight"
+SCHEME=Diastole PLATFORM=iOS SIGN=()
+# No Apple TV is registered on the team, so sign the TV archive for distribution directly (an App
+# Store profile needs no devices; a development profile does). The archive is left unsigned and the
+# upload step signs it for the App Store.
+if [[ "${1:-}" == "tv" ]]; then SCHEME=DiastoleTV PLATFORM=tvOS SIGN=(CODE_SIGNING_ALLOWED=NO); echo "Apple TV build"; fi
+OUT="${TMPDIR:-/tmp}/diastole-testflight-$SCHEME"
 rm -rf "$OUT" && mkdir -p "$OUT"
-xcodebuild -project "$HERE/Diastole.xcodeproj" -scheme Diastole -configuration Release \
-  -destination generic/platform=iOS -archivePath "$OUT/Diastole.xcarchive" \
-  -allowProvisioningUpdates "${AUTH[@]}" archive | grep -E "error:|warning: .*signing|ARCHIVE" || true
+xcodebuild -project "$HERE/Diastole.xcodeproj" -scheme "$SCHEME" -configuration Release \
+  -destination "generic/platform=$PLATFORM" -archivePath "$OUT/Diastole.xcarchive" \
+  -allowProvisioningUpdates "${AUTH[@]}" "${SIGN[@]}" archive | grep -E "error:|warning: .*signing|ARCHIVE" || true
 [[ -d "$OUT/Diastole.xcarchive" ]] || { echo "Archive failed"; exit 1; }
 export_with() {
   rm -rf "$OUT/export"
