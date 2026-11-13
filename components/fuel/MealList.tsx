@@ -7,7 +7,8 @@ import { useState, useTransition } from "react";
 import type { MealRow } from "@/lib/fuel/data";
 import EatenPicker from "@/components/fuel/EatenPicker";
 import { localDateOf, type EatenAt } from "@/lib/fuel/eaten";
-import { deleteMeal, relogMeal, setMealTime } from "@/lib/fuel/meal-actions";
+import { deleteMeal, relogMeal, restoreMeal, setMealTime } from "@/lib/fuel/meal-actions";
+import { useToast } from "@/components/coach/Toast";
 import { SLOT_LABEL, type Slot } from "@/lib/fuel/meals";
 
 const time = (iso: string, timeZone: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
@@ -19,17 +20,25 @@ function useAct() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
-  const run = (id: string, fn: () => Promise<{ ok: boolean; error?: string }>) => {
+  const { show, element: toast } = useToast(6000);
+  const run = (id: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: (r: { ok: boolean; error?: string }) => void) => {
     setBusy(id);
     setError(null);
     start(async () => {
       const r = await fn();
       if (!r.ok) setError(r.error ?? "Something went wrong.");
+      else after?.(r);
       setBusy(null);
       router.refresh();
     });
   };
-  return { busy, error, run };
+  // Remove a meal, with a few seconds to take it back.
+  const remove = (id: string, label: string) =>
+    run(id, () => deleteMeal(id), (r) => {
+      const removed = (r as { removed?: Record<string, unknown> }).removed;
+      show(`${label} removed.`, removed ? { onUndo: () => run(id, () => restoreMeal(removed)) } : {});
+    });
+  return { busy, error, run, remove, toast };
 }
 
 /** Today's meals (athlete can remove one), then their usual meals and recents to log again in one tap. */
@@ -48,12 +57,13 @@ export default function MealList({
   numbers?: boolean;
   editable?: boolean;
 }) {
-  const { busy, error, run } = useAct();
+  const { busy, error, run, remove, toast } = useAct();
   const [editing, setEditing] = useState<string | null>(null);
   // Starts as "Other time" so the picker opens on the meal's current day and time.
   const [when, setWhen] = useState<EatenAt>({ date: "", time: "" });
   return (
     <div className="space-y-5">
+      {toast}
       {meals.length > 0 && (
         <ul className="space-y-2">
           {meals.map((m) => (
@@ -105,7 +115,7 @@ export default function MealList({
               </div>
               {editable && (
                 <button
-                  onClick={() => run(m.id, () => deleteMeal(m.id))}
+                  onClick={() => remove(m.id, m.label || "Meal")}
                   className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.08]"
                   aria-label={`Remove ${m.label || "meal"}`}
                 >

@@ -6,7 +6,7 @@ import { cleanEstimate, confirmItem, SCALES, totals, type LoggedItem } from "@/l
 import { localDateOf, resolveEatenAt, type EatenAt } from "@/lib/fuel/eaten";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
-type Result = { ok: true; id?: string } | { ok: false; error: string };
+type Result = { ok: true; id?: string; removed?: Record<string, unknown> } | { ok: false; error: string };
 const UUID = /^[0-9a-f-]{36}$/i;
 
 function refresh() {
@@ -108,8 +108,21 @@ export async function deleteMeal(id: string): Promise<Result> {
   const me = await requireUser();
   if (!UUID.test(id)) return { ok: false, error: "Unknown meal." };
   const supabase = await createClient();
-  const { error } = await supabase.from("meal_logs").delete().eq("id", id).eq("athlete_id", me.id);
+  const { data: gone, error } = await supabase.from("meal_logs").delete().eq("id", id).eq("athlete_id", me.id).select("id, local_date, eaten_at, label, items, carbs_g, protein_g, fat_g, source, note, created_at").maybeSingle();
   if (error) return { ok: false, error: "Couldn't remove that meal." };
+  refresh();
+  return { ok: true, removed: gone ?? undefined };
+}
+
+/** Undo a removal: put the same meal back (same id and time). */
+export async function restoreMeal(meal: Record<string, unknown>): Promise<Result> {
+  const me = await requireUser();
+  if (!meal || typeof meal.id !== "string" || !UUID.test(meal.id)) return { ok: false, error: "Nothing to restore." };
+  const pick = ["id", "local_date", "eaten_at", "label", "items", "carbs_g", "protein_g", "fat_g", "source", "note", "created_at"] as const;
+  const row = Object.fromEntries(pick.filter((k) => k in meal).map((k) => [k, meal[k]]));
+  const supabase = await createClient();
+  const { error } = await supabase.from("meal_logs").insert({ ...row, athlete_id: me.id });
+  if (error) return { ok: false, error: "Couldn't put it back." };
   refresh();
   return { ok: true };
 }

@@ -1,7 +1,8 @@
 "use client";
 
+import { useToast } from "@/components/coach/Toast";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { createPod, deletePod, inviteToPod, removeFromPod, respondToPod, type Result } from "@/lib/pods";
 
@@ -120,18 +121,26 @@ export function RespondToInvite({ podId }: { podId: string }) {
 export function LeavePod({ podId, name }: { podId: string; name: string }) {
   const router = useRouter();
   const { pending, error, run } = useAction();
+  const { show, element } = useToast(5000);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  // Leaves after 5 seconds unless Undo is tapped (no "are you sure?" pop-up).
+  const leave = () => {
+    setLeaving(true);
+    timer.current = setTimeout(() => run(() => respondToPod(podId, "leave"), () => router.push("/me")), 5000);
+    show(`Leaving "${name}"… pod members stop seeing your data.`, {
+      onUndo: () => {
+        if (timer.current) clearTimeout(timer.current);
+        setLeaving(false);
+      },
+    });
+  };
   return (
     <>
-      <button
-        disabled={pending}
-        className={quiet}
-        onClick={() =>
-          confirm(`Leave "${name}"? Pod members will stop seeing your data right away.`) &&
-          run(() => respondToPod(podId, "leave"), () => router.push("/me"))
-        }
-      >
-        Leave pod
+      <button disabled={pending || leaving} className={quiet} onClick={leave}>
+        {leaving ? "Leaving…" : "Leave pod"}
       </button>
+      {element}
       {error && <p className="text-sm text-red-300">{error}</p>}
     </>
   );
