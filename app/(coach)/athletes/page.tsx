@@ -1,3 +1,4 @@
+import ResendInvite from "@/components/coach/ResendInvite";
 import RosterBulk from "@/components/roster/RosterBulk";
 import { ensureDemoForNewCoach } from "@/lib/demo/demo-athlete";
 import Link from "next/link";
@@ -25,7 +26,7 @@ export default async function AthletesPage() {
   const [{ data: athletes }, { data: connections }, { data: coachInvites }, { data: dietitians }, { data: dietitianInvites }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, created_at").eq("coach_id", coach.id).eq("is_test", false).order("full_name"),
     supabase.from("device_connections").select("athlete_id, source, last_synced_at"),
-    supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "coach").order("created_at", { ascending: false }),
+    supabase.from("invites").select("id, email, created_at").eq("coach_id", coach.id).eq("role", "coach").is("accepted_at", null).order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, full_name, email, created_at, dietitian_all").eq("team_coach_id", coach.id).eq("role", "dietitian").order("full_name"),
     supabase.from("invites").select("id, email, created_at, dietitian_all, dietitian_athletes").eq("coach_id", coach.id).eq("role", "dietitian").is("accepted_at", null).order("created_at", { ascending: false }),
   ]);
@@ -69,10 +70,11 @@ export default async function AthletesPage() {
           {!!coachInvites?.length && (
             <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
               {coachInvites.map((i) => (
-                <li key={i.id} className="flex flex-wrap justify-between gap-x-4 py-2">
+                <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-4 py-1">
                   <span className="text-white/80">{i.email}</span>
-                  <span className="text-white/50">
+                  <span className="flex items-center gap-2 text-white/50">
                     Invited {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    <ResendInvite id={i.id} />
                   </span>
                 </li>
               ))}
@@ -101,6 +103,7 @@ export default async function AthletesPage() {
               {(dietitianInvites ?? []).map((i) => (
                 <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending>
                   <DietitianAccess target={{ invite: i.id }} roster={roster} all={i.dietitian_all} picked={(i.dietitian_athletes ?? []) as string[]} />
+                  <ResendInvite id={i.id} />
                 </DietitianRow>
               ))}
             </ul>

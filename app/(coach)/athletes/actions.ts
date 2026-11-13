@@ -144,3 +144,38 @@ export async function setDietitianAccess(target: { dietitian: string } | { invit
   revalidatePath("/athletes");
   return { ok: true, message: all ? "Saved: sees all athletes." : `Saved: sees ${ids.length} athlete${ids.length === 1 ? "" : "s"}.` };
 }
+
+/**
+ * Send a pending invite again (invite links expire). Keeps this invite, drops older duplicates for
+ * the same email, and sends a fresh invite email; if their account already exists but was never
+ * used, a sign-in link goes out instead (same result: they land signed in).
+ */
+export async function resendInvite(inviteId: string): Promise<RemoveState> {
+  const coach = await requireCoach();
+  const supabase = await createClient();
+  const { data: inv } = await supabase.from("invites").select("id, email, role, created_at, accepted_at").eq("id", inviteId).eq("coach_id", coach.id).maybeSingle();
+  if (!inv) return { ok: false, error: "Invite not found." };
+  if (inv.accepted_at) return { ok: false, error: "They've already joined." };
+  await supabase.from("invites").delete().eq("coach_id", coach.id).eq("email", inv.email).is("accepted_at", null).neq("id", inv.id);
+  // Fresh date, so the list shows when it was last sent.
+  await supabase.from("invites").update({ created_at: new Date().toISOString() }).eq("id", inv.id);
+  const redirectTo = `${await siteUrl()}/auth/callback`;
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.inviteUserByEmail(inv.email, { redirectTo });
+  if (!error) {
+    revalidatePath("/athletes");
+    return { ok: true, message: `Sent a new invite to ${inv.email}.` };
+  }
+  if (error.status === 429) return { ok: false, error: "Email limit reached (about 2 emails an hour on the free tier). Try again later." };
+  if (error.status === 422 || /already been registered/i.test(error.message)) {
+    const { data: existing } = await admin.from("profiles").select("id, welcomed_at").eq("email", inv.email).maybeSingle();
+    // Signs them in with a one-time link. (The invite row still tells the sign-up trigger their role.)
+    const { createClient: plain } = await import("@supabase/supabase-js");
+    const anon = plain(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
+    const { error: e2 } = await anon.auth.signInWithOtp({ email: inv.email, options: { shouldCreateUser: false, emailRedirectTo: redirectTo } });
+    if (e2) return { ok: false, error: e2.status === 429 ? "Email limit reached. Try again in a bit." : e2.message };
+    revalidatePath("/athletes");
+    return { ok: true, message: existing ? `${inv.email} already has an account, so we sent them a sign-in link.` : `Sent a sign-in link to ${inv.email}.` };
+  }
+  return { ok: false, error: error.message };
+}
