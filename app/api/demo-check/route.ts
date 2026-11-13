@@ -17,7 +17,7 @@ export async function GET() {
   } catch (e) {
     const { data: left } = await admin.from("profiles").select("id").eq("email", `demo-${coach.id.slice(0, 8)}@test.diastole.app`).maybeSingle();
     if (left) await admin.auth.admin.deleteUser(left.id);
-    return NextResponse.json({ ok: false, error: String(e) });
+    return NextResponse.json({ ok: false, error: String(e), stack: e instanceof Error ? e.stack?.split("\n").slice(0, 6) : null });
   } finally {
     await admin.from("profiles").update({ demo_seeded_at: before?.demo_seeded_at ?? new Date().toISOString() }).eq("id", coach.id);
   }
