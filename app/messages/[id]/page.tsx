@@ -46,12 +46,20 @@ export default async function ConversationPage({
   const { data: avatars } = await supabase.rpc("get_avatars", { p_ids: conv.people.map((p) => p.id) });
   const looks = (avatars ?? {}) as Record<string, unknown>;
 
-  const other = conv.people.find((p) => !p.is_me && conv.kind === "direct");
+  const other = conv.people.find((p) => !p.is_me && conv.kind !== "pod");
   const subtitle =
-    conv.kind === "pod" ? `Pod chat · ${conv.people.length} ${conv.people.length === 1 ? "person" : "people"}` : other?.role === "coach" ? "Your coach" : "Athlete";
+    conv.kind === "pod"
+      ? `Pod chat · ${conv.people.length} ${conv.people.length === 1 ? "person" : "people"}`
+      : other?.role === "coach"
+        ? "Your coach"
+        : other?.role === "dietitian"
+          ? "Team dietitian · only the two of you see this"
+          : conv.kind === "dietitian"
+            ? "Athlete · only the two of you see this"
+            : "Athlete";
 
   return (
-    <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
+    <DashboardShell role={me.role === "coach" ? "coach" : me.role === "dietitian" ? "dietitian" : "athlete"}>
       <div className="mx-auto max-w-3xl">
         <BackLink href="/messages" label="Messages" />
         <header className="mt-3 flex items-center gap-3 border-b border-white/[0.08] pb-4">

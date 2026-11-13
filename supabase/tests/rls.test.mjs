@@ -1339,5 +1339,61 @@ check("a coach reply notifies the athlete", (await db.query(`select id from publ
   check("'quiet' outcome is allowed", true);
 }
 
+// Dietitian <-> athlete messages.
+{
+  const D1 = "00000000-0000-0000-0000-0000000000d1";
+  const D2 = "00000000-0000-0000-0000-0000000000d2";
+  // D1 sees only A1; D2 sees everyone.
+  await db.query(`update public.profiles set dietitian_all = false where id = '${D1}'`);
+  await db.query(`delete from public.dietitian_athletes where dietitian_id = '${D1}'`);
+  await db.query(`insert into public.dietitian_athletes (dietitian_id, athlete_id) values ('${D1}', '${A1}')`);
+  await db.query(`update public.profiles set dietitian_all = true where id = '${D2}'`);
+
+  r = await as(D1, `select public.open_direct_conversation('${A1}') as id`);
+  const conv = r.rows?.[0]?.id;
+  check("dietitian opens a thread with an athlete they can see", !!conv);
+  check("it's a dietitian thread, not the coach's", (await db.query(`select kind, coach_id from public.conversations where id = '${conv}'`)).rows[0]?.kind === "dietitian");
+  r = await as(A1, `select public.open_direct_conversation('${D1}') as id`);
+  check("athlete opening it lands in the same thread", r.rows?.[0]?.id === conv);
+  r = await as(D1, `select public.open_direct_conversation('${A2}') as id`);
+  check("dietitian can't open a thread with an athlete they can't see", r.rows?.[0]?.id === null);
+  r = await as(A2, `select public.open_direct_conversation('${D1}') as id`);
+  check("athlete can't open a thread with a dietitian who can't see them", r.rows?.[0]?.id === null);
+  r = await as(A1, `select public.open_direct_conversation('${COACH}') as id`);
+  check("the athlete's coach thread is still separate", !!r.rows?.[0]?.id && r.rows[0].id !== conv);
+
+  r = await as(D1, `insert into public.messages (conversation_id, sender_id, body) values ('${conv}', '${D1}', 'Try a yogurt after practice?') returning id`);
+  check("dietitian sends", r.rows?.length === 1);
+  r = await as(A1, `insert into public.messages (conversation_id, sender_id, body) values ('${conv}', '${A1}', 'Will do') returning id`);
+  check("athlete replies", r.rows?.length === 1);
+  r = await as(A1, `select count(*)::int as n from public.notifications where kind = 'message' and dedupe_key = 'msg:${conv}'`);
+  check("athlete was notified of the dietitian's message", r.rows?.[0]?.n === 1);
+  r = await as(D1, `select count(*)::int as n from public.messages where conversation_id = '${conv}'`);
+  check("dietitian reads the thread", r.rows?.[0]?.n === 2);
+  r = await as(COACH, `select count(*)::int as n from public.messages where conversation_id = '${conv}'`);
+  check("the coach can't read dietitian threads", r.rows?.[0]?.n === 0);
+  r = await as(D2, `select count(*)::int as n from public.messages where conversation_id = '${conv}'`);
+  check("another dietitian can't read it", r.rows?.[0]?.n === 0);
+  r = await as(A2, `insert into public.messages (conversation_id, sender_id, body) values ('${conv}', '${A2}', 'hi') returning id`);
+  check("another athlete can't post in it", !!r.error || r.rows?.length === 0);
+  r = await as(A1, `select public.get_inbox() as i`);
+  const row = (r.rows?.[0]?.i ?? []).find((x) => x.id === conv);
+  check("it shows in the athlete's inbox with the dietitian as the other person", row?.other_id === D1 && row?.kind === "dietitian");
+  r = await as(A1, `select id from public.my_dietitians()`);
+  check("athlete lists the dietitians who can see them", r.rows?.length === 2);
+  r = await as(A2, `select id from public.my_dietitians()`);
+  check("limited dietitian isn't listed for other athletes", r.rows?.length === 1 && r.rows[0].id === D2);
+
+  // The coach narrows access: the thread hides from both sides.
+  await as(COACH, `select public.set_dietitian_access('${D1}', false, array['${A2}'::uuid])`);
+  r = await as(D1, `select count(*)::int as n from public.messages where conversation_id = '${conv}'`);
+  check("removing access hides the thread from the dietitian", r.rows?.[0]?.n === 0);
+  r = await as(A1, `insert into public.messages (conversation_id, sender_id, body) values ('${conv}', '${A1}', 'still there?') returning id`);
+  check("and the athlete can't post into it", !!r.error || r.rows?.length === 0);
+  await as(COACH, `select public.set_dietitian_access('${D1}', false, array['${A1}'::uuid])`);
+  r = await as(D1, `select count(*)::int as n from public.messages where conversation_id = '${conv}'`);
+  check("restoring access brings it back", r.rows?.[0]?.n === 2);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

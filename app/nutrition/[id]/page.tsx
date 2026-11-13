@@ -61,9 +61,17 @@ export default async function NutritionAthletePage({ params, searchParams }: { p
             {` · Fuel page shows: ${FUEL_MODES[mode].label.toLowerCase()}`}
           </p>
         </div>
-        <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-white/10 px-4 text-sm text-emerald-200/90 hover:bg-white/[0.05]">
-          Full athlete view: training, readiness, activities →
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/messages/start?to=${id}`}
+            className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20"
+          >
+            Message {name.split(" ")[0]}
+          </Link>
+          <Link href={`/athlete/${id}`} className="inline-flex min-h-11 items-center rounded-2xl border border-white/10 px-4 text-sm text-emerald-200/90 hover:bg-white/[0.05]">
+            Full athlete view: training, readiness, activities →
+          </Link>
+        </div>
       </div>
 
       {/* Summary */}

@@ -710,7 +710,7 @@ export default function Thread({
         {first && group && !mine && (
           <span className="mb-1 ml-1 flex items-center gap-1.5 text-xs text-white/50">
             <AvatarCircle look={avatars[m.sender_id]} name={who?.name ?? "?"} size={22} />
-            {`${who?.name.split(" ")[0] ?? "Someone"}${who?.role === "coach" ? " · coach" : ""}`}
+            {`${who?.name.split(" ")[0] ?? "Someone"}${who?.role === "coach" ? " · coach" : who?.role === "dietitian" ? " · dietitian" : ""}`}
           </span>
         )}
         <div className="relative flex max-w-[85%] flex-col gap-1.5 sm:max-w-[70%]">

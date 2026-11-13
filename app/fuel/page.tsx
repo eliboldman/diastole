@@ -52,8 +52,21 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
           )}
           {dietitians.length > 0 && (
             <p className={`text-xs text-white/50 ${goals.note ? "mt-3" : ""}`}>
-              {dietitians.join(" and ")}, your team dietitian{dietitians.length > 1 ? "s" : ""}, can see your Diastole data and helps set your fueling goals.
+              {dietitians.map((d) => d.name).join(" and ")}, your team dietitian{dietitians.length > 1 ? "s" : ""}, can see your Diastole data and help{dietitians.length > 1 ? "" : "s"} set your fueling goals.
             </p>
+          )}
+          {dietitians.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {dietitians.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/messages/start?to=${d.id}`}
+                  className="inline-flex min-h-10 items-center rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20"
+                >
+                  Message {d.name.split(" ")[0]}
+                </Link>
+              ))}
+            </div>
           )}
         </section>
       )}
@@ -70,7 +83,7 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
 }
 
 /** Names of the team dietitians who can see this athlete (profiles aren't visible to athletes, so read server-side). */
-async function teamDietitians(coachId: string | null, athleteId: string): Promise<string[]> {
+async function teamDietitians(coachId: string | null, athleteId: string): Promise<{ id: string; name: string }[]> {
   if (!coachId) return [];
   const admin = createAdminClient();
   const [{ data }, { data: picked }] = await Promise.all([
@@ -78,5 +91,5 @@ async function teamDietitians(coachId: string | null, athleteId: string): Promis
     admin.from("dietitian_athletes").select("dietitian_id").eq("athlete_id", athleteId),
   ]);
   const mine = new Set((picked ?? []).map((p) => p.dietitian_id));
-  return (data ?? []).filter((d) => d.dietitian_all || mine.has(d.id)).map((d) => d.full_name || d.email || "A dietitian");
+  return (data ?? []).filter((d) => d.dietitian_all || mine.has(d.id)).map((d) => ({ id: d.id, name: d.full_name || d.email || "A dietitian" }));
 }

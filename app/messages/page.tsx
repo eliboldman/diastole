@@ -33,21 +33,32 @@ type Contact = { key: string; href: string; title: string; subtitle: string; pod
 export default async function MessagesPage() {
   const me = await requireUser();
   const coach = me.role === "coach";
+  const dietitian = me.role === "dietitian";
   const supabase = await createClient();
 
-  const [{ data: inbox }, people, pods] = await Promise.all([
+  const [{ data: inbox }, people, pods, { data: dietitians }] = await Promise.all([
     supabase.rpc("get_inbox"),
     coach
       ? supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.id).neq("id", me.id).eq("is_test", false).order("full_name")
-      : me.coach_id
-        ? supabase.from("profiles").select("id, full_name, email").eq("id", me.coach_id)
-        : Promise.resolve({ data: [] }),
+      : dietitian
+        ? me.team_coach_id
+          ? // Only the athletes this dietitian may see (row-level security narrows the team).
+            supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.team_coach_id).neq("id", me.team_coach_id).eq("is_test", false).order("full_name")
+          : Promise.resolve({ data: [] })
+        : me.coach_id
+          ? supabase.from("profiles").select("id, full_name, email").eq("id", me.coach_id)
+          : Promise.resolve({ data: [] }),
     coach
       ? supabase.from("pods").select("id, name").eq("coach_id", me.id).order("name")
-      : supabase.from("pod_members").select("pods(id, name)").eq("athlete_id", me.id).eq("status", "active"),
+      : dietitian
+        ? Promise.resolve({ data: [] as { id: string; name: string }[] })
+        : supabase.from("pod_members").select("pods(id, name)").eq("athlete_id", me.id).eq("status", "active"),
+    // Athletes: the team dietitians who can see them.
+    coach || dietitian ? Promise.resolve({ data: [] as { id: string; full_name: string }[] }) : supabase.rpc("my_dietitians"),
   ]);
   const rows = (inbox ?? []) as InboxRow[];
-  const ids = [...new Set([...rows.flatMap((r) => (r.other_id ? [r.other_id] : [])), ...(people.data ?? []).map((p) => p.id)])];
+  const dietitianList = (dietitians ?? []) as { id: string; full_name: string }[];
+  const ids = [...new Set([...rows.flatMap((r) => (r.other_id ? [r.other_id] : [])), ...(people.data ?? []).map((p) => p.id), ...dietitianList.map((d) => d.id)])];
   const { data: avatarRows } = ids.length ? await supabase.rpc("get_avatars", { p_ids: ids }) : { data: {} };
   const looks = (avatarRows ?? {}) as Record<string, unknown>;
   const active = rows.filter((r) => r.last);
@@ -65,14 +76,17 @@ export default async function MessagesPage() {
         key: p.id,
         href: `/messages/start?to=${p.id}`,
         title: p.full_name || p.email?.split("@")[0] || "Athlete",
-        subtitle: coach ? "Athlete" : "Your coach",
+        subtitle: coach || dietitian ? "Athlete" : "Your coach",
         pod: false,
       })),
+    ...dietitianList
+      .filter((d) => !talked.has(d.id))
+      .map((d) => ({ key: d.id, href: `/messages/start?to=${d.id}`, title: d.full_name, subtitle: "Team dietitian", pod: false })),
     ...podList.filter((p) => !talked.has(p.id)).map((p) => ({ key: p.id, href: `/messages/start?pod=${p.id}`, title: p.name, subtitle: "Pod chat", pod: true })),
   ];
 
   return (
-    <DashboardShell role={coach ? "coach" : "athlete"}>
+    <DashboardShell role={coach ? "coach" : dietitian ? "dietitian" : "athlete"}>
       <InboxLive />
       <div className="mx-auto max-w-3xl">
         <h1 className="text-4xl font-bold tracking-tight">Messages</h1>
@@ -108,7 +122,11 @@ export default async function MessagesPage() {
           </ul>
         ) : (
           <p className="mt-6 text-sm text-white/55">
-            {coach ? "No conversations yet. Start one with an athlete or a pod below." : "No messages yet. Say hi to your coach below."}
+            {coach
+              ? "No conversations yet. Start one with an athlete or a pod below."
+              : dietitian
+                ? "No conversations yet. Message an athlete below. Only you and that athlete see the thread."
+                : "No messages yet. Say hi to your coach below."}
           </p>
         )}
 

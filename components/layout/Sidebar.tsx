@@ -36,7 +36,10 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods)|connect|races|profile)/ },
   ],
   // A team dietitian: every athlete's nutrition, and from there their full athlete pages.
-  dietitian: [{ label: "Nutrition", href: "/nutrition", icon: Apple, match: /^\/(athlete|activity|profile)\// }],
+  dietitian: [
+    { label: "Nutrition", href: "/nutrition", icon: Apple, match: /^\/(athlete|activity|profile)\// },
+    { label: "Messages", href: "/messages", icon: MessageCircle },
+  ],
 };
 
 // Phones: a fixed bar at the bottom with each person's chosen places (Settings → Bottom tabs).

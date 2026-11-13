@@ -17,11 +17,11 @@ export type Message = {
 export const MESSAGE_COLUMNS =
   "id, conversation_id, sender_id, body, media_kind, media_path, media_meta, activity_id, planned_workout_id, deleted_at, created_at";
 
-export type Person = { id: string; name: string; role: "coach" | "athlete"; is_me: boolean };
+export type Person = { id: string; name: string; role: "coach" | "athlete" | "dietitian"; is_me: boolean };
 
 export type ConversationInfo = {
   id: string;
-  kind: "direct" | "pod";
+  kind: "direct" | "pod" | "dietitian";
   pod_id: string | null;
   title: string;
   other_id: string | null;
@@ -31,7 +31,7 @@ export type ConversationInfo = {
 
 export type InboxRow = {
   id: string;
-  kind: "direct" | "pod";
+  kind: "direct" | "pod" | "dietitian";
   pod_id: string | null;
   title: string;
   other_id: string | null;

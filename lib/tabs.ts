@@ -39,11 +39,12 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
   ],
   dietitian: [
     { id: "nutrition", label: "Nutrition", href: "/nutrition", match: "^/(athlete|activity|profile)/" },
+    { id: "messages", label: "Messages", href: "/messages" },
     { id: "help", label: "Help", href: "/help" },
   ],
 };
 
-export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "pods", "training", "fuel"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "help"] };
+export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "pods", "training", "fuel"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "messages", "help"] };
 export const TABS_COOKIE = "d_tabs";
 export const MIN_TABS = 3;
 export const MAX_TABS = 5;
