@@ -961,8 +961,13 @@ await as(A1, `insert into public.pod_challenge_entries (challenge_id, athlete_id
 await as(A2, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${A2}')`);
 r = await as(A2, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${A1}')`);
 check("you can only join as yourself", !!r.error);
+r = await as(STRANGER, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${STRANGER}')`);
+check("outsiders can't join a pod's challenge", !!r.error);
 r = await as(COACH, `insert into public.pod_challenge_entries (challenge_id, athlete_id) values ('${CH}', '${COACH}')`);
-check("the coach organizes but doesn't join", !!r.error);
+check("the pod's coach can join its challenge", !r.error);
+r = await as(A2, `select public.get_pod_challenges('${CPOD}') as c`);
+check("a coach who joined shows in the standings", !!r.rows?.[0]?.c?.[0]?.entries?.some((e) => e.athlete_id === COACH));
+await as(COACH, `delete from public.pod_challenge_entries where challenge_id = '${CH}' and athlete_id = '${COACH}'`);
 r = await as(A2, `select public.get_pod_challenges('${CPOD}') as c`);
 const ch = r.rows?.[0]?.c?.[0];
 const chA1 = ch?.entries?.find((e) => e.athlete_id === A1);

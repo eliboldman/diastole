@@ -48,7 +48,7 @@ export default function PodChallenges({
   podId: string;
   challenges: Challenge[];
   meId: string;
-  canJoin: boolean; // an active member (the coach organizes but doesn't compete)
+  canJoin: boolean; // an active member, or the pod's coach (joining is opt-in for everyone)
   isCoach: boolean;
   today: string;
   units: "mi" | "km";

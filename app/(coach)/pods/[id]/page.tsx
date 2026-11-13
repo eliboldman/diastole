@@ -86,7 +86,7 @@ export default async function CoachPodFeedPage({
                 </div>
               </details>
             </section>
-            <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin={false} isCoach today={today} units={coach.units} />
+            <PodChallenges podId={id} challenges={(challenges ?? []) as Challenge[]} meId={coach.id} canJoin isCoach today={today} units={coach.units} />
           </>
         ) : view === "feed" ? (
           <>
