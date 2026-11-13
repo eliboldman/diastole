@@ -2,7 +2,7 @@
 
 import { createClient, requireUser } from "@/lib/supabase/server";
 
-export type SearchHit = { kind: "athlete" | "workout" | "library" | "activity" | "pod" | "page"; title: string; sub: string | null; href: string };
+export type SearchHit = { kind: "action" | "athlete" | "workout" | "library" | "activity" | "pod" | "page"; title: string; sub: string | null; href: string };
 
 /** Escape LIKE wildcards so a typed % or _ is matched literally. */
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -32,6 +32,10 @@ const PAGES: { title: string; href: string; roles: ("coach" | "athlete" | "dieti
   { title: "Upload a workout file", href: "/me/upload", roles: ["coach", "athlete"], words: "fit file rouvy zwift trainerroad upload ride" },
   { title: "Garmin deliveries", href: "/garmin-log", roles: ["coach"], words: "webhook log sync" },
   { title: "AI test mode", href: "/lab", roles: ["coach"], words: "test lab fake athletes" },
+  { title: "Approvals", href: "/inbox", roles: ["coach"], words: "approve approvals inbox waiting pending bosses suggestions episodes requests briefs" },
+  { title: "Compare athletes", href: "/compare", roles: ["coach"], words: "compare side by side versus vs two athletes" },
+  { title: "Download my data", href: "/account/settings#data", roles: ["coach", "athlete"], words: "export download csv data spreadsheet" },
+  { title: "Grit bank and store", href: "/me/grit", roles: ["coach", "athlete"], words: "grit store shop stickers jerseys helmets auras themes" },
 ];
 
 /** Search what the signed-in person can see. Row-level security scopes every query. */
@@ -44,6 +48,8 @@ export async function search(raw: string): Promise<SearchHit[]> {
   const pat = like(q);
   const lower = q.toLowerCase();
   const hits: SearchHit[] = [];
+
+  hits.push(...(await actions(supabase, me, q)));
 
   const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -98,4 +104,41 @@ export async function search(raw: string): Promise<SearchHit[]> {
     if (p.title.toLowerCase().includes(lower) || p.words.includes(lower)) hits.push({ kind: "page", title: p.title, sub: "Page", href: p.href });
   }
   return hits.slice(0, 30);
+}
+
+/**
+ * Typed commands: "log oatmeal", "message Walker", "move Thursday", "new workout", "sick".
+ * They become the first results and open the right screen, ready to go.
+ */
+async function actions(supabase: Awaited<ReturnType<typeof createClient>>, me: Awaited<ReturnType<typeof requireUser>>, q: string): Promise<SearchHit[]> {
+  const out: SearchHit[] = [];
+  const log = q.match(/^(?:log|ate|had)\s+(.{2,})$/i);
+  if (log && me.role !== "dietitian") out.push({ kind: "action", title: `Log “${log[1]}”`, sub: "Opens the meal logger with this filled in", href: `/fuel?log=1&via=describe#t=${encodeURIComponent(log[1])}` });
+
+  const msg = q.match(/^(?:message|msg|text|dm|chat)\s+(.{2,})$/i);
+  if (msg) {
+    const name = msg[1].trim();
+    const pat = `%${name.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const people =
+      me.role === "athlete"
+        ? [
+            ...((await supabase.rpc("my_dietitians")).data ?? []).map((d: { id: string; full_name: string }) => ({ id: d.id, name: d.full_name })),
+            ...(me.coach_id ? [{ id: me.coach_id, name: "My coach" }] : []),
+          ].filter((p) => p.name.toLowerCase().includes(name.toLowerCase()) || /coach/i.test(name) === (p.name === "My coach"))
+        : ((await supabase.from("profiles").select("id, full_name").eq(me.role === "dietitian" ? "coach_id" : "coach_id", me.role === "dietitian" ? me.team_coach_id ?? "" : me.id).neq("id", me.id).ilike("full_name", pat).limit(4)).data ?? []).map((p) => ({ id: p.id, name: p.full_name ?? "Athlete" }));
+    for (const p of people.slice(0, 4)) out.push({ kind: "action", title: `Message ${p.name}`, sub: "Opens your chat", href: `/messages/start?to=${p.id}` });
+  }
+
+  if (/^(move|reschedule|swap|skip|can'?t|cannot|missed?)\b/i.test(q)) {
+    out.push(
+      me.role === "coach"
+        ? { kind: "action", title: "Change an athlete's plan", sub: "Open the athlete, then “Change of plans”, or drag on the team calendar", href: "/calendar" }
+        : { kind: "action", title: "Change a workout", sub: "Open it and tap “Life happened” to move, shorten or skip it", href: "/training" },
+    );
+  }
+  if (/^(sick|ill|injur|hurt)/i.test(q) && me.role !== "dietitian") out.push({ kind: "action", title: "I'm sick or injured", sub: "Pauses your plan and tells your coach", href: "/me#life" });
+  if (/^(new|build|create)\s+(workout|session)/i.test(q) && me.role === "coach") out.push({ kind: "action", title: "Build a new workout", sub: "The Endurance Lab", href: "/endurance-lab" });
+  if (/^(new|build|create)\s+(workout|session)/i.test(q) && me.role === "athlete") out.push({ kind: "action", title: "Build my own workout", sub: "My workouts", href: "/training/mine/new" });
+  if (/^(check ?in|how.*feel)/i.test(q) && me.role !== "dietitian") out.push({ kind: "action", title: "Check in on my last workout", sub: "How it felt, effort, sore spots", href: "/training" });
+  return out;
 }

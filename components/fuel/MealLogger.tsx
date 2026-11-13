@@ -121,7 +121,11 @@ export default function MealLogger({ numbers = true, autoOpen = false, compact =
     if (!open || !start || started.current) return;
     if (start === "scan" && !inApp && document.documentElement.dataset.app === "ios") return; // wait for the app bridge
     started.current = true;
+    // From search ("log oatmeal"): the food comes in the #t= part of the address (never sent to the server).
+    const typed = new URLSearchParams(window.location.hash.slice(1)).get("t");
+    if (start === "describe" && typed) history.replaceState(null, "", window.location.pathname + window.location.search);
     const t = setTimeout(() => {
+      if (start === "describe" && typed) setText(typed.slice(0, 500));
       if (start === "describe") noteRef.current?.focus();
       else if (start === "photo") fileRef.current?.click();
       else scan();

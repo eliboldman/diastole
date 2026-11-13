@@ -191,6 +191,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
         ) : null}
         {!pause && missedRow && <Spotlight tip={TIPS.lifeHappened} seen={seen(seenTips, TIPS.lifeHappened.id)} />}
+        {!pause && <span id="life" className="block scroll-mt-24" />}
         {!pause && <LifeHappened today={todayWorkout ? { id: todayWorkout.id, title: todayWorkout.title } : null} missed={missedRow ?? null} hasCoach={hasCoach} />}
       </section>
       </>

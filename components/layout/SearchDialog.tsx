@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpen, CalendarDays, FileText, Orbit, Search, User, X } from "lucide-react";
+import { Activity, BookOpen, CalendarDays, FileText, Orbit, Search, User, X, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { search, type SearchHit } from "@/lib/search";
 
 const ICON: Record<SearchHit["kind"], typeof User> = {
+  action: Zap,
   athlete: User,
   workout: CalendarDays,
   library: BookOpen,
@@ -16,6 +17,7 @@ const ICON: Record<SearchHit["kind"], typeof User> = {
   page: FileText,
 };
 const GROUP: Record<SearchHit["kind"], string> = {
+  action: "Do it",
   athlete: "Athletes",
   workout: "Workouts",
   library: "Library",
