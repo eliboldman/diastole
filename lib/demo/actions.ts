@@ -10,7 +10,7 @@ import { createAdminClient, createClient, requireCoach, requireUser } from "@/li
 // A coach can step into their own demo athlete's account (to try the athlete side) and back.
 // Only accounts marked is_demo on that coach's roster; the way back needs a signed cookie that
 // only this coach's browser got when it stepped in.
-export const DEMO_COOKIE = "d_demo_return";
+const DEMO_COOKIE = "d_demo_return";
 const sign = (coachId: string) => createHmac("sha256", process.env.SUPABASE_SECRET_KEY ?? "").update(`demo-return:${coachId}`).digest("base64url");
 
 async function signInAs(email: string) {
