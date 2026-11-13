@@ -74,6 +74,7 @@ enum DeepLink {
         case ("fuel", "describe"): return "/fuel?log=1&via=describe"
         case ("fuel", "meal"): return "/fuel?log=1"
         case ("fuel", _): return "/fuel"
+        case ("today", _): return "/me"
         default: return nil
         }
     }

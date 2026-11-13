@@ -49,7 +49,14 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.load(URLRequest(url: root))
     }
 
-    @objc private func pulled() { webView.reload() }
+    @objc private func pulled() {
+        if showingOffline { webView.load(URLRequest(url: root)) } else { webView.reload() }
+    }
+
+    /// True while the offline screen (OfflinePage) is up.
+    private(set) var showingOffline = false
+
+    func retry() { webView.load(URLRequest(url: root)) }
 
     /// Back to the first page, or to the top if already there.
     func reselect() {
@@ -84,13 +91,29 @@ final class WebPage: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh.endRefreshing()
+        showingOffline = webView.url?.path == "/offline"
+        if showingOffline { return }
+        // Back online with meals jotted down offline: open the logger with them filled in.
+        if let url = webView.url, AppConfig.isOwn(url), url.path != "/login", let meals = OfflinePage.takeQueued() {
+            var c = URLComponents(url: AppConfig.url("/fuel"), resolvingAgainstBaseURL: false)!
+            c.queryItems = [URLQueryItem(name: "log", value: "1"), URLQueryItem(name: "via", value: "describe")]
+            c.percentEncodedFragment = "t=" + (meals.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")
+            if let u = c.url { webView.load(URLRequest(url: u)) }
+            return
+        }
         PushCenter.shared.pageLoaded(self)
         HealthSync.shared.maybeSync(self)
         BedtimeNudges.shared.maybeRefresh(self)
         WatchLink.shared.pageLoaded(self)
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { refresh.endRefreshing() }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        refresh.endRefreshing()
+        if OfflinePage.isOffline(error) {
+            showingOffline = true
+            OfflinePage.show(in: webView)
+        }
+    }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
 
     // MARK: UI
@@ -172,6 +195,18 @@ final class PageBridge: NSObject, WKScriptMessageHandler {
         }
         if type == "fuelToday", let snapshot = body["snapshot"] {
             FuelShare.save(snapshot)
+            return
+        }
+        if type == "todayShare", let snapshot = body["snapshot"] {
+            TodayShare.save(snapshot)
+            return
+        }
+        if type == "queueMeal", let text = body["text"] as? String {
+            OfflinePage.queueMeal(text)
+            return
+        }
+        if type == "retry" {
+            message.webView?.load(URLRequest(url: AppConfig.url("/me")))
             return
         }
         if type == "haptic" {

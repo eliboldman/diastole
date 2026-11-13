@@ -81,7 +81,7 @@ final class PushCenter {
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        BedtimeNudges.registerCategory()
+        QuickActions.registerAll()
         // Background delivery needs its observers set up at every launch, including ones iOS starts
         // in the background for new Health data.
         HealthSync.shared.startBackgroundDelivery()
@@ -113,16 +113,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let href = response.notification.request.content.userInfo["href"] as? String
         let bedtimeDate = response.notification.request.content.userInfo["bedtimeDate"] as? String
         let action = response.actionIdentifier
+        let typed = (response as? UNTextInputNotificationResponse)?.userText
         nonisolated(unsafe) let done = completionHandler
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 if action == BedtimeNudges.snoozeAction, let bedtimeDate {
                     BedtimeNudges.shared.snooze(bedtimeDate) // "Not tonight": no app opening
-                } else if let href {
-                    PushCenter.shared.open(href)
+                    done()
+                } else if action != UNNotificationDefaultActionIdentifier && action != UNNotificationDismissActionIdentifier {
+                    // "Had protein ✓", "Reply": done in the background, then tell iOS we're finished.
+                    Task { @MainActor in
+                        let handled = await QuickActions.handle(action: action, href: href, text: typed)
+                        if !handled, let href { PushCenter.shared.open(href) }
+                        done()
+                    }
+                } else {
+                    if let href { PushCenter.shared.open(href) }
+                    done()
                 }
             }
-            done()
         }
     }
 }

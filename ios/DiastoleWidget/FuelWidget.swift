@@ -328,6 +328,7 @@ struct FuelControl: ControlWidget {
 @main
 struct DiastoleWidgets: WidgetBundle {
     var body: some Widget {
+        TodayWidget()
         FuelWidget()
         FuelControl()
     }
