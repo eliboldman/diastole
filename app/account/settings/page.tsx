@@ -139,6 +139,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <p className="mb-3 text-sm text-white/55">Choose what reaches your bell and your phone, and how each sounds in the Diastole app. Pick a sound to hear it.</p>
             <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} sounds={(profile?.push_sounds ?? {}) as Record<string, unknown>} />
           </section>
+          <section id="data" className={card}>
+            <h2 className="mb-1 text-lg font-medium">Your data</h2>
+            <p className="mb-3 text-sm text-white/55">Download what Diastole has for you as spreadsheets (CSV).</p>
+            <div className="flex flex-wrap gap-2">
+              {[["activities", "Workouts done"], ["workouts", "Planned workouts"], ["wellness", "Sleep, HRV, resting HR"], ["meals", "Meals"], ["checkins", "Check-ins"]].map(([k, label]) => (
+                <a key={k} href={`/api/export/me?kind=${k}`} download className="flex min-h-11 items-center rounded-2xl border border-white/15 px-4 text-sm text-white/80 hover:bg-white/[0.06]">
+                  {label}
+                </a>
+              ))}
+            </div>
+            {isCoach && (
+              <a href="/api/export/team?days=90" download className="mt-3 flex min-h-11 w-fit items-center rounded-2xl bg-emerald-300 px-4 text-sm font-semibold text-emerald-950">
+                Team training, last 90 days
+              </a>
+            )}
+          </section>
         </div>
 
         {isCoach && (
