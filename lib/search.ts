@@ -124,7 +124,7 @@ async function actions(supabase: Awaited<ReturnType<typeof createClient>>, me: A
         ? [
             ...((await supabase.rpc("my_dietitians")).data ?? []).map((d: { id: string; full_name: string }) => ({ id: d.id, name: d.full_name })),
             ...(me.coach_id ? [{ id: me.coach_id, name: "My coach" }] : []),
-          ].filter((p) => p.name.toLowerCase().includes(name.toLowerCase()) || /coach/i.test(name) === (p.name === "My coach"))
+          ].filter((p) => (p.name !== "My coach" && p.name.toLowerCase().includes(name.toLowerCase())) || (p.name === "My coach" && /coach/i.test(name)))
         : ((await supabase.from("profiles").select("id, full_name").eq(me.role === "dietitian" ? "coach_id" : "coach_id", me.role === "dietitian" ? me.team_coach_id ?? "" : me.id).neq("id", me.id).ilike("full_name", pat).limit(4)).data ?? []).map((p) => ({ id: p.id, name: p.full_name ?? "Athlete" }));
     for (const p of people.slice(0, 4)) out.push({ kind: "action", title: `Message ${p.name}`, sub: "Opens your chat", href: `/messages/start?to=${p.id}` });
   }

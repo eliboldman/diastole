@@ -59,7 +59,7 @@ const tabItems = (role: NavRole, ids: string[]): Item[] =>
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
     { label: "Approvals", href: "/inbox", icon: Inbox },
-    { label: "Calendar", href: "/calendar", icon: CalendarRange },
+    { label: "Team calendar", href: "/team-calendar", icon: CalendarRange },
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
     { label: "Pods", href: "/pods", icon: Orbit },
@@ -77,7 +77,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
 };
 
 // Coach-only pages always show the coach menu, even while a coach is in athlete view.
-const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox|compare)(\/|$)/;
+const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox|compare|team-calendar)(\/|$)/;
 
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href) return true;

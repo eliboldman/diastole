@@ -114,8 +114,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </div>
 
       {isCoach && (
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <CalendarAthletePicker athletes={roster} value={focus ?? ""} month={monthKey(month)} />
+          <Link href="/team-calendar" className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] px-4 text-sm text-emerald-100 hover:bg-emerald-300/[0.14]">
+            Team week: drag to move →
+          </Link>
         </div>
       )}
 
