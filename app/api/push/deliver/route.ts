@@ -1,3 +1,4 @@
+import { logEvent } from "@/lib/system/heartbeat";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { apnsConfigured, isDeadToken, sendPush, type ApnsEnv } from "@/lib/push/apns";
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
   const dead = results.filter(isDeadToken).map((r) => r.token);
   if (dead.length) await admin.from("push_tokens").delete().in("token", dead);
   const failed = results.filter((r) => r.status !== 200 && !isDeadToken(r));
-  if (failed.length) console.warn("APNs failures", failed.map((f) => ({ status: f.status, reason: f.reason })));
+  if (failed.length) {
+    console.warn("APNs failures", failed.map((f) => ({ status: f.status, reason: f.reason })));
+    await logEvent("apns_failure", { kind: n.kind, failures: failed.map((f) => ({ status: f.status, reason: f.reason })) });
+  }
   return NextResponse.json({ ok: true, sent: results.filter((r) => r.status === 200).length, removed: dead.length });
 }

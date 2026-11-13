@@ -1,4 +1,4 @@
-import { Backpack, CalendarDays, Dumbbell, Flag, Footprints, Gauge, Gem, HeartPulse, Image, KeyRound, LifeBuoy, Plug, Settings, ShieldCheck, Sparkles, Sun, Target, Utensils } from "lucide-react";
+import { Activity, Backpack, CalendarDays, Dumbbell, Flag, Footprints, Gauge, Gem, HeartPulse, Image, KeyRound, LifeBuoy, Plug, Settings, ShieldCheck, Sparkles, Sun, Target, Utensils } from "lucide-react";
 import type { Metadata } from "next";
 
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -22,6 +22,7 @@ export default async function MePage() {
   const me = await requireUser();
   const supabase = await createClient();
   const isCoach = me.role === "coach";
+  const admin = isCoach && !!(await supabase.from("profiles").select("is_admin").eq("id", me.id).maybeSingle()).data?.is_admin;
   const units = me.units === "km" ? "km" : "mi";
 
   const [{ data: readiness }, { data: devices }, { data: intervals }, { data: zones }, { data: gearRow }, { data: goals }, { data: notes }] = await Promise.all([
@@ -69,6 +70,7 @@ export default async function MePage() {
       <ProfileView id={me.id} me={me} order={[]} hero="compact" />
       <div className="mx-auto max-w-3xl pb-6">
         <MeGroup title="My training" rows={myTraining} />
+        {admin && <MeGroup title="Owner" rows={[{ href: "/health", icon: Activity, title: "System health", summary: "Scheduled jobs, pushes, Garmin and protein reminders" }]} />}
         <MeGroup
           title="How I'm doing"
           rows={[

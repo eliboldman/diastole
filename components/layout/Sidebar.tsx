@@ -76,7 +76,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
 };
 
 // Coach-only pages always show the coach menu, even while a coach is in athlete view.
-const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings)(\/|$)/;
+const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health)(\/|$)/;
 
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href) return true;

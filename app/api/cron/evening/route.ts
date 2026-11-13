@@ -1,3 +1,4 @@
+import { beat } from "@/lib/system/heartbeat";
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -27,5 +28,6 @@ export async function GET(request: NextRequest) {
   // Monday evenings: draft last week's pod episodes for the coach to review (never posted automatically).
   const stories = await draftWeeklyEpisodes(createAdminClient()).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   console.info("Evening run", result, batons, campfires, stories);
+  await beat("evening", true, { result, batons, campfires, stories });
   return NextResponse.json({ ok: true, result, batons, campfires, stories });
 }

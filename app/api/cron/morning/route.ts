@@ -1,3 +1,4 @@
+import { beat } from "@/lib/system/heartbeat";
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -78,5 +79,6 @@ export async function GET(request: NextRequest) {
   await admin.from("notifications").delete().not("read_at", "is", null).lt("created_at", new Date(Date.now() - 90 * day).toISOString());
   await admin.from("notifications").delete().lt("created_at", new Date(Date.now() - 365 * day).toISOString());
   console.info("Morning coach assistant", results);
+  await beat("morning", true, results);
   return NextResponse.json({ ok: true, results });
 }
