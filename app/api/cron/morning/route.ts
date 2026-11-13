@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
       })().catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
     }
   }
+  // Watches that went quiet: athlete gets a reconnect link, coach a heads-up (once per quiet spell).
+  results.stale = await admin.rpc("notify_stale_devices").then((r) => r.error?.message ?? r.data);
   // intervals.icu: re-send the coming weeks (catches anything a missed ping skipped) and bring in rides.
   const { data: icu } = await admin.from("intervals_connections").select("athlete_id");
   for (const c of icu ?? []) {

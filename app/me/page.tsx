@@ -1,3 +1,5 @@
+import SyncRepairCard from "@/components/devices/SyncRepairCard";
+import { staleDevice } from "@/lib/devices/stale";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -60,7 +62,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }, { data: layoutRow }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why, start_time, mystery, revealed_at").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
-    supabase.from("device_connections").select("source, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
+    supabase.from("device_connections").select("source, connected_at, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
 
@@ -68,6 +70,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     searchParams,
     supabase.from("profiles").select("layout, health_pause, seen_tips, grit_seen_at").eq("id", me.id).maybeSingle(),
   ]);
+  const staleWatch = device ? staleDevice([device], nowMs()) : null;
   // "Life happened": yesterday's session if it wasn't done, and sick/injured mode.
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
   const [{ data: missedRow }, { data: symptomsToday }, { data: rhrRow }] = await Promise.all([
@@ -254,6 +257,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </div>
       </div>
       {grit.balance > 0 && !showWelcome && <Spotlight tip={TIPS.grit} seen={seen(seenTips, TIPS.grit.id)} />}
+      {staleWatch && <SyncRepairCard {...staleWatch} />}
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
 
@@ -297,3 +301,5 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     </AthleteShell>
   );
 }
+
+const nowMs = () => Date.now();

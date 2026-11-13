@@ -1,3 +1,5 @@
+import SyncRepairCard from "@/components/devices/SyncRepairCard";
+import { staleDevice } from "@/lib/devices/stale";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -54,6 +56,7 @@ export default async function ConnectPage({
     .eq("athlete_id", profile.id);
 
   const connected = new Set((connections ?? []).map((c) => c.source));
+  const stale = await staleNow(connections);
   const firstName = profile.full_name?.split(" ")[0];
   const isAthlete = profile.role === "athlete";
 
@@ -159,6 +162,7 @@ export default async function ConnectPage({
           </>
         )}
 
+        {stale && <SyncRepairCard {...stale} />}
         {message && (
           <p
             className={`mt-6 rounded-2xl border p-3 text-sm ${
@@ -178,6 +182,9 @@ export default async function ConnectPage({
             body="Sign in with your Garmin Connect account and approve access to your health and activity data."
             disconnect={
               <div className="flex flex-wrap items-center justify-end gap-2">
+                <a href="/api/garmin/connect" className="inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
+                  Reconnect
+                </a>
                 <form action="/api/garmin/disconnect" method="post">
                   <button className="min-h-11 text-sm text-white/55 hover:text-white/70">
                     Disconnect Garmin
@@ -292,4 +299,8 @@ function ConnRow({ href, title, sub }: { href: string; title: string; sub: strin
       <span aria-hidden className="text-white/40">→</span>
     </Link>
   );
+}
+
+async function staleNow(conns: Parameters<typeof staleDevice>[0]) {
+  return staleDevice(conns, Date.now());
 }
