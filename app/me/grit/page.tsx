@@ -10,7 +10,7 @@ import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Grit · Diastole" };
+export const metadata: Metadata = { title: "Grit bank · Diastole" };
 
 const KIND_LABEL: Record<string, string> = {
   session: "Session",
@@ -45,11 +45,14 @@ export default async function GritPage() {
       </Link>
 
       <section className="row-in mt-4 rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-emerald-300/[0.10] to-white/[0.03] p-6 backdrop-blur-xl">
-        <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/70">Grit</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/70">Grit bank</p>
         <p className="mt-2 flex items-center gap-3 text-5xl font-semibold tabular-nums tracking-tight">
           <GritMark size={40} /> {grit.balance.toLocaleString()}
         </p>
-        <p className="mt-2 text-sm text-white/60">{earned30 > 0 ? `+${earned30.toLocaleString()} in the last 30 days.` : "Your first sessions will start it off."}</p>
+        <a href="#store" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-300 px-5 text-sm font-semibold text-emerald-950 transition active:scale-95 hover:bg-emerald-200">
+          Shop the store →
+        </a>
+        <p className="mt-3 text-sm text-white/60">{earned30 > 0 ? `+${earned30.toLocaleString()} in the last 30 days.` : "Your first sessions will start it off."}</p>
         <details className="group mt-4">
           <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm text-emerald-200 hover:underline">How you earn it</summary>
           <ul className="mt-1 grid gap-1.5 text-sm text-white/70">
@@ -62,7 +65,9 @@ export default async function GritPage() {
         </details>
       </section>
 
-      <GritStore balance={grit.balance} owned={grit.owned} gear={gearOf(avatar?.look)} look={avatar?.look ?? {}} />
+      <div id="store" className="scroll-mt-24">
+        <GritStore balance={grit.balance} owned={grit.owned} gear={gearOf(avatar?.look)} look={avatar?.look ?? {}} />
+      </div>
 
       <section className="mt-8">
         <h2 className="mb-2 px-1 text-xs font-medium uppercase tracking-[0.2em] text-white/45">History</h2>

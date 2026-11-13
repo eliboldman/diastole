@@ -1,12 +1,15 @@
 "use client";
 
-import { Apple, BookOpen, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { Apple, BookOpen, Gem, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { BackButton } from "@/components/layout/BackLink";
+import GritPill from "@/components/grit/GritPill";
+import ViewSwitch from "@/components/layout/ViewSwitch";
+import { VIEW_COOKIE, type View } from "@/lib/view";
 import HeartbeatLogo from "@/components/secrets/HeartbeatLogo";
 import SecretToast from "@/components/secrets/SecretToast";
 import { TAB_ICON } from "@/components/layout/tab-icons";
@@ -32,8 +35,9 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Today", href: "/me", icon: Sun, match: /^\/me$/ },
     { label: "Training", href: "/training", icon: Dumbbell, match: /^\/(calendar|activity)(\/|$)/ },
     { label: "Fuel", href: "/fuel", icon: Utensils },
+    { label: "Grit bank & store", short: "Grit", href: "/me/grit", icon: Gem },
     { label: "Messages", href: "/messages", icon: MessageCircle },
-    { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods)|connect|races|profile)/ },
+    { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods|grit)|connect|races|profile)/ },
   ],
   // A team dietitian: every athlete's nutrition, and from there their full athlete pages.
   dietitian: [
@@ -71,17 +75,52 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
   dietitian: [{ label: "Help", href: "/help", icon: LifeBuoy }],
 };
 
+// Coach-only pages always show the coach menu, even while a coach is in athlete view.
+const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings)(\/|$)/;
+
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
   return item.match ? item.match.test(pathname) : false;
 }
 
-export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: { role?: NavRole; tabs?: string[] }) {
-  const tabBar = tabItems(role, tabs);
+export default function Sidebar({
+  role: accountRole = "coach",
+  tabs = DEFAULT_TABS[accountRole],
+  athleteTabs = DEFAULT_TABS.athlete,
+  view: savedView = "coach",
+  grit = null,
+}: {
+  role?: NavRole;
+  tabs?: string[];
+  athleteTabs?: string[];
+  view?: View;
+  grit?: number | null;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const canSwitch = accountRole === "coach";
+  const [view, setView] = useState<View>(savedView);
+  const [prevSaved, setPrevSaved] = useState(savedView);
+  if (prevSaved !== savedView) {
+    setPrevSaved(savedView);
+    setView(savedView);
+  }
+  // A coach in athlete view gets the athlete menu everywhere except coach-only pages.
+  const role: NavRole = canSwitch && view === "athlete" && !COACH_PATH.test(pathname) ? "athlete" : accountRole;
+  const shownView: View = role === "athlete" ? "athlete" : "coach";
+  const switchTo = (next: View) => {
+    setView(next);
+    document.cookie = `${VIEW_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    const target = next === "athlete" ? "/me" : "/dashboard";
+    if (pathname === target) router.refresh();
+    else router.push(target);
+  };
+  const tabBar = tabItems(role, role === accountRole ? tabs : athleteTabs);
   const items = NAV[role];
   const shortcuts = SHORTCUTS[role];
   const home = role === "coach" ? "/dashboard" : role === "dietitian" ? "/nutrition" : "/me";
+  // Grit in the top bar on athlete pages (Today already has its own animated chip).
+  const showGrit = role === "athlete" && grit !== null && pathname !== "/me";
 
   const navLink = (item: Item, active: boolean) => (
     <Link
@@ -122,6 +161,8 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
       {/* Desktop: search and notifications top right */}
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
         <BackButton />
+        {showGrit && <span className="px-1"><GritPill balance={grit} active={pathname.startsWith("/me/grit")} /></span>}
+        {canSwitch && <ViewSwitch view={shownView} onSwitch={switchTo} />}
         <span className="relative inline-flex">
           <SearchButton />
         </span>
@@ -136,9 +177,11 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
         <div className="flex h-12 items-center justify-between pl-1 pr-1">
           <div className="flex min-w-0 items-center">
             <BackButton compact className="h-11 w-11 justify-center px-0" />
-            <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} />
+            <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} brand={!canSwitch && !showGrit} />
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center gap-1">
+            {canSwitch && <ViewSwitch compact view={shownView} onSwitch={switchTo} />}
+            {showGrit && <GritPill balance={grit} active={pathname.startsWith("/me/grit")} />}
             <span className="relative inline-flex">
               <SearchButton />
             </span>
@@ -176,7 +219,7 @@ export default function Sidebar({ role = "coach", tabs = DEFAULT_TABS[role] }: {
   );
 }
 
-function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; items: Item[]; shortcuts: Item[]; home: string }) {
+function MobileMenu({ pathname, items, shortcuts, home, brand = true }: { pathname: string; items: Item[]; shortcuts: Item[]; home: string; brand?: boolean }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
@@ -310,7 +353,7 @@ function MobileMenu({ pathname, items, shortcuts, home }: { pathname: string; it
         aria-label="Open menu"
       >
         <HeartbeatLogo size={26} />
-        <span className="text-sm font-semibold">Diastole</span>
+        <span className={`text-sm font-semibold ${brand ? "" : "hidden min-[420px]:inline"}`}>Diastole</span>
         <ChevronDown size={14} className={`text-white/45 transition-transform ${open ? "-rotate-90" : ""}`} aria-hidden />
       </button>
       {mounted && createPortal(drawer, document.body)}
