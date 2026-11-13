@@ -1,3 +1,4 @@
+import SettingsSearch from "@/components/SettingsSearch";
 import { ChevronRight, LogOut } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -68,8 +69,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <h1 className="mt-4 text-4xl font-bold tracking-tight">Settings</h1>
       <p className="mt-1 truncate text-sm text-white/50">{me.email}</p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className={card}>
+      <SettingsSearch container="settings-sections" />
+      <div id="settings-sections" className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section className={card} data-words="name timezone time zone units miles kilometers km mi">
           <h2 className="mb-4 text-lg font-medium">Profile</h2>
           <SettingsForm fullName={profile?.full_name ?? ""} timezone={profile?.timezone ?? "America/Chicago"} units={profile?.units === "km" ? "km" : "mi"} />
         </section>
@@ -134,7 +136,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <AppearanceSettings initialTheme={asTheme(profile?.theme)} initialLook={asLook(profile?.appearance)} unlock={secret === "icarus" ? "icarus" : undefined} owned={await ownedThemes(me.id)} />
           </section>
 
-          <section className={card}>
+          <section className={card} data-words="notifications push sounds alerts bell reminders protein quiet">
             <h2 className="mb-1 text-lg font-medium">Notifications</h2>
             <p className="mb-3 text-sm text-white/55">Choose what reaches your bell and your phone, and how each sounds in the Diastole app. Pick a sound to hear it.</p>
             <NotifySettings initial={(profile?.notify_prefs ?? {}) as Record<string, boolean>} coach={isCoach} sounds={(profile?.push_sounds ?? {}) as Record<string, unknown>} />
