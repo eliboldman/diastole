@@ -42,7 +42,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
         Every workout you build is saved here. Assign one to any athlete as a draft, then approve and send as usual.
       </p>
       <Spotlight tip={TIPS.plans} seen={seen(prof?.seen_tips, TIPS.plans.id)} />
-      <PlanCards plans={planCards} />
+      <div id="plans" className="scroll-mt-6"><PlanCards plans={planCards} /></div>
       <MasterList initial={cleanMaster((await supabase.from("coach_pack_lists").select("items").eq("coach_id", coach.id).maybeSingle()).data?.items)} />
       <ConnectImport athletes={(athletes ?? []).map((a) => ({ id: a.id, name: a.id === coach.id ? `${a.full_name || "You"} (you)` : a.full_name || a.email || "Athlete" }))} />
       <Library

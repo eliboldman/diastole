@@ -1,3 +1,4 @@
+import RosterBulk from "@/components/roster/RosterBulk";
 import { ensureDemoForNewCoach } from "@/lib/demo/demo-athlete";
 import Link from "next/link";
 
@@ -105,6 +106,9 @@ export default async function AthletesPage() {
           )}
         </section>
 
+        {(athletes ?? []).filter((a) => a.id !== coach.id).length > 1 && (
+          <RosterBulk athletes={(athletes ?? []).filter((a) => a.id !== coach.id).map((a) => ({ id: a.id, name: a.full_name || a.email || "Athlete" }))} pods={await coachPods(coach.id)} />
+        )}
         <section className="mt-6 grid gap-3">
           {(athletes ?? []).map((a) => {
             const device = deviceFor(a.id);
@@ -145,4 +149,9 @@ export default async function AthletesPage() {
       </div>
     </DashboardShell>
   );
+}
+
+async function coachPods(coachId: string) {
+  const { data } = await (await createClient()).from("pods").select("id, name").eq("coach_id", coachId).order("name");
+  return data ?? [];
 }

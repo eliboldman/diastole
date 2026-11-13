@@ -2,7 +2,7 @@
 
 import { ArrowRightLeft, CalendarCheck, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { applyTemplate, previewApply, type Preview } from "@/lib/plans/actions";
 
@@ -19,6 +19,16 @@ export default function ApplyPlan({ planId, raceWeek, weeks, athletes }: { planI
   const [send, setSend] = useState(false);
   const [pending, start] = useTransition();
   const dates = mode === "race" ? { raceDate: date } : { startDate: date };
+
+  // Athletes picked on the roster ("Apply a plan"), carried over once.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("d_plan_athletes") ?? "[]") as string[];
+      sessionStorage.removeItem("d_plan_athletes");
+      const valid = saved.filter((id) => athletes.some((a) => a.id === id));
+      if (valid.length) setTimeout(() => setPicked(valid), 0);
+    } catch {}
+  }, [athletes]);
 
   const toggle = (id: string) => {
     setPreviews(null);
