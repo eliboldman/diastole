@@ -185,7 +185,7 @@ export default function Sidebar({
             <span className="relative inline-flex">
               <SearchButton />
             </span>
-            {!tabs.includes("messages") && (
+            {!(role === accountRole ? tabs : athleteTabs).includes("messages") && !(canSwitch && showGrit) && (
               <Link href="/messages" aria-label="Messages" className={`flex h-11 w-11 items-center justify-center rounded-xl ${pathname.startsWith("/messages") ? "text-emerald-200" : "text-white/70"}`}>
                 <MessageCircle size={19} />
               </Link>
