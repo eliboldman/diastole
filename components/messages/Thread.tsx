@@ -1,5 +1,6 @@
 "use client";
 
+import SavedReplies from "@/components/messages/SavedReplies";
 import { ArrowUp, Bike, CalendarDays, Camera, Dumbbell, Footprints, Mic, Pause, Play, RotateCcw, Square, Trash2, Waves, X, Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -273,6 +274,7 @@ export default function Thread({
   attach: attachInitial,
   hasMore: hasMoreInitial,
   avatars = {},
+  replies = [],
 }: {
   conv: ConversationInfo;
   me: string;
@@ -281,6 +283,7 @@ export default function Thread({
   attach: WorkoutRef | null;
   hasMore: boolean;
   avatars?: Record<string, unknown>;
+  replies?: string[];
 }) {
   const supabase = browserClient();
   const { show, element: toast } = useToast(5000);
@@ -851,6 +854,14 @@ export default function Thread({
                 const f = e.target.files?.[0];
                 e.target.value = "";
                 if (f) void sendPhoto(f);
+              }}
+            />
+            <SavedReplies
+              initial={replies}
+              current={text}
+              onPick={(r) => {
+                setText((t) => (t.trim() ? `${t.trimEnd()} ${r}` : r));
+                requestAnimationFrame(() => box.current?.focus());
               }}
             />
             <textarea

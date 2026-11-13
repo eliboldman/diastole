@@ -70,9 +70,14 @@ export default async function ConversationPage({
           </span>
         </header>
         <div className="mt-2">
-          <Thread conv={conv} me={me.id} initial={messages} initialRefs={refs} attach={attach} avatars={looks} hasMore={(latest ?? []).length === PAGE} />
+          <Thread conv={conv} me={me.id} initial={messages} initialRefs={refs} attach={attach} avatars={looks} replies={await myReplies(me.id)} hasMore={(latest ?? []).length === PAGE} />
         </div>
       </div>
     </DashboardShell>
   );
+}
+
+async function myReplies(id: string): Promise<string[]> {
+  const { data } = await (await createClient()).from("profiles").select("saved_replies").eq("id", id).maybeSingle();
+  return Array.isArray(data?.saved_replies) ? (data.saved_replies as string[]) : [];
 }
