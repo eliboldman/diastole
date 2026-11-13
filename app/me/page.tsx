@@ -1,3 +1,4 @@
+import TodayShare from "@/components/today/TodayShare";
 import FirstWeek, { CHECKLIST_TIP } from "@/components/onboarding/FirstWeek";
 import WhyColor from "@/components/readiness/WhyColor";
 import SyncRepairCard from "@/components/devices/SyncRepairCard";
@@ -262,6 +263,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       </div>
       {grit.balance > 0 && !showWelcome && <Spotlight tip={TIPS.grit} seen={seen(seenTips, TIPS.grit.id)} />}
       {staleWatch && <SyncRepairCard {...staleWatch} />}
+      <TodayShare athleteId={me.id} today={today} units={me.units === "km" ? "km" : "mi"} readiness={readiness?.overall ?? null} note={readiness?.note ?? null} upcoming={workouts ?? []} />
       {me.role === "athlete" && !showWelcome && <FirstWeek athleteId={me.id} dismissed={seenTips.includes(CHECKLIST_TIP)} />}
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}

@@ -51,6 +51,8 @@ export async function POST(request: NextRequest) {
       ...(sound ? { sound } : {}),
       badge: unread ?? 1,
       "thread-id": group ?? n.kind,
+      // Long-press actions in the iPhone app (QuickActions.swift): "Had protein" / "Reply".
+      ...(n.kind === "refuel" ? { category: "REFUEL" } : n.kind === "message" ? { category: "MESSAGE" } : {}),
     },
     href: n.href ?? "/",
   };
