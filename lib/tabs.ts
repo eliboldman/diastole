@@ -25,6 +25,7 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
     { id: "athletes", label: "Athletes", href: "/athletes", match: "^/(athlete|pods)(/|$)|^/activity/" },
     { id: "lab", label: "Lab", href: "/endurance-lab", match: "^/(library|workouts|lab)(/|$)" },
     { id: "messages", label: "Messages", href: "/messages" },
+    { id: "inbox", label: "Approvals", href: "/inbox" },
     { id: "calendar", label: "Calendar", href: "/calendar" },
     { id: "workouts", label: "Workouts", href: "/workouts" },
     { id: "library", label: "Library", href: "/library" },

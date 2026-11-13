@@ -1,3 +1,4 @@
+import { inboxCount } from "@/lib/inbox/data";
 import { ensureDemoForNewCoach } from "@/lib/demo/demo-athlete";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export default async function TodayPage() {
   const coach = await requireCoach();
   await ensureDemoForNewCoach(coach.id);
   const roster = await getRoster(coach.id);
+  const waiting = await inboxCount(await createClient(), coach.id).catch(() => 0);
 
   // Coaching assistant: today's suggestions (last 2 days, so an early-morning run still shows), settings and spend.
   const supabase = await createClient();
@@ -117,6 +119,11 @@ export default async function TodayPage() {
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Today</h1>
+        {waiting > 0 && (
+          <Link href="/inbox" className="flex min-h-11 items-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/[0.10] px-4 text-sm font-medium text-amber-50 transition active:scale-95 hover:bg-amber-300/[0.16]">
+            {waiting} waiting on you →
+          </Link>
+        )}
         <Link href="/digest" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1]">
           <ClipboardList size={16} aria-hidden /> Weekly digest
         </Link>

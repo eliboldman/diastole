@@ -1,6 +1,6 @@
 "use client";
 
-import { Apple, BookOpen, Gem, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { Apple, BookOpen, Gem, Inbox, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -58,6 +58,7 @@ const tabItems = (role: NavRole, ids: string[]): Item[] =>
 // races, setup, connections, settings) lives under Me, so it isn't repeated here.
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
+    { label: "Approvals", href: "/inbox", icon: Inbox },
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
     { label: "Workouts", href: "/workouts", icon: CalendarDays },
     { label: "Library", href: "/library", icon: BookOpen },
@@ -76,7 +77,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
 };
 
 // Coach-only pages always show the coach menu, even while a coach is in athlete view.
-const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health)(\/|$)/;
+const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox)(\/|$)/;
 
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href) return true;
