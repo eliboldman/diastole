@@ -79,7 +79,9 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
 const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings)(\/|$)/;
 
 function isActive(pathname: string, item: Item) {
-  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
+  if (pathname === item.href) return true;
+  // Athlete Today (/me) owns only /me itself; /me/... pages belong to Grit, Me or Pods.
+  if (item.href !== "/me" && pathname.startsWith(`${item.href}/`)) return true;
   return item.match ? item.match.test(pathname) : false;
 }
 
