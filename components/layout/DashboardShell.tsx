@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import PhysiologyBackground from "@/components/PhysiologyBackground";
 import RoleCookie from "@/components/layout/RoleCookie";
+import DemoBanner from "@/components/demo/DemoBanner";
 import ShellBack from "@/components/layout/ShellBack";
 import Sidebar, { type NavRole } from "@/components/layout/Sidebar";
 import { VIEW_COOKIE, type View } from "@/lib/view";
@@ -40,7 +41,10 @@ export default async function DashboardShell({ children, tone = "green", role = 
       <ShellBack>
         <Sidebar role={role} tabs={tabs} athleteTabs={athleteTabs} view={view} grit={grit} />
         <RoleCookie role={role} />
-        <div className="page-breathe-in relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-8 md:py-10 md:pl-28">{children}</div>
+        <div className="page-breathe-in relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-8 md:py-10 md:pl-28">
+          {jar.get("d_demo_return") && <DemoBanner />}
+          {children}
+        </div>
       </ShellBack>
     </main>
   );

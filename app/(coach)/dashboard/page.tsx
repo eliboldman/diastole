@@ -1,3 +1,4 @@
+import { ensureDemoForNewCoach } from "@/lib/demo/demo-athlete";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -56,6 +57,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default async function TodayPage() {
   const coach = await requireCoach();
+  await ensureDemoForNewCoach(coach.id);
   const roster = await getRoster(coach.id);
 
   // Coaching assistant: today's suggestions (last 2 days, so an early-morning run still shows), settings and spend.

@@ -1,3 +1,4 @@
+import { ensureDemoForNewCoach } from "@/lib/demo/demo-athlete";
 import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
@@ -17,6 +18,7 @@ import RemoveAthlete from "./RemoveAthlete";
 
 export default async function AthletesPage() {
   const coach = await requireCoach();
+  await ensureDemoForNewCoach(coach.id);
   const supabase = await createClient();
 
   const [{ data: athletes }, { data: connections }, { data: coachInvites }, { data: dietitians }, { data: dietitianInvites }] = await Promise.all([

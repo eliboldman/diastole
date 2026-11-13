@@ -1,3 +1,4 @@
+import OpenDemoButton from "@/components/demo/OpenDemoButton";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -129,6 +130,7 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
         </div>
         <FlagBadge flag={overall} large />
       </div>
+      {!dietitian && (await isDemo(profile.id)) && <OpenDemoButton athleteId={profile.id} name={profile.full_name || "Demo athlete"} />}
 
       <ChangeOfPlans athleteId={profile.id} today={athleteToday} placeholder={`Change of plans for ${(profile.full_name ?? "").split(" ")[0] || "them"}? e.g. move Tuesday's intervals to Thursday`} />
 
@@ -284,4 +286,9 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
       </div>
     </DashboardShell>
   );
+}
+
+async function isDemo(id: string) {
+  const { data } = await (await createClient()).from("profiles").select("is_demo").eq("id", id).maybeSingle();
+  return !!data?.is_demo;
 }
