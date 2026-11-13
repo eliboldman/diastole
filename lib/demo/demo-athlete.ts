@@ -130,7 +130,7 @@ export async function seedDemoAthlete(coachId: string): Promise<string> {
   for (let d = 3; d >= 0; d--) {
     const date = addDays(today, -d);
     for (const m of d === 0 ? MEALS.slice(0, 1) : MEALS) {
-      meals.push({ athlete_id: id, local_date: date, eaten_at: new Date(`${date}T${String(m.h + 8).padStart(2, "0")}:00:00Z`).toISOString(), label: m.label, items: m.items, carbs_g: m.carbs, protein_g: m.protein, fat_g: m.fat, source: "text" });
+      meals.push({ athlete_id: id, local_date: date, eaten_at: new Date(Date.parse(`${date}T00:00:00Z`) + (m.h + 8) * 3_600_000).toISOString(), label: m.label, items: m.items, carbs_g: m.carbs, protein_g: m.protein, fat_g: m.fat, source: "text" });
     }
   }
   check("meals", await admin.from("meal_logs").insert(meals));
