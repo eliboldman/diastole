@@ -1,3 +1,4 @@
+import WhyColor from "@/components/readiness/WhyColor";
 import SyncRepairCard from "@/components/devices/SyncRepairCard";
 import { staleDevice } from "@/lib/devices/stale";
 import { redirect } from "next/navigation";
@@ -60,7 +61,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const settled = settleGrit(me.id, supabase).catch(() => 0);
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }, { data: layoutRow }] = await Promise.all([
-    supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why, start_time, mystery, revealed_at").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
     supabase.from("device_connections").select("source, connected_at, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
@@ -148,6 +149,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           )}
         </div>
         <p className="mt-3 text-white/70">{readiness?.note ?? "Waiting for your first data."}</p>
+        <WhyColor row={readiness as never} />
         <Link href="/account/body" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
           Recovery, sleep, stress and load →
         </Link>

@@ -27,7 +27,7 @@ const AREA_HELP: Record<(typeof AREAS)[number], string> = {
   load: "Last 7 days of training vs. the usual week (HR-weighted minutes)",
 };
 
-function detailLine(key: (typeof AREAS)[number], d: Record<string, unknown> | null | undefined) {
+export function detailLine(key: (typeof AREAS)[number], d: Record<string, unknown> | null | undefined) {
   if (!d) return null;
   const v = d as Record<string, Record<string, number> | number | undefined>;
   switch (key) {
