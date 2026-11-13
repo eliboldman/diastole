@@ -25,7 +25,7 @@ type Item = { label: string; href: string; icon: LucideIcon; short?: string; mat
 const NAV: Record<NavRole, Item[]> = {
   coach: [
     { label: "Today", href: "/dashboard", icon: Sun, match: /^\/digest(\/|$)/ },
-    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods)(\/|$)|^\/activity\// },
+    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods|compare)(\/|$)|^\/activity\// },
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
     // A coach's own athlete pages (day, training, fuel) live under Me.
@@ -77,7 +77,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
 };
 
 // Coach-only pages always show the coach menu, even while a coach is in athlete view.
-const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox)(\/|$)/;
+const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox|compare)(\/|$)/;
 
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href) return true;

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { Apple, CalendarRange, Orbit } from "lucide-react";
+import { Apple, CalendarRange, Orbit, GitCompare } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import QuickLinks from "@/components/layout/QuickLinks";
@@ -46,6 +46,7 @@ export default async function AthletesPage() {
         <QuickLinks
           links={[
             { href: "/pods", label: "Pods", icon: <Orbit size={16} aria-hidden /> },
+            { href: "/compare", label: "Compare", icon: <GitCompare size={16} aria-hidden /> },
             { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
             { href: "/nutrition", label: "Team fueling", icon: <Apple size={16} aria-hidden /> },
           ]}
