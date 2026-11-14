@@ -326,17 +326,6 @@ export default function PodProps({
         <span className="block text-sm font-medium">{s.label}</span>
         {s.line && <span className="block text-xs text-white/55">{s.line}</span>}
       </span>
-      {/* The running count sits on the sticker you're holding, so it's visible wherever the sheet is scrolled. */}
-      {combo?.sticker.key === s.key && (
-        <span
-          key={milestone(combo.n) ?? "x"}
-          className="success-pop pointer-events-none absolute -top-3 right-2 z-10 flex items-baseline gap-1.5 rounded-full border border-emerald-300/40 bg-panel px-2.5 py-0.5 text-sm font-semibold tabular-nums text-emerald-50 shadow-lg"
-          aria-live="polite"
-        >
-          ×{combo.n.toLocaleString()}
-          {milestone(combo.n) && <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-amber-200/85">{milestone(combo.n)}</span>}
-        </span>
-      )}
     </button>
   );
 
@@ -519,24 +508,8 @@ export default function PodProps({
               {note.length > NOTE_MAX - 30 && <span className="mt-1 block text-right text-xs text-white/45">{NOTE_MAX - note.length} left</span>}
             </label>
 
-            {/* The counter climbs while a sticker is held */}
-            <div className="flex h-20 flex-col items-center justify-center">
-              {combo ? (
-                <>
-                  <span key={milestone(combo.n) ?? "x"} className="success-pop text-3xl font-semibold tabular-nums">
-                    <StickerGlyph s={combo.sticker} /> ×{combo.n.toLocaleString()}
-                  </span>
-                  <span className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-amber-200/80">
-                    {milestone(combo.n) ?? "\u00a0"}
-                    <button type="button" onClick={undo} className="min-h-9 normal-case tracking-normal text-white/60 underline-offset-2 hover:text-white hover:underline">
-                      Undo
-                    </button>
-                  </span>
-                </>
-              ) : hint ? (
-                <span className="row-in text-sm text-white/50">psst… try holding one down</span>
-              ) : null}
-            </div>
+            {/* The count itself floats mid-screen (below); this line just teaches the hold. */}
+            <div className="flex h-10 items-center justify-center">{hint && !combo && <span className="row-in text-sm text-white/50">psst… try holding one down</span>}</div>
 
             {secrets.length > 0 && (
               <section className="mb-4">
@@ -568,6 +541,26 @@ export default function PodProps({
             </section>
           </div>
           </>,
+          document.body,
+        )}
+      {/* While counting in the sheet, the total floats in the middle of the screen, wherever the sheet is scrolled.
+          Its own portal: the sheet's backdrop-filter/transform would trap a fixed child. */}
+      {open &&
+        combo &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6">
+            <div className="flex flex-col items-center rounded-[28px] border border-white/10 bg-panel/90 px-7 py-4 shadow-2xl backdrop-blur-xl" aria-live="polite">
+              <span key={milestone(combo.n) ?? "x"} className="success-pop text-4xl font-semibold tabular-nums">
+                <StickerGlyph s={combo.sticker} /> ×{combo.n.toLocaleString()}
+              </span>
+              <span className="mt-1 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-amber-200/80">
+                {milestone(combo.n) ?? "\u00a0"}
+                <button type="button" onClick={undo} className="pointer-events-auto min-h-9 normal-case tracking-normal text-white/60 underline-offset-2 hover:text-white hover:underline">
+                  Undo
+                </button>
+              </span>
+            </div>
+          </div>,
           document.body,
         )}
       {/* Only set after a click, so this never runs during server rendering. */}
