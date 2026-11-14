@@ -1,3 +1,4 @@
+import { proposeReadinessSwap } from "@/lib/autocoach/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -136,7 +137,10 @@ export async function POST(request: NextRequest) {
       await linkPlannedWorkout(admin, a.id).catch(() => {});
     }
   }
-  if (body.wellness.length || newActivities.length) await refreshReadiness(me.id).catch((e) => console.warn("readiness refresh failed", e));
+  if (body.wellness.length || newActivities.length) {
+    const r = await refreshReadiness(me.id).catch((e) => console.warn("readiness refresh failed", e));
+    if (r && r.overall === "red") await proposeReadinessSwap(me.id).catch((e) => console.warn("readiness swap failed", e));
+  }
 
   // Upcoming sent workouts for the watch. Anything on the watch that isn't in this list gets removed.
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });

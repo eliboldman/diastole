@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { settleAllGrit } from "@/lib/grit/settle";
 import { runMonthlyBosses } from "@/lib/bosses/data";
 import { processAllBatons } from "@/lib/baton/run";
+import { evaluateCheckpoints, proposeReschedules } from "@/lib/autocoach/server";
 
 // Vercel Cron calls this once each morning (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
 export const maxDuration = 300;
@@ -73,6 +74,9 @@ export async function GET(request: NextRequest) {
   results.grit = await settleAllGrit(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // The 1st of the month: last month's recap for athletes, a team line for coaches.
   results.recaps = await runMonthlyRecaps(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+  // Self-coaching (plan athletes): a new day for yesterday's missed key sessions, checkpoint lanes.
+  results.reschedule = await proposeReschedules(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
+  results.checkpoints = await evaluateCheckpoints(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) }));
   // Notifications: read ones go after 90 days, everything after a year.
   const day = 86_400_000;
   // Read notifications clear themselves after a week; cleared ones are deleted after 30 days.

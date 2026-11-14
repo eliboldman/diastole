@@ -38,6 +38,7 @@
     "test:watch": "node lib/devices/status.test.ts",
     "test:zones-suggest": "node lib/training/zone-suggest.test.ts && node lib/training/tests.test.ts",
     "test:alerts": "node lib/training/alerts.test.ts",
+    "test:autocoach": "node lib/autocoach/autocoach.test.ts",
     "test:plans": "node lib/plans/template.test.ts",
     "test:bedtime": "node lib/sleep/bedtime.test.ts",
     "test:strength": "node lib/strength/workout.test.ts",

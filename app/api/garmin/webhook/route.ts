@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { proposeReadinessSwap } from "@/lib/autocoach/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ingestGarminPayload } from "@/lib/garmin/ingest";
@@ -54,7 +55,9 @@ export async function handleGarminPush(request: NextRequest, given: string | nul
 
   // Data is stored; a readiness failure shouldn't make Garmin resend it.
   for (const athleteId of touched) {
-    await refreshReadiness(athleteId).catch((e) => console.error("Readiness refresh failed", athleteId, e));
+    const r = await refreshReadiness(athleteId).catch((e) => console.error("Readiness refresh failed", athleteId, e));
+    // Red day: offer the easy version of today's key session (plan athletes who coach themselves).
+    if (r && r.overall === "red") await proposeReadinessSwap(athleteId).catch((e) => console.error("Readiness swap failed", athleteId, e));
   }
   return new NextResponse(null, { status: 200 });
 }

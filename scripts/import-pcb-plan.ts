@@ -29,6 +29,15 @@ import { toGarminWorkout, validateSteps, type Brick, type Pool, type PoolUnit, t
 import { BY_SLUG } from "../lib/strength/catalog.ts";
 import { toGarminStrength, validateStrength, type StrengthItem } from "../lib/strength/workout.ts";
 
+// The plan's threshold tests (same rules as migration 20270204).
+function testKind(sport: string, title: string): string | null {
+  if (sport === "swim" && /css/i.test(title) && /test/i.test(title)) return "css";
+  if (sport === "run" && /30-min run (time trial|tt)/i.test(title)) return "run30";
+  if (sport === "bike" && /ramp test/i.test(title)) return "ramp";
+  if (sport === "bike" && /20-min ftp/i.test(title)) return "ftp20";
+  return null;
+}
+
 // ------------------------------------------------------------------ args
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);
@@ -374,7 +383,7 @@ if (!SEND_ONLY) {
     });
     for (const r of out.insert) {
       const { error } = await db.from("planned_workouts").insert({
-        ...write(r), athlete_id: ATHLETE, coach_id: ATHLETE, status: "approved", approved_at: now, requested_by: null,
+        ...write(r), athlete_id: ATHLETE, coach_id: ATHLETE, status: "approved", approved_at: now, requested_by: null, test_kind: testKind(r.content.sport, r.content.title),
       });
       if (error) console.error(`  insert failed ${r.label}: ${error.message}`);
     }
