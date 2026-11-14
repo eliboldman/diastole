@@ -19,6 +19,7 @@ export default function FuelLog({
   autoOpen = false,
   start,
   firstName,
+  targetsLabel,
 }: {
   day: MealDay;
   mode: FuelMode;
@@ -28,6 +29,7 @@ export default function FuelLog({
   autoOpen?: boolean;
   start?: "photo" | "scan" | "describe";
   firstName?: string;
+  targetsLabel?: string; // race-weight goal: "Targets for your race-weight plan"
 }) {
   if (mode === "workout") return null;
   const numbers = mode === "full" || viewer === "coach";
@@ -39,7 +41,7 @@ export default function FuelLog({
           <h2 className="text-lg font-medium">{athlete ? "Today's fuel" : `${firstName ?? "Their"}'s fuel today`}</h2>
           <p className="mt-0.5 flex items-center gap-2 text-sm text-white/55">
             <span className={`h-2 w-2 rounded-full ${LEVEL_STYLE[day.level].dot}`} aria-hidden />
-            {`Targets for a ${FUEL_DAYS[day.level].label.toLowerCase()}`}
+            {targetsLabel ?? `Targets for a ${FUEL_DAYS[day.level].label.toLowerCase()}`}
           </p>
         </div>
         {athlete && <MealLogger numbers={numbers} autoOpen={autoOpen} start={start} timeZone={timeZone} />}

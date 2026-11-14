@@ -27,6 +27,10 @@ const CHOICES: Record<string, Choice[]> = {
     { value: "apply", label: "Reset goal pace", primary: true },
     { value: "decline", label: "Keep 3:55 pace" },
   ],
+  deficit_up: [
+    { value: "apply", label: "Add 100 kcal on easy days", primary: true },
+    { value: "decline", label: "Keep it as is" },
+  ],
 };
 
 export default async function ProposalPage({ params }: { params: Promise<{ id: string }> }) {

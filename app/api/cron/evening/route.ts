@@ -8,6 +8,7 @@ import { draftWeeklyEpisodes } from "@/lib/stories/draft";
 import { runEvening } from "@/lib/evening";
 import { deliverDuePlanWorkouts, notifyTestZones } from "@/lib/autocoach/server";
 import { runWeeklyReviews } from "@/lib/autocoach/review";
+import { runWeightGoals } from "@/lib/fuel/weight-run";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Vercel Cron calls this each evening (see vercel.json): "pack for tomorrow" and worn-shoe nudges.
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
   const autocoach = {
     deliver: await deliverDuePlanWorkouts(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) })),
     tests: await notifyTestZones(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) })),
+    // Race-weight guardrails before the review, so Sunday's email shows next week's state.
+    weight: await runWeightGoals(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) })),
     review: await runWeeklyReviews(admin).catch((e) => ({ status: "error", reason: String(e).slice(0, 200) })),
   };
   console.info("Evening run", result, batons, campfires, stories, autocoach);

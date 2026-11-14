@@ -4,10 +4,13 @@ import Link from "next/link";
 
 import FuelLog from "@/components/fuel/FuelLog";
 import FuelView from "@/components/fuel/FuelView";
+import WeightGoalCard from "@/components/fuel/WeightGoalCard";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { getFuelDays, getFuelMode, getMealDay, getNutritionGoals } from "@/lib/fuel/data";
 import { ring } from "@/lib/fuel/meals";
-import { createAdminClient, requireUser } from "@/lib/supabase/server";
+import { getWeightView } from "@/lib/fuel/weight-data";
+import { asRingTargets } from "@/lib/fuel/weight-plan";
+import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
 
 import WidgetSync, { type FuelSnapshot } from "@/components/fuel/WidgetSync";
 
@@ -19,7 +22,9 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
   const start = via === "photo" || via === "scan" || via === "describe" ? via : undefined;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
   const [mode, days, goals, dietitians] = await Promise.all([getFuelMode(me.id), getFuelDays(me.id, today, 7), getNutritionGoals(me.id), teamDietitians(me.coach_id, me.id)]);
-  const meals = mode === "workout" ? null : await getMealDay(me.id, today, me.timezone, days[0].level);
+  const [meals, weight] = mode === "workout" ? [null, null] : await Promise.all([getMealDay(me.id, today, me.timezone, days[0].level), getWeightView(await createClient(), me.id, me.timezone)]);
+  // A race-weight goal sets the day's targets (calories, then macros) in place of the per-kg ranges.
+  if (meals && weight) meals.targets = asRingTargets(weight.todayTarget, weight.avg ?? meals.weightKg ?? weight.goal.start_kg);
   const r = (n: number) => Math.round(n);
   const show = mode === "full" && meals?.targets;
   const snapshot: FuelSnapshot = {
@@ -70,7 +75,14 @@ export default async function FuelPage({ searchParams }: { searchParams: Promise
           )}
         </section>
       )}
-      <FuelView mode={mode} days={days} log={meals && <FuelLog day={meals} mode={mode} timeZone={me.timezone} units={me.units} autoOpen={log === "1"} start={start} />} />
+      <FuelView mode={mode} days={days} log={
+          meals && (
+            <>
+              {weight && mode === "full" && <WeightGoalCard view={weight} />}
+              <FuelLog day={meals} mode={mode} timeZone={me.timezone} units={me.units} autoOpen={log === "1"} start={start} targetsLabel={weight ? "Targets for your race-weight plan" : undefined} />
+            </>
+          )
+        } />
       <Link href="/races" className="lift mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/[0.055] p-5">
         <span>
           <span className="block font-medium">Race fueling</span>

@@ -127,14 +127,41 @@ export async function restoreMeal(meal: Record<string, unknown>): Promise<Result
   return { ok: true };
 }
 
-/** Body weight for targets, in the athlete's units (lb when they use miles). */
+/** Body weight for targets, in the athlete's units (lb when they use miles). Also logs today's weigh-in. */
 export async function saveWeight(value: number, unit: "kg" | "lb"): Promise<Result> {
   const me = await requireUser();
   const kg = unit === "lb" ? Number(value) * 0.45359237 : Number(value);
   if (!Number.isFinite(kg) || kg < 25 || kg > 250) return { ok: false, error: unit === "lb" ? "Enter a weight between 55 and 550 lb." : "Enter a weight between 25 and 250 kg." };
   const supabase = await createClient();
-  const { error } = await supabase.from("athlete_body").upsert({ athlete_id: me.id, weight_kg: Math.round(kg * 10) / 10, updated_at: new Date().toISOString() });
-  if (error) return { ok: false, error: "Couldn't save your weight." };
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  const [{ error }, { error: logErr }] = await Promise.all([
+    supabase.from("athlete_body").upsert({ athlete_id: me.id, weight_kg: Math.round(kg * 10) / 10, updated_at: new Date().toISOString() }),
+    // The daily log (7-day averages for a race-weight goal). One per day: a second weigh-in replaces the first.
+    supabase.from("body_weights").upsert({ athlete_id: me.id, date: today, weight_kg: Math.round(kg * 100) / 100, source: "manual" }),
+  ]);
+  if (error || logErr) return { ok: false, error: "Couldn't save your weight." };
   refresh();
+  revalidatePath("/fuel/weight");
+  return { ok: true };
+}
+
+/** The weekly low-energy check-in (race-weight goal). Any box ticked can pause the deficit. */
+export async function saveEnergyCheckin(input: { fatigue: boolean; low_libido: boolean; ill: boolean; low_mood: boolean }): Promise<Result> {
+  const me = await requireUser();
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
+  const d = new Date(`${today}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  const supabase = await createClient();
+  const { error } = await supabase.from("energy_checkins").upsert({
+    athlete_id: me.id,
+    week_start: d.toISOString().slice(0, 10),
+    fatigue: !!input.fatigue,
+    low_libido: !!input.low_libido,
+    ill: !!input.ill,
+    low_mood: !!input.low_mood,
+  });
+  if (error) return { ok: false, error: "Couldn't save that." };
+  revalidatePath("/fuel/weight");
+  revalidatePath("/fuel");
   return { ok: true };
 }

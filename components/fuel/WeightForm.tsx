@@ -8,7 +8,7 @@ import { saveWeight } from "@/lib/fuel/meal-actions";
 /** Body weight for daily targets. Only the athlete and their coach can see it. */
 export default function WeightForm({ weightKg, unit }: { weightKg: number | null; unit: "kg" | "lb" }) {
   const router = useRouter();
-  const shown = weightKg ? (unit === "lb" ? Math.round(weightKg / 0.45359237) : Math.round(weightKg * 10) / 10) : "";
+  const shown = weightKg ? (unit === "lb" ? Math.round((weightKg / 0.45359237) * 10) / 10 : Math.round(weightKg * 10) / 10) : "";
   const [value, setValue] = useState(String(shown));
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();

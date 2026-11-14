@@ -77,9 +77,9 @@ export async function deliverDuePlanWorkouts(admin: Admin) {
 }
 
 // ------------------------------------------------------------------ proposals
-type NewProposal = { athleteId: string; kind: "readiness_swap" | "reschedule" | "goal_pace"; workoutId?: string | null; title: string; body: string; payload: Record<string, unknown>; key: string; expiresAt?: string };
+type NewProposal = { athleteId: string; kind: "readiness_swap" | "reschedule" | "goal_pace" | "deficit_up"; workoutId?: string | null; title: string; body: string; payload: Record<string, unknown>; key: string; expiresAt?: string };
 
-async function propose(admin: Admin, p: NewProposal): Promise<"created" | "exists"> {
+export async function propose(admin: Admin, p: NewProposal): Promise<"created" | "exists"> {
   const { data, error } = await admin
     .from("coach_proposals")
     .insert({ athlete_id: p.athleteId, kind: p.kind, workout_id: p.workoutId ?? null, title: p.title, body: p.body, payload: p.payload, dedupe_key: p.key, expires_at: p.expiresAt ?? null })
@@ -159,6 +159,16 @@ export async function decideProposal(proposalId: string, athleteId: string, choi
     } else if (p.kind === "goal_pace") {
       const pace = payload.pace as [number, number];
       result = await resetGoalPace(admin, athleteId, tz, pace);
+    } else if (p.kind === "deficit_up") {
+      // Race-weight stall: +100 kcal on easy/rest days, capped at 600 (lib/fuel/weight-plan EASY_DEFICIT_CAP).
+      const goalId = String(payload.goal_id);
+      const { data: g } = await admin.from("weight_goals").select("easy_deficit").eq("id", goalId).eq("athlete_id", athleteId).eq("active", true).maybeSingle();
+      if (!g) return { ok: false, message: "That goal isn't active any more, so nothing was applied." };
+      const next = Math.min(600, g.easy_deficit + 100);
+      await admin.from("weight_goals").update({ easy_deficit: next, updated_at: new Date().toISOString() }).eq("id", goalId);
+      const { data: weeks } = await admin.from("weight_goal_weeks").select("week_start, easy_deficit").eq("goal_id", goalId).gte("week_start", String(payload.week_start));
+      for (const w of weeks ?? []) await admin.from("weight_goal_weeks").update({ easy_deficit: Math.min(600, w.easy_deficit + 100) }).eq("goal_id", goalId).eq("week_start", w.week_start);
+      result = `Easy and rest days now carry a ${next} kcal deficit. Key days are unchanged.`;
     } else {
       return { ok: false, message: "Unknown choice." };
     }

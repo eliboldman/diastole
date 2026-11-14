@@ -4,6 +4,8 @@ import "server-only";
 // readiness and HRV, current zones against the plan's projection, checkpoint results, and next week.
 // Rules only. Emailed (Resend) and linked from a bell notification.
 
+import { getWeightView } from "@/lib/fuel/weight-data";
+import { LB, addDays as addD, plannedKg, shiftedLine } from "@/lib/fuel/weight-plan";
 import type { createAdminClient } from "@/lib/supabase/server";
 import { isKeySession } from "@/lib/training/alerts";
 import { addDays, mondayOf } from "@/lib/training/week";
@@ -60,7 +62,32 @@ export async function buildReview(admin: Admin, a: { id: string; timezone: strin
   }));
   const est = cur.ftp && cur.thr && cur.css ? raceEstimate(cur as Fitness) : null;
   const nextKey = next.sessions.filter((s) => isKeySession(s.plan.title, s.plan.steps as Step[], s.plan.sport)).map((s) => ({ date: s.plan.date, title: s.plan.title }));
-  return { monday, end: addDays(monday, 6), wk, week, next, missedKey, colors, loadRatio, hrv7, hrv28, zoneRows, est, cps: cps ?? [], decided: decided ?? [], nextKey };
+  const weight = await weightSummary(admin, a, t);
+  return { monday, end: addDays(monday, 6), wk, week, next, missedKey, colors, loadRatio, hrv7, hrv28, zoneRows, est, cps: cps ?? [], decided: decided ?? [], nextKey, weight };
+}
+
+/** Race-weight lines for the review (null without an active goal). Reads the row tonight's weight job wrote. */
+async function weightSummary(admin: Admin, a: { id: string; timezone: string }, t: string) {
+  const v = await getWeightView(admin, a.id, a.timezone);
+  if (!v) return null;
+  const latest = v.rows.at(-1) ?? null;
+  const target = latest?.target_date ?? v.week.target_date;
+  const line = shiftedLine(v.goal.line, target);
+  const planned = plannedKg(line, t);
+  const plannedRate = (plannedKg(line, addD(t, -7)) - planned) / LB;
+  return {
+    avg: v.avg,
+    planned,
+    rate: latest?.rate_lb_wk ?? null,
+    plannedRate,
+    guardrails: latest?.guardrails ?? [],
+    maintenance: t > target,
+    onTrack: v.projection.onTrack,
+    projected: v.projection.date,
+    target,
+    targetLb: v.goal.target_kg / LB,
+    nextDeficit: latest ? { easy: latest.easy_deficit, moderate: latest.moderate_deficit, pause: latest.pause_until } : null,
+  };
 }
 
 type Review = Awaited<ReturnType<typeof buildReview>>;
@@ -95,10 +122,19 @@ ${r.missedKey.length ? `<p style="font-size:14px"><b>Key sessions missed or cut 
 ${section("Recovery", `<p style="font-size:14px">Readiness: ${r.colors.green} green · ${r.colors.yellow} yellow · ${r.colors.red} red.${r.loadRatio !== null ? ` Load ${Math.round(r.loadRatio * 100)}% of usual.` : ""}${r.hrv7 && r.hrv28 ? ` HRV ${Math.round(r.hrv7)} ms this week vs ${Math.round(r.hrv28)} ms over 4 weeks (${r.hrv7 >= r.hrv28 ? "+" : ""}${Math.round(((r.hrv7 - r.hrv28) / r.hrv28) * 100)}%).` : ""}</p>`)}
 ${section("Fitness vs the 3:55 projection", table(row(["", "Now", `Projected wk ${r.wk}`, ""], true) + r.zoneRows.map((z) => row([z.label, z.actual ? z.fmt(z.actual) : "not set", z.fmt(z.projected), `<span style="color:${color(z.status)};font-weight:600">${z.status ?? ""}</span>`])).join("")) + (r.est ? `<p style="font-size:14px">Race-equivalent finish at today's zones: <b>${fmtClock(r.est.total)}</b> (swim ${fmtClock(r.est.swim)}, bike ${fmtClock(r.est.bike)}, run ${fmtClock(r.est.run)} + 3:00).</p>` : "") + `<p style="color:#6e6e73;font-size:12px">Zones only move when you log a test, so "behind" between tests usually just means the next test hasn't happened yet.</p>`)}
 ${cpHtml ? section("Checkpoints", cpHtml) : ""}
+${r.weight ? section("Race weight", weightHtml(r.weight, day)) : ""}
 ${r.decided.length ? section("Suggestions this week", `<p style="font-size:14px">${r.decided.map((d) => `${esc(d.title)}: ${d.status === "pending" ? "waiting" : d.status === "approved" ? "applied" : "kept as planned"}`).join("<br>")}</p>`) : ""}
 ${section("Next week", `<p style="font-size:14px">${nextSports.map((s) => `${LABEL[s.family] ?? s.family} ${hrs(s.plannedSec)}`).join(" · ")}</p>${r.nextKey.length ? `<p style="font-size:14px"><b>Key sessions:</b> ${r.nextKey.map((k) => `${day(k.date)} ${esc(k.title)}`).join(" · ")}</p>` : ""}`)}
 <p style="margin-top:24px"><a href="${BASE}/calendar" style="color:#b8460b">Open your calendar</a> · <a href="${BASE}/proposals" style="color:#b8460b">Suggestions</a></p>
 </body></html>`;
+}
+
+function weightHtml(w: NonNullable<Review["weight"]>, day: (d: string) => string) {
+  const lb = (kg: number | null) => (kg === null ? "no trend yet" : `${(kg / LB).toFixed(1)} lb`);
+  if (w.maintenance) return `<p style="font-size:14px">Maintenance block: 7-day average ${lb(w.avg)}. No deficit through race day.</p>`;
+  const status = w.avg === null ? "Weigh in most mornings so the trend can start." : w.onTrack ? `On track for ${Math.round(w.targetLb)} lb by ${day(w.target)}.` : `Behind the line${w.projected ? `; projected ${day(w.projected)}` : ""}.`;
+  const rails = w.guardrails.length ? w.guardrails.map((g) => esc(g.message)).join("<br>") : "No guardrails fired.";
+  return `<p style="font-size:14px">7-day average <b>${lb(w.avg)}</b> vs planned ${lb(w.planned)}. Rate ${w.rate === null ? "—" : `${Number(w.rate).toFixed(2)} lb/wk`} vs planned ${Math.max(0, w.plannedRate).toFixed(2)}. ${status}</p><p style="font-size:14px">${rails}</p>${w.nextDeficit ? `<p style="color:#6e6e73;font-size:12px">Next week: ${w.nextDeficit.easy} kcal deficit on easy/rest days, ${w.nextDeficit.moderate} on moderate days, smaller amounts on key and long-session days, 0 on test days and the day before.${w.nextDeficit.pause ? ` Paused until ${day(w.nextDeficit.pause)}.` : ""}</p>` : ""}`;
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
