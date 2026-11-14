@@ -316,7 +316,7 @@ export default function PodProps({
       onPointerUp={release}
       onPointerCancel={cancel}
       onContextMenu={(e) => e.preventDefault()}
-      className={`flex select-none touch-manipulation items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-90 ${
+      className={`relative flex select-none touch-manipulation items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-90 ${
         combo?.sticker.key === s.key ? "border-emerald-300/40 bg-emerald-300/10" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
       } ${big ? "col-span-2" : ""}`}
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
@@ -326,6 +326,17 @@ export default function PodProps({
         <span className="block text-sm font-medium">{s.label}</span>
         {s.line && <span className="block text-xs text-white/55">{s.line}</span>}
       </span>
+      {/* The running count sits on the sticker you're holding, so it's visible wherever the sheet is scrolled. */}
+      {combo?.sticker.key === s.key && (
+        <span
+          key={milestone(combo.n) ?? "x"}
+          className="success-pop pointer-events-none absolute -top-3 right-2 z-10 flex items-baseline gap-1.5 rounded-full border border-emerald-300/40 bg-panel px-2.5 py-0.5 text-sm font-semibold tabular-nums text-emerald-50 shadow-lg"
+          aria-live="polite"
+        >
+          ×{combo.n.toLocaleString()}
+          {milestone(combo.n) && <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-amber-200/85">{milestone(combo.n)}</span>}
+        </span>
+      )}
     </button>
   );
 
