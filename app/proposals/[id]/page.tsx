@@ -15,7 +15,8 @@ const pastDue = (iso: string) => Date.parse(iso) < Date.now();
 
 const CHOICES: Record<string, Choice[]> = {
   readiness_swap: [
-    { value: "easy", label: "Make it easy", primary: true },
+    { value: "check", label: "Start it, check at 20 min", primary: true },
+    { value: "easy", label: "Make it easy now" },
     { value: "rest", label: "Rest day" },
     { value: "keep", label: "Keep as planned" },
   ],
@@ -26,6 +27,14 @@ const CHOICES: Record<string, Choice[]> = {
   goal_pace: [
     { value: "apply", label: "Reset goal pace", primary: true },
     { value: "decline", label: "Keep 3:55 pace" },
+  ],
+  week_call: [
+    { value: "apply", label: "Make them easy", primary: true },
+    { value: "keep", label: "Build as planned" },
+  ],
+  lighter_days: [
+    { value: "apply", label: "Make them easy", primary: true },
+    { value: "keep", label: "Keep as planned" },
   ],
   deficit_up: [
     { value: "apply", label: "Add 100 kcal on easy days", primary: true },
@@ -46,6 +55,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
     summary?: string;
     from?: string;
     to?: string;
+    swaps?: { workoutId: string; date: string; before: { title: string }; summary: string }[];
   };
   const sport = p.kind === "readiness_swap" && p.workout_id ? (await supabase.from("planned_workouts").select("sport").eq("id", p.workout_id).maybeSingle()).data?.sport ?? "run" : "run";
   const expired = p.status === "pending" && p.expires_at && pastDue(p.expires_at);
@@ -72,6 +82,17 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
             <p className="mt-1 text-sm text-white/60">{payload.summary ?? structure(payload.after.steps ?? [], sport, null, units)}</p>
           </div>
         </div>
+      )}
+      {payload.swaps && payload.swaps.length > 0 && (
+        <ul className="mt-6 max-w-3xl space-y-2">
+          {payload.swaps.map((s) => (
+            <li key={s.workoutId} className="rounded-2xl border border-white/10 p-4 text-sm">
+              <span className="text-white/45">{day(s.date)}</span>
+              <p className="mt-1 font-medium">{s.before.title}</p>
+              <p className="mt-1 text-emerald-100/80">Easy version: {s.summary}</p>
+            </li>
+          ))}
+        </ul>
       )}
       {p.kind === "reschedule" && payload.from && payload.to && (
         <p className="mt-6 text-white/70">

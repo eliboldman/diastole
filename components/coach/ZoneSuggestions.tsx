@@ -54,6 +54,7 @@ function Item({ s, units }: { s: Suggestion & { athleteId: string; name?: string
         <p className="text-xs text-white/55">
           {s.why}
           {s.test?.thresholdHr ? ` Applying also sets threshold heart rate to ${s.test.thresholdHr} bpm.` : ""}{" "}
+          {s.hrCheck && s.hrCheck.verdict !== "unclear" && <span className={s.hrCheck.verdict === "confirmed" ? "text-emerald-100/80" : "text-amber-100/80"}>{s.hrCheck.text} </span>}
           <Link href={`/activity/${s.activity_id}`} className="text-emerald-200/80 hover:underline">
             See workout
           </Link>

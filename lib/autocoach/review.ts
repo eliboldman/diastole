@@ -12,8 +12,9 @@ import { addDays, mondayOf } from "@/lib/training/week";
 import { getWeek } from "@/lib/training/week-data";
 import type { Step } from "@/lib/workouts/garmin-format";
 
-import { CHECKPOINTS, PCB_PLAN_ID, fitnessFromZones, fmtClock, metricText, planWeek, projectedAt, raceEstimate, type Fitness, type MetricKey } from "./plan";
-import { localToday, planAthletes } from "./server";
+import { CHECKPOINTS, PCB_PLAN_ID, fitnessFromZones, fmtClock, laneText, metricText, planWeek, projectedAt, raceEstimate, type Fitness, type Lane, type MetricKey } from "./plan";
+import { buildSwaps, localToday, planAthletes, propose } from "./server";
+import { CALL_TEXT, weekCall } from "./week-call";
 
 type Admin = ReturnType<typeof createAdminClient>;
 const BASE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://diastole.app").replace(/\/$/, "");
@@ -34,7 +35,7 @@ export async function buildReview(admin: Admin, a: { id: string; timezone: strin
   const next = await getWeek(admin, a.id, a.timezone, addDays(monday, 7));
   const [{ data: rs }, { data: well }, { data: zones }, { data: cps }, { data: decided }] = await Promise.all([
     admin.from("readiness_scores").select("date, overall, details").eq("athlete_id", a.id).gte("date", monday).lte("date", addDays(monday, 6)).order("date"),
-    admin.from("daily_wellness").select("date, hrv_ms").eq("athlete_id", a.id).gte("date", addDays(t, -28)).not("hrv_ms", "is", null),
+    admin.from("daily_wellness").select("date, hrv_ms, resting_hr, sleep_seconds").eq("athlete_id", a.id).gte("date", addDays(t, -28)),
     admin.from("athlete_zones").select("ftp_w, threshold_speed_mps, css_sec_per_100m").eq("athlete_id", a.id).maybeSingle(),
     admin.from("plan_checkpoints").select("checkpoint, results, lane, evaluated_at").eq("athlete_id", a.id).eq("plan_id", PCB_PLAN_ID).gte("evaluated_at", `${monday}T00:00:00Z`),
     admin.from("coach_proposals").select("kind, title, status, choice").eq("athlete_id", a.id).gte("created_at", `${monday}T00:00:00Z`),
@@ -43,10 +44,11 @@ export async function buildReview(admin: Admin, a: { id: string; timezone: strin
   const colors = { green: 0, yellow: 0, red: 0 } as Record<string, number>;
   for (const r of rs ?? []) if (r.overall in colors) colors[r.overall]++;
   const loadRatio = (rs ?? []).map((r) => (r.details as { load?: { ratio?: number } } | null)?.load?.ratio).filter((x): x is number => typeof x === "number").at(-1) ?? null;
-  const hrv = (from: string) => {
-    const v = (well ?? []).filter((w) => w.date >= from).map((w) => Number(w.hrv_ms));
-    return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null;
+  const avg = (col: "hrv_ms" | "resting_hr" | "sleep_seconds", from: string, min = 1) => {
+    const v = (well ?? []).filter((w) => w.date >= from && w[col] !== null && Number(w[col]) > 0).map((w) => Number(w[col]));
+    return v.length >= min ? v.reduce((p, q) => p + q, 0) / v.length : null;
   };
+  const hrv = (from: string) => avg("hrv_ms", from);
   const hrv7 = hrv(addDays(t, -6));
   const hrv28 = hrv(addDays(t, -28));
   const wk = planWeek(t);
@@ -63,7 +65,29 @@ export async function buildReview(admin: Admin, a: { id: string; timezone: strin
   const est = cur.ftp && cur.thr && cur.css ? raceEstimate(cur as Fitness) : null;
   const nextKey = next.sessions.filter((s) => isKeySession(s.plan.title, s.plan.steps as Step[], s.plan.sport)).map((s) => ({ date: s.plan.date, title: s.plan.title }));
   const weight = await weightSummary(admin, a, t);
-  return { monday, end: addDays(monday, 6), wk, week, next, missedKey, colors, loadRatio, hrv7, hrv28, zoneRows, est, cps: cps ?? [], decided: decided ?? [], nextKey, weight };
+
+  // Next week, judged from the last three: build as planned, hold, or recover.
+  const [w2, w3, { data: nextMeta }] = await Promise.all([
+    getWeek(admin, a.id, a.timezone, addDays(monday, -7)),
+    getWeek(admin, a.id, a.timezone, addDays(monday, -14)),
+    admin.from("planned_workouts").select("plan_meta").eq("athlete_id", a.id).eq("plan_meta->>plan_id", PCB_PLAN_ID).is("deleted_at", null).gte("scheduled_date", addDays(monday, 7)).lte("scheduled_date", addDays(monday, 13)).limit(1),
+  ]);
+  const keys = [week, w2, w3].flatMap((w) => w.sessions.filter((s) => s.status !== "upcoming" && s.status !== "today" && isKeySession(s.plan.title, s.plan.steps as Step[], s.plan.sport)));
+  const call = weekCall({
+    keyDue: keys.length,
+    keyDone: keys.filter((s) => s.status === "done").length,
+    red: colors.red,
+    yellow: colors.yellow,
+    hrv7: avg("hrv_ms", addDays(t, -6), 4),
+    hrv28: avg("hrv_ms", addDays(t, -28), 14),
+    rhr7: avg("resting_hr", addDays(t, -6), 4),
+    rhr28: avg("resting_hr", addDays(t, -28), 14),
+    sleep7: avg("sleep_seconds", addDays(t, -6), 4),
+    sleep28: avg("sleep_seconds", addDays(t, -28), 14),
+    loadRatio,
+    nextWeekType: ((nextMeta?.[0]?.plan_meta ?? null) as { week_type?: string } | null)?.week_type ?? null,
+  });
+  return { monday, end: addDays(monday, 6), wk, week, next, missedKey, colors, loadRatio, hrv7, hrv28, zoneRows, est, cps: cps ?? [], decided: decided ?? [], nextKey, weight, call };
 }
 
 /** Race-weight lines for the review (null without an active goal). Reads the row tonight's weight job wrote. */
@@ -110,7 +134,7 @@ export function reviewHtml(r: Review, name: string) {
     .map((c) => {
       const cp = CHECKPOINTS.find((x) => x.n === c.checkpoint);
       const res = Object.entries(c.results as Record<string, { value: number; lane: string; label: string }>).map(([k, v]) => `${esc(v.label)} ${metricText(k as MetricKey, v.value)} (${v.lane})`).join(" · ");
-      return `<p style="font-size:14px"><b>${esc(cp?.label ?? `Checkpoint ${c.checkpoint}`)}: ${c.lane} lane.</b> ${res}</p>`;
+      return `<p style="font-size:14px"><b>${esc(cp?.label ?? `Checkpoint ${c.checkpoint}`)}: ${esc(laneText(cp ?? {}, c.lane as Lane))}.</b> ${res}</p>`;
     })
     .join("");
   const nextSports = r.next.sports.filter((s) => s.plannedSec);
@@ -124,7 +148,7 @@ ${section("Fitness vs the 3:55 projection", table(row(["", "Now", `Projected wk 
 ${cpHtml ? section("Checkpoints", cpHtml) : ""}
 ${r.weight ? section("Race weight", weightHtml(r.weight, day)) : ""}
 ${r.decided.length ? section("Suggestions this week", `<p style="font-size:14px">${r.decided.map((d) => `${esc(d.title)}: ${d.status === "pending" ? "waiting" : d.status === "approved" ? "applied" : "kept as planned"}`).join("<br>")}</p>`) : ""}
-${section("Next week", `<p style="font-size:14px">${nextSports.map((s) => `${LABEL[s.family] ?? s.family} ${hrs(s.plannedSec)}`).join(" · ")}</p>${r.nextKey.length ? `<p style="font-size:14px"><b>Key sessions:</b> ${r.nextKey.map((k) => `${day(k.date)} ${esc(k.title)}`).join(" · ")}</p>` : ""}`)}
+${section("Next week", `<p style="font-size:14px"><b>${r.call.asPlanned ? "As planned" : esc(CALL_TEXT[r.call.call])}.</b> ${r.call.reasons.map(esc).join("; ")}.${r.call.asPlanned ? "" : " Approve or keep it in Suggestions."}</p><p style="font-size:14px">${nextSports.map((s) => `${LABEL[s.family] ?? s.family} ${hrs(s.plannedSec)}`).join(" · ")}</p>${r.nextKey.length ? `<p style="font-size:14px"><b>Key sessions:</b> ${r.nextKey.map((k) => `${day(k.date)} ${esc(k.title)}`).join(" · ")}</p>` : ""}`)}
 <p style="margin-top:24px"><a href="${BASE}/calendar" style="color:#b8460b">Open your calendar</a> · <a href="${BASE}/proposals" style="color:#b8460b">Suggestions</a></p>
 </body></html>`;
 }
@@ -156,10 +180,26 @@ export async function runWeeklyReviews(admin: Admin, opts: { force?: boolean } =
     if (!isSunday && !opts.force) continue;
     try {
       const r = await buildReview(admin, a);
+      let proposal = "none";
+      if (!r.call.asPlanned && r.call.call !== "build") {
+        const nextMon = addDays(r.monday, 7);
+        const { data: z } = await admin.from("athlete_zones").select("ftp_w, threshold_speed_mps").eq("athlete_id", a.id).maybeSingle();
+        const swaps = await buildSwaps(admin, a.id, nextMon, r.call.call === "hold" ? addDays(nextMon, 6) : addDays(nextMon, 3), r.call.call, z ?? {}, a.timezone);
+        if (swaps.length)
+          proposal = await propose(admin, {
+            athleteId: a.id,
+            kind: "week_call",
+            title: `Week ${r.wk + 1}: ${CALL_TEXT[r.call.call].toLowerCase()}?`,
+            body: `From the last three weeks: ${r.call.reasons.join("; ")}. This makes ${swaps.map((s) => s.before.title).join(", ")} easy, same time. Tests stay as planned.`,
+            payload: { call: r.call.call, reasons: r.call.reasons, swaps },
+            key: `week:${a.id}:${nextMon}`,
+            expiresAt: new Date(Date.parse(`${nextMon}T12:00:00Z`) + 2 * 86_400_000).toISOString(),
+          });
+      }
       const first = (a.full_name ?? "").split(" ")[0] || "Hi";
       const email = a.email ? await sendEmail(a.email, `Week ${r.wk} review: ${reviewHeadline(r)}`, reviewHtml(r, first)) : "no email";
       await admin.rpc("server_notify", { p_user: a.id, p_kind: "autocoach", p_title: `Week ${r.wk} review`, p_body: reviewHeadline(r), p_href: "/calendar", p_key: `review:${a.id}:${r.monday}` });
-      out[a.id] = { email };
+      out[a.id] = { email, call: r.call.call, proposal };
     } catch (e) {
       out[a.id] = { error: String(e).slice(0, 200) };
     }

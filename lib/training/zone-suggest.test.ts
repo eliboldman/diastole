@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { hourSpeed, suggestZones, zoneText } from "./zone-suggest.ts";
+import { hourSpeed, hrAtPower, suggestZones, zoneText } from "./zone-suggest.ts";
 
 const e = (id: string, o: object) => ({ activity_id: id, start_time: "2026-11-01T14:00:00Z", sport: "cycling", ...o });
 
@@ -39,3 +39,21 @@ assert.equal(mixed[0].suggested, 204, "the ride sets it, not the higher run");
 assert.equal(mixed[0].activity_id, "ride");
 assert.equal(suggestZones({ ftp_w: 190 }, [e("v", { sport: "virtual_ride", bests: { power_20m: 215 } })])[0].suggested, 204);
 console.log("zone suggestions: all passed");
+
+// Run threshold from standalone runs only: a brick or a triathlon run leg never sets it.
+const half = { run_half: 5400 }; // 1:30 half: fast enough to suggest over 3.6 m/s
+assert.equal(suggestZones({ threshold_speed_mps: 3.6 }, [e("leg", { sport: "running", offBike: true, bests: half })]).length, 0, "brick run ignored");
+assert.equal(suggestZones({ threshold_speed_mps: 3.6 }, [e("tri", { sport: "multi_sport", bests: half })]).length, 0, "multisport ignored");
+assert.equal(suggestZones({ threshold_speed_mps: 3.6 }, [e("solo", { sport: "running", bests: half })])[0].key, "threshold_speed_mps", "standalone half counts");
+
+// HR at power: watts per beat on steady laps, last 3 weeks vs the 3-8 weeks before.
+const now = Date.parse("2026-12-20T12:00:00Z");
+const lap = (daysAgo: number, w: number, hr: number) => ({ start_time: new Date(now - daysAgo * 86_400_000).toISOString(), duration_s: 900, avg_power: w, avg_hr: hr });
+const old = [lap(30, 200, 140), lap(35, 200, 140), lap(40, 200, 141)];
+assert.equal(hrAtPower([...old, lap(5, 200, 133), lap(8, 205, 134), lap(12, 200, 134)], 270, now).verdict, "confirmed");
+assert.equal(hrAtPower([...old, lap(5, 200, 141), lap(8, 200, 142), lap(12, 200, 140)], 270, now).verdict, "not_confirmed");
+assert.equal(hrAtPower([...old, lap(5, 200, 133)], 270, now).verdict, "unclear");
+assert.equal(hrAtPower([...old, lap(5, 260, 160), lap(6, 260, 160), lap(7, 260, 160)], 270, now).verdict, "unclear", "hard laps are not steady");
+const withCheck = suggestZones({ ftp_w: 270 }, [e("b", { bests: { power_20m: 300 }, hrCheck: { verdict: "confirmed", text: "ok" } })]);
+assert.equal(withCheck[0].hrCheck?.verdict, "confirmed");
+console.log("zone-suggest tests passed (incl. standalone runs + HR at power)");

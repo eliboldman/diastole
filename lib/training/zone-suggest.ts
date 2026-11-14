@@ -10,6 +10,10 @@ export type Effort = {
   sport?: string | null;
   bests?: { run_5k?: number; run_10k?: number; run_half?: number; power_20m?: number } | null;
   max_hr?: number | null;
+  /** A run that started within 30 min of a ride ending: a brick or a triathlon run leg. */
+  offBike?: boolean;
+  /** HR-at-power check for an FTP suggestion (zone-suggest-data fills it from lap files). */
+  hrCheck?: HrCheck | null;
 };
 export type Suggestion = {
   key: ZoneKey;
@@ -18,6 +22,8 @@ export type Suggestion = {
   why: string;
   activity_id: string;
   date: string;
+  /** FTP only: does heart rate at a given power back the new number up? */
+  hrCheck?: HrCheck | null;
   /** From a threshold test: can lower the zone, and applying or dismissing it settles this test. */
   test?: { kind: string; title: string; thresholdHr?: number };
 };
@@ -27,6 +33,10 @@ export type Suggestion = {
 const BIKE = /cycl|bik|ride|spin/i;
 const RUN = /run|treadmill|track|trail/i;
 const isRide = (sport: string | null | undefined) => BIKE.test(sport ?? "") && !RUN.test(sport ?? "");
+// Run threshold comes from standalone runs only. A run leg inside a triathlon, or a brick, is for pacing,
+// never for setting threshold: the legs are already tired, and the pace says so.
+const MULTI = /multi|transition|triathlon|duathlon/i;
+const standaloneRun = (e: Effort) => !e.offBike && !MULTI.test(e.sport ?? "");
 
 const MIN_RAISE = 0.03; // suggest only when at least 3% above the current zone
 const RIEGEL = 1.06;
@@ -63,12 +73,12 @@ export function suggestZones(zones: CurrentZones, efforts: Effort[]): Suggestion
     const ftp = Math.round(p.bests!.power_20m! * 0.95);
     const cur = zones?.ftp_w ? Number(zones.ftp_w) : null;
     if (ftp >= 50 && ftp <= 600 && worth("ftp_w", ftp, cur))
-      out.push({ key: "ftp_w", current: cur, suggested: ftp, why: `Best 20 minutes: ${p.bests!.power_20m} W on ${day(p.start_time)} (FTP ≈ 95% of that).`, activity_id: p.activity_id, date: p.start_time });
+      out.push({ key: "ftp_w", current: cur, suggested: ftp, why: `Best 20 minutes: ${p.bests!.power_20m} W on ${day(p.start_time)} (FTP ≈ 95% of that).`, activity_id: p.activity_id, date: p.start_time, hrCheck: p.hrCheck ?? null });
   }
 
   // Threshold pace: the best 5K/10K/half projected to an hour's effort.
   let best: { speed: number; e: Effort; k: keyof typeof DIST; t: number } | null = null;
-  for (const e of efforts)
+  for (const e of efforts.filter(standaloneRun))
     for (const k of Object.keys(DIST) as (keyof typeof DIST)[]) {
       const t = e.bests?.[k];
       if (!t || t <= 0) continue;
@@ -100,6 +110,28 @@ export function suggestZones(zones: CurrentZones, efforts: Effort[]): Suggestion
       out.push({ key: "max_hr", current: cur, suggested: hr, why: `Reached ${Math.round(hrs[0].max_hr!)} and ${hr} bpm in two workouts recently.`, activity_id: hrs[1].activity_id, date: hrs[1].start_time });
   }
   return out;
+}
+
+// ---- HR at power: FTP is confirmed by what heart rate does at a given power, not by a peak alone.
+export type SteadyLap = { start_time: string; duration_s: number; avg_power: number; avg_hr: number };
+export type HrCheck = { verdict: "confirmed" | "not_confirmed" | "unclear"; text: string };
+
+/** Watts per beat on steady 8+ minute laps (50-90% of the current FTP), last 3 weeks vs the 3-8 weeks before. */
+export function hrAtPower(laps: SteadyLap[], currentFtp: number | null, now = Date.now()): HrCheck {
+  if (!currentFtp) return { verdict: "unclear", text: "No current FTP to compare heart rate against." };
+  const steady = laps.filter((l) => l.duration_s >= 480 && l.avg_hr >= 90 && l.avg_power >= currentFtp * 0.5 && l.avg_power <= currentFtp * 0.9);
+  const age = (l: SteadyLap) => (now - Date.parse(l.start_time)) / 86_400_000;
+  const eff = (ls: SteadyLap[]) => {
+    const secs = ls.reduce((a, l) => a + l.duration_s, 0);
+    return ls.reduce((a, l) => a + (l.avg_power / l.avg_hr) * l.duration_s, 0) / secs;
+  };
+  const recent = steady.filter((l) => age(l) <= 21);
+  const before = steady.filter((l) => age(l) > 21 && age(l) <= 56);
+  if (recent.length < 3 || before.length < 3) return { verdict: "unclear", text: "Not enough steady laps yet to check heart rate at power." };
+  const change = (eff(recent) - eff(before)) / eff(before);
+  const p = `${change >= 0 ? "+" : ""}${Math.round(change * 100)}%`;
+  if (change >= 0.02) return { verdict: "confirmed", text: `Confirmed by heart rate at power: steady rides give ${p} watts per beat vs a month ago.` };
+  return { verdict: "not_confirmed", text: `Heart rate says otherwise: watts per beat on steady rides is ${p} vs a month ago, so this may be a good day rather than a new FTP.` };
 }
 
 /** Plain words for a suggestion's numbers, in the coach's units. */

@@ -16,9 +16,11 @@ export function planWeek(date: string): number {
 
 // ---- projection (the plan's 3:55-lane curve, anchored on the zones the plan was loaded with on Nov 13)
 // Values: FTP (W), run threshold (s/mi), CSS (s/100 yd).
+// Plan v2 (14 Nov) builds base, speed and strength first and puts threshold work in
+// W9-16, so FTP lands later: ~293 W at Checkpoint 1 (W8), still 315 W by Checkpoint 2 (W16).
 export const PROJECTION_BASE = { ftp: 231, thr: 401, css: 90 };
 const ANCHORS = {
-  ftp: [[0, 231], [8, 300], [16, 315], [25, 315]],
+  ftp: [[0, 231], [8, 293], [16, 315], [25, 315]],
   thr: [[0, 401], [8, 380], [16, 365], [21, 360], [25, 360]],
   css: [[0, 90], [8, 84], [16, 81], [21, 80], [25, 80]],
 } as const;
@@ -68,13 +70,15 @@ export function raceEstimate(f: Fitness) {
 export type Lane = "3:55" | "4:05" | "below";
 export type MetricKey = "ftp" | "thr" | "css" | "run10k" | "simMph" | "simIf" | "simRunPace";
 export type Metric = { key: MetricKey; label: string; better: "higher" | "lower"; lane355: number; lane405: number };
-export type Checkpoint = { n: 1 | 2 | 3; label: string; from: string; to: string; metrics: Metric[] };
+/** `progressOnly`: a progress check, not a lane decision. It's scored and reported, but never offers a goal-pace reset. */
+export type Checkpoint = { n: 1 | 2 | 3; label: string; from: string; to: string; metrics: Metric[]; progressOnly?: boolean };
 
 export const CHECKPOINTS: Checkpoint[] = [
   {
-    n: 1, label: "Checkpoint 1", from: "2027-01-04", to: "2027-01-10",
+    // Plan v2: a progress check. "3:55" here means on track for it, "4:05" a little behind.
+    n: 1, label: "Checkpoint 1", from: "2027-01-04", to: "2027-01-10", progressOnly: true,
     metrics: [
-      { key: "ftp", label: "FTP", better: "higher", lane355: 300, lane405: 285 },
+      { key: "ftp", label: "FTP", better: "higher", lane355: 290, lane405: 278 },
       { key: "thr", label: "30-min run TT pace", better: "lower", lane355: 375, lane405: 390 },
       { key: "css", label: "CSS", better: "lower", lane355: 84, lane405: 87 },
     ],
@@ -106,6 +110,12 @@ const RANK: Record<Lane, number> = { "3:55": 0, "4:05": 1, below: 2 };
 export function overallLane(lanes: Lane[]): Lane | null {
   if (!lanes.length) return null;
   return lanes.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+}
+
+/** How a checkpoint result reads: lanes for decision checkpoints, on-track wording for a progress check. */
+export function laneText(cp: Pick<Checkpoint, "progressOnly">, lane: Lane): string {
+  if (cp.progressOnly) return lane === "3:55" ? "on track for 3:55" : lane === "4:05" ? "a little behind, nothing to change yet" : "behind; worth a look at the last few weeks";
+  return lane === "below" ? "below the 4:05 lane" : `${lane} lane`;
 }
 
 /** Goal race pace (s/mi, [fast, slow]) for a lane, used when resetting the fixed race-pace steps. */

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 
 import { easyVersion } from "./easy.ts";
-import { CHECKPOINTS, laneFor, overallLane, planWeek, projectedAt, raceEstimate } from "./plan.ts";
+import { CHECKPOINTS, laneFor, laneText, overallLane, planWeek, projectedAt, raceEstimate } from "./plan.ts";
 import { pickRescheduleDate } from "./reschedule-rules.ts";
+import { redTrend, swapCandidates, weekCall, type WeekSignals } from "./week-call.ts";
 
 // ---- easy version: same time, Z1–Z2 power for bikes (never HR), pace for runs, effort for swims
 const z = { ftp_w: 300, threshold_speed_mps: 4.0 };
@@ -55,17 +56,48 @@ assert.equal(planWeek("2026-11-13"), 0);
 assert.equal(planWeek("2026-11-16"), 1);
 assert.equal(planWeek("2026-11-23"), 2);
 assert.equal(planWeek("2027-05-08"), 25);
-assert.equal(Math.round(projectedAt(8).ftp), 300);
+assert.equal(Math.round(projectedAt(8).ftp), 293); // plan v2: FTP comes later
 assert.equal(Math.round(projectedAt(16).thr), 365);
 const race = raceEstimate(projectedAt(25));
 assert.ok(race.total > 3 * 3600 + 53 * 60 && race.total < 3 * 3600 + 56 * 60, `race day ≈ 3:54:30, got ${race.total}`);
 const cp1 = CHECKPOINTS[0];
-assert.equal(laneFor(cp1.metrics[0], 305), "3:55");
-assert.equal(laneFor(cp1.metrics[0], 290), "4:05");
+assert.equal(laneFor(cp1.metrics[0], 293), "3:55");
+assert.equal(laneFor(cp1.metrics[0], 285), "4:05");
 assert.equal(laneFor(cp1.metrics[0], 270), "below");
+assert.ok(cp1.progressOnly && !CHECKPOINTS[1].progressOnly);
+assert.equal(laneText(cp1, "3:55"), "on track for 3:55");
+assert.equal(laneText(CHECKPOINTS[1], "4:05"), "4:05 lane");
 assert.equal(laneFor(cp1.metrics[1], 372), "3:55"); // TT pace 6:12/mi
 assert.equal(laneFor(cp1.metrics[1], 395), "below");
 assert.equal(overallLane(["3:55", "4:05", "3:55"]), "4:05");
 assert.equal(overallLane([]), null);
+
+// ---- next-week call
+const base: WeekSignals = { keyDue: 9, keyDone: 9, red: 0, yellow: 1, hrv7: 60, hrv28: 60, rhr7: 48, rhr28: 48, sleep7: 27000, sleep28: 27000, loadRatio: 1.1, nextWeekType: "build" };
+assert.equal(weekCall(base).call, "build");
+assert.ok(weekCall(base).asPlanned);
+assert.equal(weekCall({ ...base, hrv7: 54, rhr7: 52 }).call, "recover"); // accumulated load on normal sleep
+assert.equal(weekCall({ ...base, hrv7: 54, rhr7: 52, sleep7: 22000 }).call, "hold"); // sleep explains it
+assert.equal(weekCall({ ...base, hrv7: 54 }).call, "hold");
+assert.equal(weekCall({ ...base, red: 3 }).call, "recover");
+assert.equal(weekCall({ ...base, red: 2 }).call, "hold");
+assert.equal(weekCall({ ...base, keyDone: 5 }).call, "hold");
+assert.equal(weekCall({ ...base, hrv28: null, rhr28: null }).call, "build"); // no data, no call
+const rec = weekCall({ ...base, red: 3, nextWeekType: "recovery" });
+assert.ok(rec.asPlanned && rec.call === "build" && rec.reasons.at(-1)!.includes("recovery week"));
+// ---- red trend
+assert.equal(redTrend(["red", "yellow", "red"]), true);
+assert.equal(redTrend(["green", "yellow", "red"]), false);
+// ---- which sessions get lighter
+const wk = [
+  { id: "tue", date: "2027-01-19", sport: "bike", key: true, category: "threshold" },
+  { id: "wed", date: "2027-01-20", sport: "swim", key: true, category: "test", test: true },
+  { id: "thu", date: "2027-01-21", sport: "run", key: true, category: "threshold" },
+  { id: "sat", date: "2027-01-23", sport: "bike", key: true, category: "long_ride" },
+  { id: "easy", date: "2027-01-18", sport: "run", key: false, category: "easy" },
+];
+assert.deepEqual(swapCandidates(wk, "hold", "2027-01-18").map((c) => c.id), ["tue"]);
+assert.deepEqual(swapCandidates(wk, "recover", "2027-01-18", 4).map((c) => c.id), ["tue", "thu"]); // the test stays
+assert.deepEqual(swapCandidates(wk, "recover", "2027-01-21").map((c) => c.id), ["thu", "sat"]);
 
 console.log("autocoach tests passed");
