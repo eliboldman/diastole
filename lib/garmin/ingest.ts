@@ -170,6 +170,21 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
         // The same session from the Apple Watch (or elsewhere): merge into one record.
         const keptId = saved ? await mergeIfDuplicate(admin, saved.id).catch(() => saved.id) : null;
         if (keptId) await linkPlannedWorkout(admin, keptId);
+      } else if (type === "bodyComps") {
+        // Index scale (or a weight typed into Garmin Connect). Feeds the race-weight goal's weight log,
+        // which only the athlete and their head coach can read. Body fat etc. stay in garmin_raw only.
+        const grams = num(item.weightInGrams);
+        const at = num(item.measurementTimeInSeconds);
+        if (!grams || !at) continue;
+        const kg = Math.round(grams / 10) / 100;
+        if (kg < 25 || kg > 250) continue;
+        // The athlete's local day: Garmin gives the offset from UTC at the time of the weigh-in.
+        const date = new Date((at + (num(item.measurementTimeOffsetInSeconds) ?? 0)) * 1000).toISOString().slice(0, 10);
+        // One weight per day: the first scale reading of the day (the morning weigh-in) wins over
+        // later ones, and over a weight typed in by hand.
+        const { data: existing } = await admin.from("body_weights").select("source").eq("athlete_id", athleteId).eq("date", date).maybeSingle();
+        if (existing?.source === "garmin") continue;
+        await admin.from("body_weights").upsert({ athlete_id: athleteId, date, weight_kg: kg, source: "garmin" });
       } else {
         const fields = wellnessFields(type, item);
         const date = typeof item.calendarDate === "string" ? item.calendarDate : null;

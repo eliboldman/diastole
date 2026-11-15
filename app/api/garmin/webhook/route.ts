@@ -6,7 +6,7 @@ import { ingestGarminPayload } from "@/lib/garmin/ingest";
 import { logWebhook, summarizePush } from "@/lib/garmin/webhook-log";
 import { refreshReadiness } from "@/lib/readiness/run";
 
-// One endpoint for every Garmin push type (dailies, sleeps, hrv, stressDetails, activities,
+// One endpoint for every Garmin push type (dailies, sleeps, hrv, stressDetails, bodyComps, activities,
 // deregistrations, userPermissionsChange). Garmin strips query strings when pushing, so the
 // secret goes in the path. In Garmin's Endpoint Configuration, set each URL to:
 //   https://<site>/api/garmin/webhook/<GARMIN_WEBHOOK_SECRET>
