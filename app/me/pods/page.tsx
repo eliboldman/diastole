@@ -15,7 +15,7 @@ export default async function MyPodsPage({ searchParams }: { searchParams: Promi
   const supabase = await createClient();
   const { data: mine } = await supabase
     .from("profiles")
-    .select("share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress")
+    .select("share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, pod_share_calendar")
     .eq("id", me.id)
     .maybeSingle();
   const { data } = await supabase
@@ -79,6 +79,7 @@ export default async function MyPodsPage({ searchParams }: { searchParams: Promi
               sleep: Boolean(mine?.pod_share_sleep),
               stress: Boolean(mine?.pod_share_stress),
             }}
+            calendar={mine?.pod_share_calendar !== false}
           />
         </section>
       )}

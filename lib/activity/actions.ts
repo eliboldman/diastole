@@ -77,6 +77,16 @@ export async function setPodSharing(s: PodSharing) {
   revalidatePath("/account/settings");
 }
 
+/** Whether pod mates see my training week (on by default). Enforced by the database (pod_can_see 'calendar'). */
+export async function setPodCalendar(share: boolean) {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_pod_calendar", { p_share: share });
+  if (error) throw new Error("Couldn't update calendar sharing.");
+  revalidatePath("/me/pods");
+  revalidatePath("/account/settings");
+}
+
 export type NotifyPrefs = Partial<Record<"props" | "comments" | "messages" | "pods" | "workouts" | "coaching" | "sleep" | "fuel", boolean>>;
 
 export async function setNotifyPrefs(prefs: NotifyPrefs) {

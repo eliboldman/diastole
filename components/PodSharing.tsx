@@ -3,10 +3,10 @@
 import { Check } from "lucide-react";
 import { useState, useTransition } from "react";
 
-import { setPodSharing, type PodSharing as Sharing } from "@/lib/activity/actions";
+import { setPodCalendar, setPodSharing, type PodSharing as Sharing } from "@/lib/activity/actions";
 
 const RUNGS = [
-  { id: "avatar", title: "Avatar and name", sub: "Pod mates see who you are. Nothing else." },
+  { id: "avatar", title: "Avatar and name", sub: "Pod mates see who you are (plus your calendar, if it is on below)." },
   { id: "readiness", title: "+ Readiness", sub: "Today's flag and note, and which muscles are still recovering." },
   { id: "training", title: "+ Training and performance", sub: "Your workouts in the pod feed (so they can give props), FTP, threshold pace, PRs and goal race." },
   { id: "details", title: "+ Workout details", sub: "Charts, laps, zones and the route (start and finish hidden), with pod mates who share theirs too." },
@@ -35,8 +35,9 @@ function Switch({ on, onFlip, label, disabled }: { on: boolean; onFlip: () => vo
 }
 
 /** What pod mates see of me: a ladder of levels, plus health items that are always a separate yes. */
-export default function PodSharing({ initial }: { initial: Sharing }) {
+export default function PodSharing({ initial, calendar: initialCalendar = true }: { initial: Sharing; calendar?: boolean }) {
   const [s, setS] = useState(initial);
+  const [calendar, setCalendar] = useState(initialCalendar);
   const [pending, start] = useTransition();
   const [error, setError] = useState(false);
   const rung = s.details ? 3 : s.level;
@@ -51,6 +52,20 @@ export default function PodSharing({ initial }: { initial: Sharing }) {
         setError(false);
       } catch {
         setS(prev);
+        setError(true);
+      }
+    });
+  };
+  const flipCalendar = () => {
+    const next = !calendar;
+    setCalendar(next);
+    navigator.vibrate?.(5);
+    start(async () => {
+      try {
+        await setPodCalendar(next);
+        setError(false);
+      } catch {
+        setCalendar(!next);
         setError(true);
       }
     });
@@ -88,6 +103,14 @@ export default function PodSharing({ initial }: { initial: Sharing }) {
           );
         })}
       </ol>
+
+      <div className="mt-5 flex min-h-11 items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">Training calendar</span>
+          <span className="block text-xs text-white/50">Your week in the pod&apos;s Week tab: each session&apos;s sport, name and length, and whether it&apos;s done. Never the steps, targets or coach notes. Helps everyone stay accountable.</span>
+        </span>
+        <Switch on={calendar} onFlip={flipCalendar} label="Share my training calendar with my pods" disabled={pending} />
+      </div>
 
       <p className="mt-5 text-sm font-medium">Health data</p>
       <p className="mt-0.5 text-xs text-white/50">Never shared unless you turn on that specific item.</p>

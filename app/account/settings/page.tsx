@@ -52,7 +52,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const [{ data: profile }, { data: memberships }, { data: aiRow }, spent, { data: secretRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar, eggs")
+      .select("full_name, timezone, units, share_workout_details, pod_share_level, pod_share_hrv, pod_share_sleep, pod_share_stress, pod_share_calendar, notify_prefs, push_sounds, theme, appearance, weather_location, adjust_conditions, tab_bar, eggs")
       .eq("id", me.id)
       .single(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
@@ -101,6 +101,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     sleep: Boolean(profile?.pod_share_sleep),
                     stress: Boolean(profile?.pod_share_stress),
                   }}
+                  calendar={profile?.pod_share_calendar !== false}
                 />
               </div>
             )}

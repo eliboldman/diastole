@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-/** Members / Feed / Challenges switch for a pod page (a link per view, so it works without JavaScript). Members is the main view. */
-export type PodView = "feed" | "members" | "challenges";
+/** Members / Week / Feed / Challenges switch for a pod page (a link per view, so it works without JavaScript). Members is the main view. */
+export type PodView = "feed" | "members" | "week" | "challenges";
 
 export default function PodTabs({ base, view }: { base: string; view: PodView }) {
   const tab = (v: PodView, label: string) => (
@@ -18,6 +18,7 @@ export default function PodTabs({ base, view }: { base: string; view: PodView })
   return (
     <nav aria-label="Pod views" className="inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
       {tab("members", "Members")}
+      {tab("week", "Week")}
       {tab("feed", "Feed")}
       {tab("challenges", "Challenges")}
     </nav>
