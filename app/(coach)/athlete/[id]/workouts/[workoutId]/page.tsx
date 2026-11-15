@@ -128,7 +128,7 @@ export default async function WorkoutPage({
         </div>
       )}
       {w && !w.deleted_at && id !== me.id && <MysteryToggle workoutId={w.id} on={Boolean(w.mystery)} note={w.mystery_note ?? null} sent={Boolean(w.external_id)} />}
-      {/* Drafts edit the why inside the builder; once sent (builder locked), it's edited here. */}
+      {/* Drafts edit the why inside the builder; once approved or sent, it is edited here (saving and resending leaves it alone). */}
       {w && !w.deleted_at && w.status !== "draft" && (
         <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl sm:p-6">
           <h2 className="text-lg font-medium">Why this workout</h2>

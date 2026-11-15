@@ -3,7 +3,7 @@
 import { sendToApple } from "@/lib/apple/send";
 import { revalidatePath } from "next/cache";
 
-import { sendWorkoutToGarmin } from "@/lib/garmin/training";
+import { resendWorkoutToGarmin, sendWorkoutToGarmin } from "@/lib/garmin/training";
 import { recordVersion, syncToLibrary } from "@/lib/workouts/actions";
 import { retireReplacedBy } from "@/lib/workouts/retire";
 import { createClient, requireCoach } from "@/lib/supabase/server";
@@ -44,13 +44,10 @@ function check(input: WorkoutInput): string | null {
   return errors.length ? [...new Set(errors)].join(" ") : null;
 }
 
-/** Create or update a draft. Row-level security limits this to the coach's own athletes. */
-export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
-  const coach = await requireCoach();
-  const problem = check(input);
-  if (problem) return { ok: false, error: problem };
+type Supa = Awaited<ReturnType<typeof createClient>>;
 
-  const supabase = await createClient();
+/** The planned_workouts columns the builder controls, with targets annotated against the athlete's zones. */
+async function buildRow(supabase: Supa, input: WorkoutInput, coachId: string) {
   // Remember each target as a % of this athlete's zones too, so the Library can scale it to others.
   const [{ data: zones }, { data: wk }] = await Promise.all([
     supabase.from("athlete_zones").select(ZONE_COLUMNS).eq("athlete_id", input.athleteId).maybeSingle(),
@@ -61,7 +58,7 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
   const brick = input.sport === "bike" && input.brick?.steps?.length ? { sport: "run" as const, steps: annotate(stripRel(input.brick.steps), zones as RelZones) } : null;
   const row = {
     athlete_id: input.athleteId,
-    coach_id: coach.id,
+    coach_id: coachId,
     title: input.title.trim(),
     sport: input.sport,
     scheduled_date: input.scheduledDate,
@@ -76,6 +73,17 @@ export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
       ? { why: input.why.replace(/\s+/g, " ").trim().slice(0, 400) || null, why_updated_at: input.why.trim() ? new Date().toISOString() : null }
       : {}),
   };
+  return row;
+}
+
+/** Create or update a draft. Row-level security limits this to the coach's own athletes. */
+export async function saveDraft(input: WorkoutInput): Promise<ActionResult> {
+  const coach = await requireCoach();
+  const problem = check(input);
+  if (problem) return { ok: false, error: problem };
+
+  const supabase = await createClient();
+  const row = await buildRow(supabase, input, coach.id);
 
   if (input.id) {
     const { error } = await supabase.from("planned_workouts").update(row).eq("id", input.id).eq("status", "draft");
@@ -139,6 +147,55 @@ export async function deliver(workoutId: string, athleteId: string): Promise<Act
     return { ok: true, id: workoutId, message: "Sent. It goes on their Apple Watch the next time they open the Diastole app." };
   }
   return { ok: true, id: workoutId, message: "Approved. The athlete has no device connected yet." };
+}
+
+/**
+ * Edit a workout that was already approved or sent, then replace it on the athlete's device: on Garmin
+ * the old calendar entry and workout are deleted and the edited one is sent in their place; the
+ * iPhone app picks up the change at its next sync. The why is left alone (edited on its own card).
+ */
+export async function saveAndResend(input: WorkoutInput): Promise<ActionResult> {
+  const coach = await requireCoach();
+  if (!input.id) return { ok: false, error: "Save it as a draft first." };
+  const problem = check(input);
+  if (problem) return { ok: false, error: problem };
+
+  const supabase = await createClient();
+  // Row-level security confirms this is one of the coach's athletes.
+  const { data: w } = await supabase.from("planned_workouts").select("id, status, deleted_at, external_id").eq("id", input.id).maybeSingle();
+  if (!w || w.deleted_at) return { ok: false, error: "Workout not found." };
+  if (w.status === "draft") return { ok: false, error: "This is still a draft: use Approve & send." };
+  if (w.status === "completed" || w.status === "skipped") return { ok: false, error: `Can't edit a ${w.status} workout.` };
+
+  const row = await buildRow(supabase, { ...input, why: undefined }, coach.id);
+  const { error } = await supabase.from("planned_workouts").update(row).eq("id", input.id).in("status", ["approved", "sent"]);
+  if (error) return { ok: false, error: error.message };
+  await recordVersion(input.id, "edited and resent");
+  await syncToLibrary(input.id);
+  revalidatePath(`/athlete/${input.athleteId}`);
+  revalidatePath(`/athlete/${input.athleteId}/workouts/${input.id}`);
+
+  const { data: device } = await supabase.from("device_connections").select("source").eq("athlete_id", input.athleteId).maybeSingle();
+  if (device?.source === "garmin") {
+    try {
+      if (w.external_id) await resendWorkoutToGarmin(input.id);
+      else await sendWorkoutToGarmin(input.id);
+      return { ok: true, id: input.id, message: "Saved. The old version was removed from Garmin and the edited one sent; the watch gets it at the next sync." };
+    } catch (e) {
+      // If the old one came off but the new one didn't go on, show it as approved so Retry appears.
+      const { data: now } = await supabase.from("planned_workouts").select("external_id").eq("id", input.id).maybeSingle();
+      if (!now?.external_id) await supabase.from("planned_workouts").update({ status: "approved" }).eq("id", input.id);
+      return { ok: false, error: `Saved, but Garmin didn't take the new version: ${(e as Error).message}${now?.external_id ? "" : " It's not on the watch right now; use Retry sending."}` };
+    }
+  }
+  if (device?.source === "apple") {
+    if (w.status === "approved") {
+      const failed = await sendToApple(supabase, input.id);
+      if (failed) return { ok: false, error: failed };
+    }
+    return { ok: true, id: input.id, message: "Saved. Their iPhone app picks up the edited version at its next sync." };
+  }
+  return { ok: true, id: input.id, message: "Saved. The athlete has no device connected yet." };
 }
 
 /**

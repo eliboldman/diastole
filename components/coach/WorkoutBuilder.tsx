@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { approveAndSend, deleteDraft, deliver, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
+import { approveAndSend, deleteDraft, deliver, saveAndResend, saveDraft, type WorkoutInput } from "@/app/(coach)/athlete/[id]/workouts/actions";
 import { buildWorkoutFromPrompt } from "@/lib/ai/build-workout";
 import { draftWhyForBuilder } from "@/lib/ai/why";
 import { requestWorkout, saveMyWorkout } from "@/lib/workouts/athlete-actions";
@@ -598,7 +598,10 @@ export default function WorkoutBuilder({
     }, 600);
     return () => clearTimeout(t);
   }, [strengthMode, templateMode, athleteMode, athleteId, date, strength]);
-  const editable = athleteMode || !initial || initial.status === "draft";
+  const isDraft = !initial || initial.status === "draft";
+  // Approved or sent workouts can be edited too; saving replaces the version on the athlete's device.
+  const resendable = !athleteMode && !templateMode && Boolean(initial?.id) && (initial?.status === "approved" || initial?.status === "sent");
+  const editable = athleteMode || isDraft || resendable;
 
   // Describe it: Claude turns the coach's words into steps that fill this builder for review.
   const [prompt, setPrompt] = useState("");
@@ -666,7 +669,7 @@ export default function WorkoutBuilder({
 
   return (
     <div className="grid gap-5">
-      {editable && !athleteMode && !templateMode && !strengthMode && (
+      {isDraft && !athleteMode && !templateMode && !strengthMode && (
         <section className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.04] p-3">
           <label className="block">
             <span className="mb-1.5 flex items-center gap-2 text-sm font-medium">
@@ -794,7 +797,7 @@ export default function WorkoutBuilder({
         disabled={!editable}
         maxLength={1024}
       />
-      {editable && !athleteMode && (
+      {(isDraft || templateMode) && !athleteMode && (
         <div>
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Why this workout</span>
@@ -966,6 +969,24 @@ export default function WorkoutBuilder({
             </button>
           )}
         </div>
+      ) : resendable ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+            className="min-h-12 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50"
+          >
+            Save &amp; resend…
+          </button>
+          <span className="text-sm text-white/50">
+            {`Status: ${initial?.status}. Saving replaces the version on ${destination}.`}
+          </span>
+          {initial?.status === "approved" && device === "garmin" && id && (
+            <button disabled={pending} onClick={() => run(() => deliver(id, athleteId))} className="text-sm text-emerald-200 hover:underline">
+              Retry sending to Garmin
+            </button>
+          )}
+        </div>
       ) : editable ? (
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -1006,7 +1027,7 @@ export default function WorkoutBuilder({
       {confirming && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-panel p-6">
-            <h3 className="text-lg font-medium">Send this workout?</h3>
+            <h3 className="text-lg font-medium">{resendable ? "Replace the sent workout?" : "Send this workout?"}</h3>
             <p className="mt-2 text-sm text-white/60">
               <strong className="text-white">{title || "Untitled"}</strong> ({sport}) on{" "}
               {new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} → {destination}
@@ -1036,10 +1057,10 @@ export default function WorkoutBuilder({
               </button>
               <button
                 disabled={pending}
-                onClick={() => run(() => approveAndSend(input()), () => setConfirming(false))}
+                onClick={() => run(() => (resendable ? saveAndResend({ ...input(), why: undefined }) : approveAndSend(input())), () => setConfirming(false))}
                 className="min-h-12 rounded-2xl border border-emerald-300/25 bg-emerald-300/15 px-5 text-sm font-medium text-emerald-100 hover:bg-emerald-300/25 disabled:opacity-50"
               >
-                {pending ? "Sending…" : "Approve & send"}
+                {pending ? "Sending…" : resendable ? "Save & resend" : "Approve & send"}
               </button>
             </div>
           </div>
