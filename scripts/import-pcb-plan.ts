@@ -5,7 +5,12 @@
 //   node scripts/import-pcb-plan.ts --plan <folder>                  # everything from today on
 //   node scripts/import-pcb-plan.ts --send-only                       # just send the next 7 days to Garmin
 //
-// Options: --athlete <uuid> (default: the owner account, profiles.is_admin), --no-send.
+// Options: --athlete <uuid> (default: the owner account, profiles.is_admin), --no-send,
+//   --draft            write rows as coach drafts (hidden from the athlete, never sent) under the athlete's coach;
+//                      approve later with --approve (sets approved; the evening cron sends 7 days at a time)
+//   --approve          approve this plan's drafts for the athlete (respects --from/--to)
+//   --threshold-mi m:ss  run threshold to resolve paces with when the athlete has none set in the app
+// Zones are only required for the bases a plan actually uses (an effort-only swim plan needs no CSS).
 //
 // What it does (see DIASTOLE-HANDOFF.md in the zip):
 //  * Each sessions/*.json is parsed with parseWorkoutJson (run, bike, swim). Every target is then
@@ -51,9 +56,13 @@ const NO_SEND = flag("--no-send");
 const FROM = opt("--from");
 const TO = opt("--to");
 const PLAN_DIR = opt("--plan");
+const DRAFT = flag("--draft");
+const APPROVE = flag("--approve");
+const THR_ARG = opt("--threshold-mi");
+if (THR_ARG && !/^\d{1,2}:\d{2}$/.test(THR_ARG)) fail("--threshold-mi must look like 7:15");
 const isDate = (s: string | undefined) => !s || /^\d{4}-\d{2}-\d{2}$/.test(s);
 if (!isDate(FROM) || !isDate(TO)) fail("--from/--to must be YYYY-MM-DD");
-if (!SEND_ONLY && (!PLAN_DIR || !existsSync(join(resolve(PLAN_DIR), "sessions")))) fail("--plan <folder> must point at the unzipped plan (with sessions/)");
+if (!SEND_ONLY && !APPROVE && (!PLAN_DIR || !existsSync(join(resolve(PLAN_DIR), "sessions")))) fail("--plan <folder> must point at the unzipped plan (with sessions/)");
 
 function fail(msg: string): never {
   console.error(msg);
@@ -74,8 +83,8 @@ const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
 
 const athleteArg = opt("--athlete");
 const { data: me, error: meErr } = athleteArg
-  ? await db.from("profiles").select("id, full_name, timezone, units, is_test").eq("id", athleteArg).single()
-  : await db.from("profiles").select("id, full_name, timezone, units, is_test").eq("is_admin", true).single();
+  ? await db.from("profiles").select("id, full_name, timezone, units, is_test, coach_id").eq("id", athleteArg).single()
+  : await db.from("profiles").select("id, full_name, timezone, units, is_test, coach_id").eq("is_admin", true).single();
 if (meErr || !me) fail(`Athlete not found: ${meErr?.message ?? ""}`);
 const ATHLETE = me.id as string;
 const TZ = (me.timezone as string | null) || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -88,7 +97,9 @@ console.log(`${DRY ? "DRY RUN · " : ""}Athlete: ${me.full_name} · today ${toda
 // ------------------------------------------------------------------ zones
 const { data: z } = await db.from("athlete_zones").select("ftp_w, threshold_speed_mps, css_sec_per_100m").eq("athlete_id", ATHLETE).maybeSingle();
 const FTP = z?.ftp_w ? Number(z.ftp_w) : null;
-const THR_MPS = z?.threshold_speed_mps ? Number(z.threshold_speed_mps) : null;
+const thrFromArg = THR_ARG ? 1609.344 / (Number(THR_ARG.split(":")[0]) * 60 + Number(THR_ARG.split(":")[1])) : null;
+const THR_MPS = z?.threshold_speed_mps ? Number(z.threshold_speed_mps) : thrFromArg;
+if (THR_ARG && z?.threshold_speed_mps) console.log("Note: the app's threshold pace wins over --threshold-mi.");
 const CSS_100M = z?.css_sec_per_100m ? Number(z.css_sec_per_100m) : null;
 const MILE = 1609.344;
 const YARD = 0.9144;
@@ -97,8 +108,9 @@ if (!SEND_ONLY) {
   console.log(
     `Zones: FTP ${FTP ?? "—"} W · threshold ${THR_MPS ? clock(MILE / THR_MPS) + "/mi" : "—"} · CSS ${CSS_100M ? clock(CSS_100M * YARD) + "/100yd" : "—"}`,
   );
-  if (!FTP || !THR_MPS || !CSS_100M) fail("Set FTP, threshold pace and CSS first: targets are resolved from them.");
 }
+// Fails per basis in targetFrom when a plan uses a zone that isn't set.
+const need = (v: number | null, what: string) => v ?? fail(`This plan needs ${what}: set it in the app first.`);
 
 // ------------------------------------------------------------------ targets from rel
 type Rel =
@@ -114,14 +126,17 @@ function targetFrom(rel: Rel, pool: Pool): Target & { rel?: { pct: [number, numb
   switch (rel.basis) {
     case "ftp": {
       const [lo, hi] = rel.pct;
-      return { type: "power_range", low: Math.round((FTP! * lo) / 100), high: Math.round((FTP! * hi) / 100), rel: { pct: [lo, hi] } };
+      const ftp = need(FTP, "an FTP");
+      return { type: "power_range", low: Math.round((ftp * lo) / 100), high: Math.round((ftp * hi) / 100), rel: { pct: [lo, hi] } };
     }
     case "threshold_pace": {
       // Higher % = faster. Same arithmetic as lib/workouts/relative.ts resolve().
       const [lo, hi] = rel.pct_of_threshold_speed;
-      return { type: "pace_range", slowSecPerKm: Math.round(1000 / ((THR_MPS! * lo) / 100)), fastSecPerKm: Math.round(1000 / ((THR_MPS! * hi) / 100)), rel: { pct: [lo, hi] } };
+      const thr = need(THR_MPS, "a run threshold pace (or --threshold-mi)");
+      return { type: "pace_range", slowSecPerKm: Math.round(1000 / ((thr * lo) / 100)), fastSecPerKm: Math.round(1000 / ((thr * hi) / 100)), rel: { pct: [lo, hi] } };
     }
     case "css": {
+      need(CSS_100M, "a swim CSS");
       const unitM = pool?.unit === "METER" ? 100 : 100 * YARD; // metres in "100" of the pool's unit
       const secPer100 = Math.round(CSS_100M! * (unitM / 100) + rel.offset_sec_per_100);
       const pct = round1((unitM / secPer100 / (100 / CSS_100M!)) * 100);
@@ -165,6 +180,7 @@ const NAME_TO_SLUGS: Record<string, { slug: string; note?: string }[]> = {
   "pull-ups": [{ slug: "pull-up" }],
   "step-up": [{ slug: "step-up" }],
   "copenhagen plank": [{ slug: "copenhagen" }],
+  "bird dog": [{ slug: "bird-dog" }],
 };
 
 /** "3x12", "3x10/leg", "3x30 s/side", "4x5, heavy, 2-3 min rest", "3x6-8" → sets/reps/seconds/rest/note. */
@@ -298,6 +314,25 @@ function buildRows(dir: string): { rows: Row[]; restDays: number } {
   return { rows, restDays };
 }
 
+// ------------------------------------------------------------------ approve drafts
+if (APPROVE) {
+  let q = db.from("planned_workouts").select("id, scheduled_date, title").eq("athlete_id", ATHLETE).eq("status", "draft").is("deleted_at", null).not("plan_meta", "is", null).gte("scheduled_date", today);
+  if (FROM) q = q.gte("scheduled_date", FROM);
+  if (TO) q = q.lte("scheduled_date", TO);
+  const { data: drafts, error } = await q.order("scheduled_date");
+  if (error) fail(error.message);
+  console.log(`${DRY ? "Would approve" : "Approving"} ${drafts?.length ?? 0} plan drafts${FROM || TO ? ` in ${FROM ?? "start"} … ${TO ?? "end"}` : ""}.`);
+  if (!DRY && drafts?.length) {
+    const ids = drafts.map((d) => d.id);
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error: e } = await db.from("planned_workouts").update({ status: "approved", approved_at: new Date().toISOString() }).in("id", ids.slice(i, i + 100)).eq("status", "draft");
+      if (e) fail(e.message);
+    }
+    console.log("Approved. The evening job sends the next 7 days to Garmin each night.");
+  }
+  process.exit(0);
+}
+
 // ------------------------------------------------------------------ import
 const resend = new Set<string>(); // sent rows whose content this run changed
 if (!SEND_ONLY) {
@@ -383,7 +418,7 @@ if (!SEND_ONLY) {
     });
     for (const r of out.insert) {
       const { error } = await db.from("planned_workouts").insert({
-        ...write(r), athlete_id: ATHLETE, coach_id: ATHLETE, status: "approved", approved_at: now, requested_by: null, test_kind: testKind(r.content.sport, r.content.title),
+        ...write(r), athlete_id: ATHLETE, coach_id: DRAFT ? ((me.coach_id as string | null) ?? ATHLETE) : ATHLETE, status: DRAFT ? "draft" : "approved", approved_at: DRAFT ? null : now, requested_by: null, test_kind: testKind(r.content.sport, r.content.title),
       });
       if (error) console.error(`  insert failed ${r.label}: ${error.message}`);
     }
@@ -397,7 +432,7 @@ if (!SEND_ONLY) {
 }
 
 // ------------------------------------------------------------------ Garmin (next 7 days only)
-if (NO_SEND) process.exit(0);
+if (NO_SEND || DRAFT) process.exit(0);
 const { data: device } = await db.from("device_connections").select("source").eq("athlete_id", ATHLETE).eq("source", "garmin").maybeSingle();
 if (!device) {
   console.log("\nNo Garmin connection: nothing sent.");
