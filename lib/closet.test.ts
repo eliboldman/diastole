@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { bikeMileage, cleanCloset, closetForPrompt, defaultShoe, EMPTY_CLOSET, isEmptyCloset, packFor, SHOE_REPLACE_M, shoeMileage, shoeWear } from "./closet.ts";
+import { bikeMileage, cleanCloset, closetForPrompt, defaultShoe, EMPTY_CLOSET, isEmptyCloset, namedShoe, packFor, SHOE_REPLACE_M, shoeMileage, shoeWear } from "./closet.ts";
 
 const c = cleanCloset({
   shoes: [
@@ -106,5 +106,22 @@ assert.deepEqual(bikeMileage(oneBike, rides, {}), { b1: { m: 40000, rides: 1 } }
 const twoBikes = cleanCloset({ bikes: [{ id: "b1", model: "Tarmac", kind: "road", since: "2026-11-01" }, { id: "b2", model: "P5", kind: "tt" }] });
 assert.deepEqual(bikeMileage(twoBikes, rides, { x3: "b2" }), { b1: { m: 0, rides: 0 }, b2: { m: 50000, rides: 1 } }, "two bikes: only tagged rides count");
 assert.equal(cleanCloset({ bikes: [{ model: "X", since: "nope" }] }).bikes[0].since, null);
+
+// A workout that names a pair gets that pair (Eli, 2026-11-16: the notice said Cloudboom Max, the workout said Endorphin Speed).
+const eli = cleanCloset({ shoes: [
+  { id: "a", kind: "speed", model: "On Cloudboom Max", since: "2026-11-08" },
+  { id: "b", kind: "speed", model: "Saucony Endorphin Speed", since: "2026-11-08" },
+  { id: "c", kind: "race", model: "On Cloudboom Echo", since: "2026-11-08" },
+  { id: "d", kind: "daily", model: "Craft Nordlite Speed", since: "2026-11-08" },
+] });
+const cruise = items({ sport: "run", title: "Cruise Control (No Autopilot)", description: "Saucony Endorphin Speed, on a flat loop or the treadmill. 4 × 6:00 at threshold" }, eli);
+assert.equal(cruise[0], "Saucony Endorphin Speed", "named pair first");
+assert.ok(!cruise.includes("On Cloudboom Max"), "the rule's pick is dropped when a pair is named");
+assert.ok(cruise.includes("Craft Nordlite Speed"), "daily pair still there to warm up in");
+assert.equal(items({ sport: "run", title: "Threshold", description: "In the Endorphin Speed" }, eli)[0], "Saucony Endorphin Speed", "model without brand");
+assert.equal(items({ sport: "run", title: "Easy", description: "Easy 40 in your Nordlite Speed" }, eli).join(), "Craft Nordlite Speed", "easy run naming the daily pair: just that pair");
+assert.equal(namedShoe(eli.shoes, "cloudboom max for the long run")?.id, "a", "longest match");
+assert.equal(namedShoe(eli.shoes, "speed work on the track"), null, "a bare word like 'speed' isn't a shoe");
+assert.equal(items({ sport: "run", title: "Tempo", description: "3 × 10 min tempo" }, eli)[0], "On Cloudboom Max", "no pair named: rule unchanged");
 
 console.log("closet: all passed");

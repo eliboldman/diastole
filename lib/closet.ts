@@ -196,6 +196,30 @@ const has = (s: string, re: RegExp) => re.test(s);
  * A packing list for one workout from its sport and wording plus the athlete's closet. Rule-based
  * and conservative: it names the athlete's own gear where it can, and general items otherwise.
  */
+/**
+ * The athlete's pair a workout's text names, by full model or model without the brand
+ * ("Endorphin Speed" for "Saucony Endorphin Speed"). The longest match wins, so "Cloudboom Max"
+ * isn't taken for "Cloudboom". Retired pairs are already filtered out by the caller.
+ */
+export function namedShoe<T extends { model: string }>(shoes: T[], words: string): T | null {
+  const text = words.toLowerCase().replace(/\s+/g, " ");
+  let best: T | null = null;
+  let bestLen = 0;
+  for (const s of shoes) {
+    const model = s.model.toLowerCase().replace(/\s+/g, " ").trim();
+    const parts = model.split(" ");
+    const names = [model, ...(parts.length >= 3 ? [parts.slice(1).join(" ")] : [])].filter((n) => n.length >= 6);
+    for (const n of names) {
+      const re = new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`);
+      if (re.test(text) && n.length > bestLen) {
+        best = s;
+        bestLen = n.length;
+      }
+    }
+  }
+  return best;
+}
+
 export function packFor(w: PackWorkout, closet: Closet, mileage: Record<string, number> = {}): PackItem[] {
   const c = { ...closet, shoes: closet.shoes.filter((s) => !s.retired) };
   const sport = (w.sport ?? "").toLowerCase();
@@ -213,7 +237,9 @@ export function packFor(w: PackWorkout, closet: Closet, mileage: Record<string, 
     const treadmill = has(words, /treadmill/);
     // Track: spikes, else track flats, else the fastest road pair. Race efforts: carbon first. Other
     // fast work: speed shoes first, saving the race pair.
-    const pick = trail
+    // A pair the workout names ("Saucony Endorphin Speed, on a flat loop") beats the rule below.
+    const named = namedShoe(c.shoes, words);
+    const pick = named ?? (trail
       ? shoe("trail")
       : track
         ? shoe("spikes") ?? shoe("track") ?? shoe("race") ?? shoe("speed")
@@ -221,10 +247,11 @@ export function packFor(w: PackWorkout, closet: Closet, mileage: Record<string, 
           ? shoe("race") ?? shoe("speed")
           : fast
             ? shoe("speed") ?? shoe("race")
-            : null;
+            : null);
     const daily = defaultShoe(c);
-    if (pick) out.push({ item: pick.model, why: trail ? "Trail shoes for this route" : track ? "Fast shoes for the track" : "Workout shoes for the fast parts" });
-    if (daily && daily !== pick) out.push({ item: daily.model, why: pick ? "To warm up and cool down in" : undefined });
+    if (pick) out.push({ item: pick.model, why: named ? "The pair this workout calls for" : trail ? "Trail shoes for this route" : track ? "Fast shoes for the track" : "Workout shoes for the fast parts" });
+    // A second pair to warm up in only when the named pair is for the fast parts.
+    if (daily && daily !== pick && (!named || fast || track)) out.push({ item: daily.model, why: pick ? "To warm up and cool down in" : undefined });
     if (!pick && !daily) out.push({ item: trail ? "Trail shoes" : "Running shoes" });
     for (const p of out) {
       const sh = c.shoes.find((x) => x.model === p.item);
