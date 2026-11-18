@@ -36,6 +36,7 @@ import MusclesWorked from "@/components/avatar/MusclesWorked";
 import { normalizePain } from "@/lib/avatar/pain";
 import { normalizeStrain } from "@/lib/avatar/strain";
 import { writeAutoStrain } from "@/lib/avatar/strain-store";
+import { inAthleteView } from "@/lib/view-server";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -148,6 +149,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
   if (!act) notFound();
 
   const isOwn = act.athlete_id === me.id;
+  const athleteView = await inAthleteView(me.role); // a coach looking at their own session in athlete view gets athlete links
   const isCoach = me.role === "coach" || me.role === "dietitian"; // a team dietitian has the coach's access
   const since = daysBackIso(180);
 
@@ -240,7 +242,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
           : null,
       ].filter(Boolean)
     : [];
-  const canEditZones = isCoach; // a coach only ever sees their own athletes here
+  const canEditZones = isCoach && !(isOwn && athleteView); // a coach only ever sees their own athletes here
   const back = isCoach && !isOwn ? { href: `/athlete/${act.athlete_id}`, label: owner?.full_name || "Athlete" } : isOwn ? { href: "/training", label: "Training" } : { href: "/me/pods", label: "Pods" };
 
   const when = new Date(act.start_time);
@@ -412,8 +414,8 @@ export default async function ActivityPage({ params, searchParams }: { params: P
         <Card
           title="Planned vs completed"
           aside={
-            isCoach ? (
-              <Link href={`/athlete/${act.athlete_id}/workouts/${plan.id}`} className="truncate text-sm text-emerald-200 hover:underline">
+            isCoach || isOwn ? (
+              <Link href={isCoach && !(isOwn && athleteView) ? `/athlete/${act.athlete_id}/workouts/${plan.id}` : `/training/workouts/${plan.id}`} className="truncate text-sm text-emerald-200 hover:underline">
                 {plan.title} →
               </Link>
             ) : (

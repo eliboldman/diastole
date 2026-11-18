@@ -5,14 +5,12 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { CalendarDays, CalendarRange, ClipboardList, Plus, Sparkles } from "lucide-react";
+import { CalendarDays, CalendarRange, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Plus, Shuffle, Sparkles, Sun, type LucideIcon } from "lucide-react";
 
-import QuickLinks from "@/components/layout/QuickLinks";
 import SyncedAgo from "@/components/SyncedAgo";
 
 import AiSuggestions, { type SuggestionView } from "@/components/coach/AiSuggestions";
-import { FLAG_ORDER, FLAG_STYLE, FlagBadge, FlagRow } from "@/components/coach/Flags";
-import Sparkline, { fmt, lastNDays } from "@/components/coach/Sparkline";
+import { FLAG_ORDER, FLAG_STYLE } from "@/components/coach/Flags";
 import ChangeOfPlans from "@/components/coach/ChangeOfPlans";
 import Spotlight from "@/components/Spotlight";
 import WhatsNew from "@/components/WhatsNew";
@@ -32,7 +30,6 @@ import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
 import BossReview from "@/components/bosses/BossReview";
 import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import SafetyNotes from "@/components/coach/SafetyNotes";
-import WeeklyProgress from "@/components/WeeklyProgress";
 import { WatchCard } from "@/components/coach/WatchStatus";
 import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
@@ -114,6 +111,11 @@ export default async function TodayPage() {
   const { data: prof } = await supabase.from("profiles").select("seen_tips").eq("id", coach.id).maybeSingle();
   const release = latestRelease();
 
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone });
+  const firstName = (r: AthleteSummary) => (r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete");
+  const watchProblems = roster.map((r) => ({ id: r.id, name: firstName(r), status: watches.get(r.id)! })).filter((r) => r.status?.state === "attention");
+  const summary = (["red", "yellow", "green", "unknown"] as Flag[]).filter((f) => counts[f]).map((f) => `${counts[f]} ${FLAG_STYLE[f].label.toLowerCase()}`).join(" · ");
+
   return (
     <DashboardShell tone={tone}>
       <p className="text-sm uppercase tracking-[0.25em] text-white/50">{today}</p>
@@ -124,53 +126,56 @@ export default async function TodayPage() {
             {waiting} waiting on you →
           </Link>
         )}
-        <Link href="/digest" className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 text-sm text-white/80 transition active:scale-95 hover:bg-white/[0.1]">
-          <ClipboardList size={16} aria-hidden /> Weekly digest
-        </Link>
       </div>
-      {/* "Doing this instead": the coach's own schedule, or any athlete they name */}
-      {release && !seen(prof?.seen_tips, release.id) && <WhatsNew id={release.id} items={release.coach} />}
-      <Spotlight tip={TIPS.changeOfPlans} seen={seen(prof?.seen_tips, TIPS.changeOfPlans.id)} />
-      <ChangeOfPlans today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} />
-      <PlanChanges coachId={coach.id} />
-      <WorkoutRequests coachId={coach.id} units={coach.units === "km" ? "km" : "mi"} />
-      {/* The coach trains too: their own post-workout check */}
-      <WeeklyProgress athleteId={coach.id} timeZone={coach.timezone} />
-      <CheckinPrompt athleteId={coach.id} />
-      <SafetyNotes />
-      {ai.ai_enabled && <MorningReview status={morning} />}
-      <MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} />
-      <BossReview coachId={coach.id} today={new Date().toLocaleDateString("en-CA", { timeZone: coach.timezone })} names={Object.fromEntries(roster.map((r) => [r.id, r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete"]))} />
-      <ZoneSuggestions units={coach.units === "km" ? "km" : "mi"} rows={roster.filter((r) => zoneSugg.has(r.id)).map((r) => ({ athleteId: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", suggestions: zoneSugg.get(r.id)! }))} />
-      <WatchCard rows={roster.map((r) => ({ id: r.id, name: r.id === coach.id ? "You" : r.name.split(" ")[0] || "Athlete", status: watches.get(r.id)! })).filter((r) => r.status)} />
-      <QuickLinks
-        links={[
-          { href: "/ask", label: "Ask Diastole", icon: <Sparkles size={16} aria-hidden /> },
-          { href: "/endurance-lab", label: "Build a workout", icon: <Plus size={16} aria-hidden /> },
-          { href: "/calendar", label: "Calendar", icon: <CalendarRange size={16} aria-hidden /> },
-          { href: "/workouts", label: "All workouts", icon: <CalendarDays size={16} aria-hidden /> },
-        ]}
-      />
 
-      <section className="stagger mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(["red", "yellow", "green", "unknown"] as Flag[]).map((f) => (
-          <div key={f} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-2xl">
-            <p className="text-3xl font-semibold">{counts[f]}</p>
-            <div className="mt-1">
-              <FlagBadge flag={f} />
-            </div>
+      {/* One prompt at most: the next one shows once this one is done or dismissed. */}
+      <div className="[&>:empty]:hidden [&>:not(:empty)~*]:hidden">
+        <div>{release && !seen(prof?.seen_tips, release.id) && <WhatsNew id={release.id} items={release.coach} />}</div>
+        <div><CheckinPrompt athleteId={coach.id} /></div>
+        <div><Spotlight tip={TIPS.changeOfPlans} seen={seen(prof?.seen_tips, TIPS.changeOfPlans.id)} /></div>
+      </div>
+
+      {/* Needs you: each card only shows when there's something to act on. */}
+      <div className="[&:has(.needs>:not(:empty))_.all-clear]:hidden">
+        <div className="needs [&>:empty]:hidden">
+          <div><SafetyNotes /></div>
+          <div><PlanChanges coachId={coach.id} /></div>
+          <div><WorkoutRequests coachId={coach.id} units={coach.units === "km" ? "km" : "mi"} /></div>
+          <div>{ai.ai_enabled && <MorningReview status={morning} />}</div>
+          <div><MorningBriefs coachId={coach.id} hasAthletes={roster.some((r) => r.id !== coach.id)} /></div>
+          <div>
+            {suggestions.length > 0 && (
+              <AiSuggestions
+                suggestions={suggestions}
+                spent={spent}
+                cap={Number(ai.ai_monthly_cap_usd)}
+                modelLabel={AI_MODELS[ai.ai_model as AiModel]?.label ?? ai.ai_model}
+                enabled={ai.ai_enabled}
+                hasKey={Boolean(process.env.ANTHROPIC_API_KEY)}
+              />
+            )}
           </div>
-        ))}
-      </section>
+          <div><BossReview coachId={coach.id} today={todayIso} names={Object.fromEntries(roster.map((r) => [r.id, firstName(r)]))} /></div>
+          <div><ZoneSuggestions units={coach.units === "km" ? "km" : "mi"} rows={roster.filter((r) => zoneSugg.has(r.id)).map((r) => ({ athleteId: r.id, name: firstName(r), suggestions: zoneSugg.get(r.id)! }))} /></div>
+          <div><WatchCard rows={watchProblems} /></div>
+        </div>
+        {roster.length > 0 && (
+          <p className="all-clear mt-6 flex items-center gap-2 rounded-[24px] border border-emerald-300/15 bg-emerald-300/[0.05] p-5 text-sm text-emerald-50/85">
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-200" aria-hidden /> Nothing needs you right now.
+          </p>
+        )}
+      </div>
 
-      <AiSuggestions
-        suggestions={suggestions}
-        spent={spent}
-        cap={Number(ai.ai_monthly_cap_usd)}
-        modelLabel={AI_MODELS[ai.ai_model as AiModel]?.label ?? ai.ai_model}
-        enabled={ai.ai_enabled}
-        hasKey={Boolean(process.env.ANTHROPIC_API_KEY)}
-      />
+      {/* Change of plans: tucked away until needed */}
+      <details className="group mt-6 rounded-[24px] border border-white/10 bg-white/[0.03]">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm text-white/75 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2"><Shuffle size={16} className="text-emerald-200/80" aria-hidden /> Something changed? Move or swap a workout</span>
+          <ChevronDown size={16} className="transition group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="px-5 pb-5">
+          <ChangeOfPlans today={todayIso} />
+        </div>
+      </details>
 
       {roster.length === 0 ? (
         <div className="mt-10">
@@ -179,60 +184,50 @@ export default async function TodayPage() {
           </EmptyState>
         </div>
       ) : (
-        <section className="stagger mt-8 grid gap-4 lg:grid-cols-2">
-          {sorted.map((a) => {
-            const flag = flagOf(a);
-            const r = a.readiness;
-            return (
-              <Link
-                key={a.id}
-                href={`/athlete/${a.id}`}
-                className="lift group block min-w-0 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl hover:bg-white/[0.075] sm:p-6"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-xl font-semibold tracking-tight">
-                      {a.name} {a.isCoach && <span className="text-sm font-normal text-white/50">(you)</span>}
-                    </h2>
-                    <p className="mt-1 text-xs text-white/55">
-                      {a.device ? (
-                        <>
-                          {a.device.source === "garmin" ? "Garmin" : "Apple Watch"} · <SyncedAgo at={a.device.last_synced_at} />
-                        </>
-                      ) : (
-                        "No device connected"
-                      )}
-                    </p>
-                  </div>
-                  <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${FLAG_STYLE[flag].dot} ${FLAG_STYLE[flag].glow}`} aria-hidden />
-                </div>
-
-                <div className="mt-3">
-                  <FlagBadge flag={flag} />
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-white/65">
-                  {r?.note ?? (a.device ? "Waiting for first data." : "Connect a device to start.")}
-                </p>
-
-                {r && (
-                  <div className="mt-4">
-                    <FlagRow flags={r} />
-                  </div>
-                )}
-
-                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/[0.09] pt-4">
-                  <Sparkline label="HRV" points={lastNDays(a.trend, "hrv_ms")} format={fmt.hrv} />
-                  <Sparkline label="Resting HR" points={lastNDays(a.trend, "resting_hr")} format={fmt.rhr} />
-                  <Sparkline label="Sleep" points={lastNDays(a.trend, "sleep_seconds")} format={fmt.sleep} />
-                  <Sparkline label="Stress" points={lastNDays(a.trend, "stress_avg")} format={fmt.stress} />
-                </div>
-
-                <p className="mt-4 text-xs text-white/55">Last activity: {activityLine(a.lastActivity, a.timezone, coach.units)}</p>
-              </Link>
-            );
-          })}
+        <section className="mt-8">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-medium">Athletes</h2>
+            <p className="text-sm text-white/55">{summary}</p>
+          </div>
+          <ul className="stagger grid gap-2 lg:grid-cols-2">
+            {sorted.map((a) => {
+              const flag = flagOf(a);
+              return (
+                <li key={a.id}>
+                  <Link href={`/athlete/${a.id}`} className="lift flex min-w-0 items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:bg-white/[0.07]">
+                    <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${FLAG_STYLE[flag].dot} ${FLAG_STYLE[flag].glow}`} aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="truncate font-medium">
+                          {a.name} {a.isCoach && <span className="text-sm font-normal text-white/50">(you)</span>}
+                        </span>
+                        <span className={`shrink-0 text-xs ${FLAG_STYLE[flag].text}`}>{FLAG_STYLE[flag].label}</span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-sm text-white/60">
+                        {a.readiness?.note ?? (a.device ? "Waiting for first data." : "Connect a device to start.")}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-white/45">
+                        {activityLine(a.lastActivity, a.timezone, coach.units)}
+                        {a.device ? <> · <SyncedAgo at={a.device.last_synced_at} /></> : " · No device"}
+                      </span>
+                    </span>
+                    <ChevronRight size={16} className="mt-1 shrink-0 text-white/35" aria-hidden />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
+
+      <nav aria-label="Shortcuts" className="mt-8 grid grid-cols-3 gap-2">
+        {SHORTCUTS.map((t) => (
+          <Link key={t.href} href={t.href} className="lift flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.03] text-xs text-white/70 hover:bg-white/[0.06]">
+            <t.icon size={18} className="text-emerald-200/80" aria-hidden />
+            {t.label}
+          </Link>
+        ))}
+      </nav>
 
       <p className="mt-10 text-xs text-white/45">
         Flags compare each athlete to their own last 28 days. Training guidance, not medical advice.
@@ -240,3 +235,12 @@ export default async function TodayPage() {
     </DashboardShell>
   );
 }
+
+const SHORTCUTS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: "My day", href: "/me", icon: Sun },
+  { label: "Build a workout", href: "/endurance-lab", icon: Plus },
+  { label: "Calendar", href: "/calendar", icon: CalendarRange },
+  { label: "All workouts", href: "/workouts", icon: CalendarDays },
+  { label: "Ask Diastole", href: "/ask", icon: Sparkles },
+  { label: "Weekly digest", href: "/digest", icon: ClipboardList },
+];

@@ -28,6 +28,7 @@ export default async function MorningBriefs({ coachId, hasAthletes }: { coachId:
     seen.add(r.athlete_id);
     items.push({ ...r, name: name.get(r.athlete_id) ?? "Athlete", look: (looks as Record<string, unknown> | null)?.[r.athlete_id] ?? null });
   }
+  if (!items.length) return null;
   return (
     <section id="briefs" className="row-in mt-6 scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6">
       <h2 className="text-lg font-medium">Morning briefs</h2>

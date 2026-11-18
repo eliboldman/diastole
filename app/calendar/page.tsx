@@ -11,6 +11,7 @@ import { shortDistance } from "@/lib/activity/format";
 import WorkoutPeek, { type Peek } from "@/components/calendar/WorkoutPeek";
 import { PEEK_COLUMNS, toPeek, type PeekRow } from "@/lib/workouts/peek";
 import { titleFor } from "@/lib/workouts/mystery";
+import { inAthleteView } from "@/lib/view-server";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calendar · Diastole" };
@@ -25,7 +26,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_"
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
-  const isCoach = me.role === "coach";
+  // A coach in athlete view sees their own calendar, like an athlete, and workouts open the athlete page.
+  const isCoach = me.role === "coach" && !(await inAthleteView(me.role));
   const sp = await searchParams;
   const supabase = await createClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: me.timezone });
