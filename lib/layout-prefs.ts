@@ -2,17 +2,14 @@
 // Stored on profiles.layout as { today?: { order, hidden }, me?: { order, hidden } }.
 
 export const LAYOUT_PAGES = {
-  // Today answers "what do I do today": the workout first, then how you're doing and what to eat.
-  // Weekly tallies, streaks and history start hidden (Customize brings them back).
+  // Today answers "what do I do today" in one card (readiness + today's workout, always shown), then
+  // one prompt and what's coming up. Everything else starts hidden and is one tap away in the shortcuts
+  // (Customize brings any of it back onto the page).
   today: [
     { key: "race", label: "Race week" },
-    { key: "upcoming", label: "Today and coming up" },
-    { key: "readiness", label: "Readiness" },
-    { key: "bedtime", label: "Tonight's bedtime" },
     { key: "fuel", label: "Today's fuel" },
-    { key: "checkin", label: "Check-in prompt" },
-    { key: "recovery", label: "Recovery" },
-    { key: "gear", label: "Which shoes?" },
+    { key: "bedtime", label: "Tonight's bedtime", hidden: true },
+    { key: "recovery", label: "Recovery", hidden: true },
     { key: "progress", label: "Weekly progress", hidden: true },
     { key: "streaks", label: "Streaks", hidden: true },
     { key: "recent", label: "Recent workouts", hidden: true },

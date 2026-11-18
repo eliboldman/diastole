@@ -7,26 +7,17 @@ import CalendarAthletePicker from "@/components/CalendarAthletePicker";
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import { addDays, dayIn, monthGrid, monthKey, parseMonth, shiftMonth } from "@/lib/calendar";
 import type { Flag } from "@/lib/readiness/engine";
-import { shortDistance, sportLabel } from "@/lib/activity/format";
+import { shortDistance } from "@/lib/activity/format";
 import WorkoutPeek, { type Peek } from "@/components/calendar/WorkoutPeek";
-import { estimateSession } from "@/lib/fuel/plan";
-import { describeStrength, type StrengthItem } from "@/lib/strength/workout";
-import { clock12 } from "@/lib/week-prefs";
-import { describe } from "@/lib/workouts/describe";
-import { inferPool, type Brick, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
-import { sealed, titleFor } from "@/lib/workouts/mystery";
+import { PEEK_COLUMNS, toPeek, type PeekRow } from "@/lib/workouts/peek";
+import { titleFor } from "@/lib/workouts/mystery";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calendar · Diastole" };
 
 type Search = { month?: string; day?: string; athlete?: string };
 
-type Planned = {
-  id: string; athlete_id: string; scheduled_date: string; title: string; sport: string; status: string; description: string | null;
-  steps: Step[] | null; brick: Brick; strength: StrengthItem[] | null; start_time: string | null; pool_length: number | null; pool_unit: string | null;
-  mystery: boolean | null; revealed_at: string | null; plan_meta: { planned_duration_min?: number } | null;
-};
-const PEEK_LINES = 8;
+type Planned = PeekRow;
 type Done = { id: string; athlete_id: string; sport: string | null; start_time: string; duration_s: number | null; distance_m: number | null; avg_hr: number | null; planned_workout_id: string | null };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -61,7 +52,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     ? await Promise.all([
         supabase
           .from("planned_workouts")
-          .select("id, athlete_id, scheduled_date, title, sport, status, description, steps, brick, strength, start_time, pool_length, pool_unit, mystery, revealed_at, plan_meta")
+          .select(PEEK_COLUMNS)
           .in("athlete_id", ids)
           .is("deleted_at", null)
           .gte("scheduled_date", from)
@@ -106,35 +97,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const linked = new Set(dayDone.map((a) => a.planned_workout_id).filter(Boolean));
 
   // What the bubble shows for each planned session. A sealed mystery stays sealed for the athlete (coaches wrote it, so they see it).
-  const peeks: Peek[] = dayPlanned.map((w) => {
-    const isDone = w.status === "completed" || linked.has(w.id);
-    const hidden = !isCoach && sealed(w, isDone);
-    const saved: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
-    const steps = (w.steps ?? []) as Step[];
-    const pool: Pool = w.sport === "swim" ? inferPool(steps, saved) : saved;
-    const brick = w.sport === "bike" && w.brick?.steps?.length ? w.brick : null;
-    const session = estimateSession(steps, w.sport, null, pool);
-    const planned = Number(w.plan_meta?.planned_duration_min);
-    const all =
-      w.sport === "strength"
-        ? describeStrength(w.strength ?? [], me.units === "km" ? "kg" : "lb")
-        : [...describe(steps, me.units, pool, w.sport === "swim"), ...(brick ? ["Then run:", ...describe(brick.steps, me.units)] : [])];
-    return {
-      id: w.id,
-      href: isCoach ? `/athlete/${w.athlete_id}/workouts/${w.id}` : `/training/workouts/${w.id}`,
-      title: isCoach ? w.title : titleFor(w, isDone),
-      who: isCoach && !focus ? nameOf(w.athlete_id) : undefined,
-      badge: { label: w.status === "draft" ? "Draft" : isDone ? "Done" : "Planned", done: isDone },
-      sport: sportLabel(w.sport),
-      time: w.start_time ? clock12(String(w.start_time).slice(0, 5)) : null,
-      minutes: Number.isFinite(planned) && planned > 0 ? Math.round(planned) : session.minutes,
-      hardMinutes: session.hardMinutes,
-      description: hidden ? null : w.description,
-      lines: hidden ? [] : all.slice(0, PEEK_LINES),
-      more: hidden ? 0 : Math.max(0, all.length - PEEK_LINES),
-      sealed: hidden,
-    };
-  });
+  const peeks: Peek[] = dayPlanned.map((w) =>
+    toPeek(w, { coach: isCoach, done: w.status === "completed" || linked.has(w.id), units: me.units === "km" ? "km" : "mi", who: isCoach && !focus ? nameOf(w.athlete_id) : undefined }),
+  );
   const title = new Date(Date.UTC(month.year, month.month - 1, 15)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (

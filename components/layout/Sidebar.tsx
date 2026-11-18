@@ -35,7 +35,6 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Today", href: "/me", icon: Sun, match: /^\/me$/ },
     { label: "Training", href: "/training", icon: Dumbbell, match: /^\/(calendar|activity)(\/|$)/ },
     { label: "Fuel", href: "/fuel", icon: Utensils },
-    { label: "Grit bank & store", short: "Grit", href: "/me/grit", icon: Gem },
     { label: "Messages", href: "/messages", icon: MessageCircle },
     { label: "Me", href: "/account", icon: User, match: /^\/(me\/(?!pods|grit)|connect|races|profile)/ },
   ],
@@ -71,6 +70,7 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
   athlete: [
     { label: "Calendar", href: "/calendar", icon: CalendarRange },
     { label: "My pods", href: "/me/pods", icon: Orbit },
+    { label: "Grit bank & store", href: "/me/grit", icon: Gem },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
   dietitian: [{ label: "Help", href: "/help", icon: LifeBuoy }],

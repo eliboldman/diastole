@@ -6,6 +6,9 @@ import { staleDevice } from "@/lib/devices/stale";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CalendarRange, ChevronRight, Flag as FlagIcon, Gem, Leaf, Orbit, StretchHorizontal, type LucideIcon } from "lucide-react";
+import WorkoutPeek from "@/components/calendar/WorkoutPeek";
+import { PEEK_COLUMNS, toPeek, type PeekRow } from "@/lib/workouts/peek";
 import { Fragment, type ReactNode } from "react";
 
 import SyncedAgo from "@/components/SyncedAgo";
@@ -38,12 +41,10 @@ import { pullIfStale } from "@/lib/intervals/pull-soon";
 import { after } from "next/server";
 import BedtimeCard from "@/components/sleep/BedtimeCard";
 import GritChip from "@/components/grit/GritChip";
-import { sealed, titleFor } from "@/lib/workouts/mystery";
 import RestQuests from "@/components/quests/RestQuests";
 import ReadyOffer from "@/components/confidence/ReadyOffer";
 import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
-import { clock12 } from "@/lib/week-prefs";
 
 export const metadata: Metadata = { title: "My Diastole" };
 
@@ -64,7 +65,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   const [{ data: readiness }, { data: workouts }, { data: device }, { data: memberships }, { data: recent }, { data: welcome }, { welcome: replay }, { data: layoutRow }] = await Promise.all([
     supabase.from("readiness_scores").select("date, overall, recovery, sleep, stress, load, note, details").eq("athlete_id", me.id).order("date", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("planned_workouts").select("id, scheduled_date, title, sport, status, why, start_time, mystery, revealed_at").eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").limit(7),
+    supabase.from("planned_workouts").select(PEEK_COLUMNS).eq("athlete_id", me.id).is("deleted_at", null).gte("scheduled_date", today).neq("status", "draft").order("scheduled_date").order("start_time").limit(8),
     supabase.from("device_connections").select("source, connected_at, last_synced_at").eq("athlete_id", me.id).maybeSingle(),
     supabase.from("pod_members").select("pod_id, status, pods(name)").eq("athlete_id", me.id).in("status", ["invited", "active"]),
     supabase.from("activities").select("id, name, sport, start_time, duration_s, distance_m").eq("athlete_id", me.id).order("start_time", { ascending: false }).limit(3),
@@ -123,78 +124,15 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       <Streaks athleteId={me.id} timeZone={me.timezone} today={today} />
       </>
     ),
-    checkin: (
-      <>
-      <CheckinPrompt athleteId={me.id} />
-      </>
-    ),
-    gear: (
-      <>
-      <GearCheck athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.gear.id)} />
-      </>
-    ),
     recovery: (
       <>
       <RestQuests athleteId={me.id} today={today} timeZone={me.timezone} tipSeen={seen(seenTips, TIPS.quests.id)} />
       <RecoveryCard athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.recovery.id)} />
       </>
     ),
-    readiness: (
-      <>
-      <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <FlagBadge flag={(readiness?.overall as Flag) ?? "unknown"} large />
-          {device && (
-            <span className="text-xs text-white/55">
-              {device.source === "garmin" ? "Garmin" : "Apple Watch"} · <SyncedAgo at={device.last_synced_at} />
-            </span>
-          )}
-        </div>
-        <p className="mt-3 text-white/70">{readiness?.note ?? "Waiting for your first data."}</p>
-        <WhyColor row={readiness as never} />
-        <Link href="/account/body" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">
-          Recovery, sleep, stress and load →
-        </Link>
-      </section>
-      </>
-    ),
     fuel: (
       <>
       <FuelToday athleteId={me.id} today={today} timeZone={me.timezone} />
-      </>
-    ),
-    upcoming: (
-      <>
-      <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6" style={{ animationDelay: "80ms" }}>
-        <h2 className="text-lg font-medium">Coming up</h2>
-        {!workouts?.length ? (
-          <p className="mt-2 text-sm text-white/55">No workouts scheduled.</p>
-        ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {workouts.map((w, i) => (
-              <li key={w.id} className="border-t border-white/[0.09]">
-                <Link href={`/training/workouts/${w.id}`} className="flex min-h-11 items-center justify-between gap-3 rounded-lg py-1 hover:bg-white/[0.04]">
-                  <span className="min-w-0 truncate">
-                    <span className="text-white/50">
-                      {new Date(`${w.scheduled_date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      {w.start_time ? ` ${clock12(String(w.start_time).slice(0, 5))}` : ""}
-                    </span>{" "}
-                    {titleFor(w)}
-                  </span>
-                  <span className="shrink-0 text-xs uppercase tracking-wider text-white/55">{w.sport}</span>
-                </Link>
-                {i === 0 && w.why && !sealed(w) && <p className="pb-2 text-sm leading-relaxed text-emerald-50/80">{w.why}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-        {device?.source === "garmin" && workouts?.length ? (
-          <p className="mt-3 text-xs text-white/50">These are on your Garmin calendar after your watch syncs.</p>
-        ) : null}
-        {!pause && missedRow && <Spotlight tip={TIPS.lifeHappened} seen={seen(seenTips, TIPS.lifeHappened.id)} />}
-        {!pause && <span id="life" className="block scroll-mt-24" />}
-        {!pause && <LifeHappened today={todayWorkout ? { id: todayWorkout.id, title: todayWorkout.title } : null} missed={missedRow ?? null} hasCoach={hasCoach} />}
-      </section>
       </>
     ),
     recent: (
@@ -251,25 +189,24 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const grit = await getGrit(supabase, me.id, layoutRow?.grit_seen_at ?? null, 1);
   const freshGrit = grit.fresh.reduce((n, r) => n + r.amount, 0);
 
+  const units = me.units === "km" ? "km" : "mi";
+  const live = ((workouts ?? []) as unknown as PeekRow[]).filter((w) => ["approved", "sent", "completed"].includes(w.status));
+  const todays = live.filter((w) => w.scheduled_date === today).map((w) => toPeek(w, { coach: false, done: w.status === "completed", units }));
+  const nextUp = live.filter((w) => w.scheduled_date > today).slice(0, 3);
+  const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+
   return (
     <AthleteShell isCoach={me.role === "coach"}>
       <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">{firstName ? `Hi, ${firstName}` : "Welcome"}</p>
       <div className="mt-3 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{me.role === "coach" ? "My day" : "Today"}</h1>
-        <div className="flex items-center gap-1">
-          <GritChip balance={grit.balance} fresh={freshGrit} reason={grit.fresh.length === 1 ? grit.fresh[0].reason : grit.fresh.length > 1 ? `${grit.fresh.length} new awards` : null} />
-          <LayoutCustomizer page="today" initial={layout} />
-        </div>
+        <GritChip balance={grit.balance} fresh={freshGrit} reason={grit.fresh.length === 1 ? grit.fresh[0].reason : grit.fresh.length > 1 ? `${grit.fresh.length} new awards` : null} />
       </div>
-      {grit.balance > 0 && !showWelcome && <Spotlight tip={TIPS.grit} seen={seen(seenTips, TIPS.grit.id)} />}
-      {staleWatch && <SyncRepairCard {...staleWatch} />}
-      <TodayShare athleteId={me.id} today={today} units={me.units === "km" ? "km" : "mi"} readiness={readiness?.overall ?? null} note={readiness?.note ?? null} upcoming={workouts ?? []} />
-      {me.role === "athlete" && !showWelcome && <FirstWeek athleteId={me.id} dismissed={seenTips.includes(CHECKLIST_TIP)} />}
+      <TodayShare athleteId={me.id} today={today} units={units} readiness={readiness?.overall ?? null} note={readiness?.note ?? null} upcoming={live} />
       <TodaySecrets restingHr={rhrRow?.resting_hr ? Number(rhrRow.resting_hr) : null} />
       {showWelcome && <Welcome firstName={firstName} hasWatch={Boolean(device)} replay={replay === "1"} />}
-
-      {!showWelcome && release && !seen(seenTips, release.id) && <WhatsNew id={release.id} items={me.role === "coach" ? release.coach : release.athlete} />}
-
+      {staleWatch && <SyncRepairCard {...staleWatch} />}
       {pause && <PausedCard kind={pause.kind} since={pause.since} today={today} logged={symptomsToday ?? null} hasCoach={hasCoach} />}
 
       {invites.map((inv) => (
@@ -297,16 +234,94 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </section>
       )}
 
-      {!pause && <ReadyOffer athleteId={me.id} today={today} />}
+      {/* The one card that matters: how you're doing and what you're doing. Tap a workout for its details. */}
+      <section className="row-in mt-6 rounded-[28px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <FlagBadge flag={(readiness?.overall as Flag) ?? "unknown"} large />
+          {device && (
+            <span className="text-xs text-white/55">
+              {device.source === "garmin" ? "Garmin" : "Apple Watch"} · <SyncedAgo at={device.last_synced_at} />
+            </span>
+          )}
+        </div>
+        <p className="mt-3 text-white/75">{readiness?.note ?? "Waiting for your first data."}</p>
+        <WhyColor row={readiness as never} />
+
+        <ul className="mt-5 grid gap-2">
+          {todays.length ? (
+            todays.map((w) => <WorkoutPeek key={w.id} w={w} />)
+          ) : (
+            <li className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/60">{pause ? "Nothing planned while you recover." : "Nothing planned today. Enjoy it."}</li>
+          )}
+        </ul>
+        {!pause && (
+          <div className="mt-2">
+            <LifeHappened today={todayWorkout ? { id: todayWorkout.id, title: todayWorkout.title } : null} missed={missedRow ?? null} hasCoach={hasCoach} />
+          </div>
+        )}
+      </section>
+
+      {/* One prompt at a time, most useful first. The next shows once this one is done or dismissed. */}
+      {!showWelcome && (
+        <div className="[&>:empty]:hidden [&>:not(:empty)~*]:hidden">
+          <div><CheckinPrompt athleteId={me.id} /></div>
+          <div>{me.role === "athlete" && <FirstWeek athleteId={me.id} dismissed={seenTips.includes(CHECKLIST_TIP)} />}</div>
+          <div>{!pause && <ReadyOffer athleteId={me.id} today={today} />}</div>
+          <div><GearCheck athleteId={me.id} today={today} tipSeen={seen(seenTips, TIPS.gear.id)} /></div>
+          <div>{release && !seen(seenTips, release.id) && <WhatsNew id={release.id} items={me.role === "coach" ? release.coach : release.athlete} />}</div>
+          <div><RestQuests athleteId={me.id} today={today} timeZone={me.timezone} tipSeen={seen(seenTips, TIPS.quests.id)} /></div>
+          <div>{!pause && missedRow && <Spotlight tip={TIPS.lifeHappened} seen={seen(seenTips, TIPS.lifeHappened.id)} />}</div>
+          <div>{grit.balance > 0 && <Spotlight tip={TIPS.grit} seen={seen(seenTips, TIPS.grit.id)} />}</div>
+        </div>
+      )}
+
+      {nextUp.length > 0 && (
+        <section className="row-in mt-6">
+          <div className="flex items-center justify-between gap-3 px-1">
+            <h2 className="text-sm font-medium uppercase tracking-[0.18em] text-white/55">Coming up</h2>
+            <Link href="/training" className="inline-flex min-h-11 items-center gap-0.5 text-sm text-emerald-200 hover:text-emerald-100">
+              Full plan <ChevronRight size={14} aria-hidden />
+            </Link>
+          </div>
+          <ul className="mt-1 grid gap-2">
+            {nextUp.map((w) => {
+              const p = toPeek(w, { coach: false, done: false, units });
+              return <WorkoutPeek key={w.id} w={{ ...p, badge: { label: w.scheduled_date === tomorrow ? "Tomorrow" : dayLabel(w.scheduled_date), done: true } }} />;
+            })}
+          </ul>
+          {device?.source === "garmin" && <p className="mt-2 px-1 text-xs text-white/45">These are on your Garmin calendar after your watch syncs.</p>}
+        </section>
+      )}
 
       {visibleSections(layout).map((k) => (
         <Fragment key={k}>{blocks[k]}</Fragment>
       ))}
 
+      {/* Everything else, one tap away instead of on this page. */}
+      <nav aria-label="More" className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {SHORTCUTS.map((t) => (
+          <Link key={t.href} href={t.href} className="lift flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.03] text-xs text-white/70 hover:bg-white/[0.06]">
+            <t.icon size={18} className="text-emerald-200/80" aria-hidden />
+            {t.label}
+          </Link>
+        ))}
+      </nav>
 
-      <p className="mt-10 text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-white/45">Readiness compares you to your own last 28 days. Training guidance, not medical advice.</p>
+        <LayoutCustomizer page="today" initial={layout} />
+      </div>
     </AthleteShell>
   );
 }
+
+const SHORTCUTS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: "Calendar", href: "/calendar", icon: CalendarRange },
+  { label: "Recovery", href: "/recovery", icon: Leaf },
+  { label: "Mobility", href: "/recovery/mobility", icon: StretchHorizontal },
+  { label: "Races", href: "/races", icon: FlagIcon },
+  { label: "Pods", href: "/me/pods", icon: Orbit },
+  { label: "Grit", href: "/me/grit", icon: Gem },
+];
 
 const nowMs = () => Date.now();

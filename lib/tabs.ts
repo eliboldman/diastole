@@ -8,7 +8,7 @@ export type TabDef = { id: string; label: string; href: string; match?: string }
 // match: other paths that light the tab up (a RegExp source).
 export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
   athlete: [
-    { id: "me", label: "Me", href: "/me", match: "^/me$|^/me/(story|setup|posters|confidence)|^/(account|connect|races)(/|$)" },
+    { id: "me", label: "Today", href: "/me", match: "^/me$|^/me/(story|setup|posters|confidence)|^/(account|connect|races)(/|$)" },
     { id: "pods", label: "Pods", href: "/me/pods" },
     { id: "training", label: "Training", href: "/training", match: "^/(calendar|activity)(/|$)" },
     { id: "grit", label: "Grit", href: "/me/grit" },
@@ -18,7 +18,7 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
     { id: "recovery", label: "Recovery", href: "/recovery" },
     { id: "races", label: "Races", href: "/races" },
     { id: "setup", label: "My setup", href: "/me/setup" },
-    { id: "profile", label: "Profile", href: "/account" },
+    { id: "profile", label: "Me", href: "/account" },
   ],
   coach: [
     { id: "today", label: "Today", href: "/dashboard", match: "^/digest(/|$)" },
@@ -47,7 +47,7 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
   ],
 };
 
-export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "training", "grit", "fuel", "pods"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "messages", "help"] };
+export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "training", "fuel", "messages", "profile"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "messages", "help"] };
 export const TABS_COOKIE = "d_tabs";
 export const MIN_TABS = 3;
 export const MAX_TABS = 5;
