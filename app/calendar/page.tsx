@@ -7,15 +7,27 @@ import CalendarAthletePicker from "@/components/CalendarAthletePicker";
 import { FLAG_STYLE, FlagBadge } from "@/components/coach/Flags";
 import { addDays, dayIn, monthGrid, monthKey, parseMonth, shiftMonth } from "@/lib/calendar";
 import type { Flag } from "@/lib/readiness/engine";
-import { shortDistance } from "@/lib/activity/format";
+import { shortDistance, sportLabel } from "@/lib/activity/format";
+import WorkoutPeek, { type Peek } from "@/components/calendar/WorkoutPeek";
+import { estimateSession } from "@/lib/fuel/plan";
+import { describeStrength, type StrengthItem } from "@/lib/strength/workout";
+import { clock12 } from "@/lib/week-prefs";
+import { describe } from "@/lib/workouts/describe";
+import { inferPool, type Brick, type Pool, type PoolUnit, type Step } from "@/lib/workouts/garmin-format";
+import { sealed, titleFor } from "@/lib/workouts/mystery";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calendar · Diastole" };
 
 type Search = { month?: string; day?: string; athlete?: string };
 
-type Planned = { id: string; athlete_id: string; scheduled_date: string; title: string; sport: string; status: string; description: string | null };
-type Done = { id: string; athlete_id: string; sport: string | null; start_time: string; duration_s: number | null; distance_m: number | null; avg_hr: number | null };
+type Planned = {
+  id: string; athlete_id: string; scheduled_date: string; title: string; sport: string; status: string; description: string | null;
+  steps: Step[] | null; brick: Brick; strength: StrengthItem[] | null; start_time: string | null; pool_length: number | null; pool_unit: string | null;
+  mystery: boolean | null; revealed_at: string | null; plan_meta: { planned_duration_min?: number } | null;
+};
+const PEEK_LINES = 8;
+type Done = { id: string; athlete_id: string; sport: string | null; start_time: string; duration_s: number | null; distance_m: number | null; avg_hr: number | null; planned_workout_id: string | null };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_", " ");
@@ -49,7 +61,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     ? await Promise.all([
         supabase
           .from("planned_workouts")
-          .select("id, athlete_id, scheduled_date, title, sport, status, description")
+          .select("id, athlete_id, scheduled_date, title, sport, status, description, steps, brick, strength, start_time, pool_length, pool_unit, mystery, revealed_at, plan_meta")
           .in("athlete_id", ids)
           .is("deleted_at", null)
           .gte("scheduled_date", from)
@@ -58,7 +70,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           .limit(1000),
         supabase
           .from("activities")
-          .select("id, athlete_id, sport, start_time, duration_s, distance_m, avg_hr")
+          .select("id, athlete_id, sport, start_time, duration_s, distance_m, avg_hr, planned_workout_id")
           .in("athlete_id", ids)
           .gte("start_time", `${addDays(from, -1)}T00:00:00Z`)
           .lte("start_time", `${addDays(to, 1)}T23:59:59Z`)
@@ -91,6 +103,38 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const dayPlanned = plannedBy.get(selected) ?? [];
   const dayDone = doneBy.get(selected) ?? [];
+  const linked = new Set(dayDone.map((a) => a.planned_workout_id).filter(Boolean));
+
+  // What the bubble shows for each planned session. A sealed mystery stays sealed for the athlete (coaches wrote it, so they see it).
+  const peeks: Peek[] = dayPlanned.map((w) => {
+    const isDone = w.status === "completed" || linked.has(w.id);
+    const hidden = !isCoach && sealed(w, isDone);
+    const saved: Pool = w.pool_length && w.pool_unit ? { length: Number(w.pool_length), unit: w.pool_unit as PoolUnit } : null;
+    const steps = (w.steps ?? []) as Step[];
+    const pool: Pool = w.sport === "swim" ? inferPool(steps, saved) : saved;
+    const brick = w.sport === "bike" && w.brick?.steps?.length ? w.brick : null;
+    const session = estimateSession(steps, w.sport, null, pool);
+    const planned = Number(w.plan_meta?.planned_duration_min);
+    const all =
+      w.sport === "strength"
+        ? describeStrength(w.strength ?? [], me.units === "km" ? "kg" : "lb")
+        : [...describe(steps, me.units, pool, w.sport === "swim"), ...(brick ? ["Then run:", ...describe(brick.steps, me.units)] : [])];
+    return {
+      id: w.id,
+      href: isCoach ? `/athlete/${w.athlete_id}/workouts/${w.id}` : `/training/workouts/${w.id}`,
+      title: isCoach ? w.title : titleFor(w, isDone),
+      who: isCoach && !focus ? nameOf(w.athlete_id) : undefined,
+      badge: { label: w.status === "draft" ? "Draft" : isDone ? "Done" : "Planned", done: isDone },
+      sport: sportLabel(w.sport),
+      time: w.start_time ? clock12(String(w.start_time).slice(0, 5)) : null,
+      minutes: Number.isFinite(planned) && planned > 0 ? Math.round(planned) : session.minutes,
+      hardMinutes: session.hardMinutes,
+      description: hidden ? null : w.description,
+      lines: hidden ? [] : all.slice(0, PEEK_LINES),
+      more: hidden ? 0 : Math.max(0, all.length - PEEK_LINES),
+      sealed: hidden,
+    };
+  });
   const title = new Date(Date.UTC(month.year, month.month - 1, 15)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
@@ -141,7 +185,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 const isSel = d === selected;
                 const isToday = d === today;
                 const items = [
-                  ...p.map((w) => ({ key: w.id, text: `${isCoach && !focus ? `${nameOf(w.athlete_id)} · ` : ""}${w.title}`, kind: w.status === "completed" ? "done" : "plan" })),
+                  ...p.map((w) => ({ key: w.id, text: `${isCoach && !focus ? `${nameOf(w.athlete_id)} · ` : ""}${isCoach ? w.title : titleFor(w, w.status === "completed" || a.some((x) => x.planned_workout_id === w.id))}`, kind: w.status === "completed" ? "done" : "plan" })),
                   ...a.map((x) => ({ key: x.id, text: `${isCoach && !focus ? `${nameOf(x.athlete_id)} · ` : ""}${cap(x.sport ?? "activity")}`, kind: "done" })),
                 ];
                 return (
@@ -202,34 +246,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <p className="mt-3 text-sm text-white/55">{selected > today ? "Nothing planned yet." : "Rest day. Nothing planned or recorded."}</p>
         ) : (
           <ul className="stagger mt-4 grid gap-2">
-            {dayPlanned.map((w) => {
-              const body = (
-                <>
-                  <span className="min-w-0">
-                    <span className="block font-medium">
-                      {isCoach && !focus && <span className="text-white/55">{nameOf(w.athlete_id)} · </span>}
-                      {w.title}
-                    </span>
-                    {w.description && <span className="mt-0.5 block text-sm text-white/55">{w.description}</span>}
-                  </span>
-                  <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] uppercase tracking-wider ${w.status === "completed" ? "border-white/10 bg-white/[0.08] text-white/70" : "border-emerald-300/25 text-emerald-100"}`}>
-                    {w.status === "draft" ? "Draft" : w.status === "completed" ? "Done" : "Planned"}
-                  </span>
-                </>
-              );
-              const cls = "flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4";
-              return (
-                <li key={w.id}>
-                  {isCoach ? (
-                    <Link href={`/athlete/${w.athlete_id}/workouts/${w.id}`} className={`${cls} lift`}>
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className={cls}>{body}</div>
-                  )}
-                </li>
-              );
-            })}
+            {peeks.map((w) => (
+              <WorkoutPeek key={w.id} w={w} />
+            ))}
             {dayDone.map((a) => (
               <li key={a.id}>
                 <Link href={`/activity/${a.id}`} className="lift flex items-center justify-between gap-3 rounded-2xl bg-white/[0.06] p-4">
