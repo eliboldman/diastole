@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { DAY_WORDS, todaysFlow } from "@/lib/mobility/data";
 import { cleanItems, STARTERS, type Routine } from "@/lib/recovery/catalog";
 
 /** Public URLs for every move that has a clip: slug → { video, poster }. */
@@ -22,7 +23,18 @@ export async function routinesFor(supabase: SupabaseClient, coachId: string | nu
  * What the player runs, from a key: "starter-calf", a routine id, or "a-<assignment id>". Row-level
  * security decides what the viewer can open.
  */
-export async function resolveRoutine(supabase: SupabaseClient, key: string): Promise<(Routine & { assignmentId: string | null }) | null> {
+export async function resolveRoutine(
+  supabase: SupabaseClient,
+  key: string,
+  viewer?: { id: string; timezone: string },
+): Promise<(Routine & { assignmentId: string | null }) | null> {
+  // The viewer's own flow from their latest mobility screen.
+  if (key === "mobility-today") {
+    if (!viewer) return null;
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: viewer.timezone });
+    const flow = await todaysFlow(supabase, viewer.id, today, viewer.timezone);
+    return flow ? { id: key, title: "Today's mobility", description: DAY_WORDS[flow.day].title, items: flow.items, assignmentId: null } : null;
+  }
   const starter = STARTERS.find((s) => s.id === key);
   if (starter) return { ...starter, assignmentId: null };
   const a = /^a-([0-9a-f-]{36})$/i.exec(key);

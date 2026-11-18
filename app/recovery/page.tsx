@@ -7,6 +7,7 @@ import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { minutesLabel, routineSeconds, suggestRoutine } from "@/lib/recovery/catalog";
 import { routinesFor } from "@/lib/recovery/data";
+import { DAY_WORDS, todaysFlow } from "@/lib/mobility/data";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Recovery · Diastole" };
@@ -32,6 +33,7 @@ export default async function RecoveryPage() {
           supabase.from("profiles").select("id, full_name, email").eq("coach_id", me.id).eq("is_test", false).order("full_name"),
         ])
       : [{ data: null }, { data: null }];
+  const mobility = await todaysFlow(supabase, me.id, today, me.timezone);
   const tip = suggestRoutine({ spots, readiness: (ready?.overall as string) ?? null });
   const when = (d: string) => (d === today ? "Today" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }));
 
@@ -52,6 +54,18 @@ export default async function RecoveryPage() {
       <BackLink href={me.role === "coach" ? "/me" : "/training"} label={me.role === "coach" ? "My day" : "Training"} />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Recovery</h1>
       <p className="mt-2 text-white/55">Rolling, stretching and breathing, with your coach&apos;s demos. General recovery guidance, not medical treatment.</p>
+
+      <section className="mt-6">
+        <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Mobility</h2>
+        <ul className="space-y-2">
+          {mobility
+            ? [
+                row("/recovery/mobility-today?from=/recovery", "Today's mobility", `${DAY_WORDS[mobility.day].title} · ${minutesLabel(routineSeconds(mobility.items))}`),
+                row("/recovery/mobility", "Your mobility screen", `Score ${mobility.screen.score}/100 · results and what to work on`),
+              ]
+            : row("/recovery/mobility", "Take the mobility screen", "Eight quick tests, then a daily flow fitted to your training")}
+        </ul>
+      </section>
 
       {(assigned ?? []).length > 0 && (
         <section className="mt-6">

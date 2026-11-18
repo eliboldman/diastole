@@ -1,10 +1,11 @@
 // The recovery exercise catalog: the moves the coach's demo clips show. Clip filenames are matched
 // to these ids (see matchSlug). Pure, for tests. General recovery guidance, not medical treatment.
 
-export type Equipment = "foam roller" | "massage ball" | "strap" | "none";
+export type Equipment = "foam roller" | "massage ball" | "strap" | "wall" | "none";
 export type Area =
   | "quads" | "hamstrings" | "it band" | "glutes" | "piriformis" | "calves" | "soleus"
-  | "adductors" | "foot arch" | "upper back" | "hip flexors" | "hips" | "breathing";
+  | "adductors" | "foot arch" | "upper back" | "hip flexors" | "hips" | "breathing"
+  | "ankles" | "shoulders" | "balance";
 export type Move = {
   slug: string;
   name: string;
@@ -14,7 +15,13 @@ export type Move = {
   perSide: boolean;
   cue: string;
   pattern?: "box"; // a guided breathing pattern instead of a clip
+  easier?: string; // slug of a gentler version, for limited range or a body that can't get into this one
 };
+
+/** How a move works, from its slug: dynamic moves suit before training, holds and rolling after. */
+export type MoveKind = "dynamic" | "hold" | "roll" | "breath" | "balance";
+export const kindOf = (m: Move): MoveKind =>
+  m.pattern ? "breath" : /^(foam-roll|ball)-/.test(m.slug) ? "roll" : /^balance-/.test(m.slug) ? "balance" : /^stretch-/.test(m.slug) ? "hold" : "dynamic";
 
 export const MOVES: Move[] = [
   { slug: "foam-roll-quads", name: "Foam roll quads", equipment: "foam roller", areas: ["quads"], seconds: 45, perSide: true, cue: "Face down, roller under the thigh. Slow passes hip to just above the knee; pause on tight spots." },
@@ -37,6 +44,41 @@ export const MOVES: Move[] = [
   { slug: "mobility-cat-cow", name: "Cat-cow", equipment: "none", areas: ["upper back"], seconds: 45, perSide: false, cue: "On hands and knees. Round up as you breathe out, let the belly drop as you breathe in. Slow." },
   { slug: "mobility-90-90", name: "90-90 hip switches", equipment: "none", areas: ["hips", "glutes"], seconds: 60, perSide: false, cue: "Sit with both knees bent at 90°. Rotate both knees to the other side and back, tall through the spine." },
   { slug: "breath-box", name: "Box breathing", equipment: "none", areas: ["breathing"], seconds: 240, perSide: false, cue: "In for 4, hold for 4, out for 4, hold for 4. Shoulders soft.", pattern: "box" },
+
+  // Mobility (2026-11-18): the moves the mobility screen's daily flows draw on. Gentler versions via `easier`.
+  { slug: "mobility-ankle-circles", name: "Ankle circles", equipment: "none", areas: ["ankles"], seconds: 30, perSide: true, cue: "Seated or holding a wall, draw slow, big circles with your toes. Both directions." },
+  { slug: "mobility-knee-to-wall", name: "Knee-to-wall ankle rocks", equipment: "wall", areas: ["ankles", "calves"], seconds: 45, perSide: true, cue: "Foot a few inches from the wall, heel down. Rock the knee forward to touch the wall over your middle toes, then back.", easier: "mobility-ankle-circles" },
+  { slug: "stretch-supported-squat", name: "Supported deep squat", equipment: "none", areas: ["ankles", "hips"], seconds: 60, perSide: false, cue: "Hold a door frame or post and sit down between your heels. Let the hands take as much weight as you need. Chest tall." },
+  { slug: "stretch-deep-squat", name: "Deep squat hold", equipment: "none", areas: ["ankles", "hips", "adductors"], seconds: 60, perSide: false, cue: "Feet a bit wider than hips, heels down, sit as low as you comfortably can. Elbows gently press the knees out.", easier: "stretch-supported-squat" },
+  { slug: "stretch-couch", name: "Couch stretch", equipment: "wall", areas: ["hip flexors", "quads"], seconds: 60, perSide: true, cue: "Back knee on a pad by the wall, shin up the wall, front foot planted. Squeeze the back glute and lift your chest slowly.", easier: "stretch-hip-flexor-lunge" },
+  { slug: "mobility-lunge-reach", name: "Lunge with overhead reach", equipment: "none", areas: ["hip flexors", "upper back"], seconds: 45, perSide: true, cue: "Half-kneeling, tuck the hips, reach the back-leg arm up and slightly over. Breathe out at the top, then lower." },
+  { slug: "mobility-worlds-greatest", name: "World's greatest stretch", equipment: "none", areas: ["hip flexors", "hips", "hamstrings", "upper back"], seconds: 45, perSide: true, cue: "Long lunge, hands down inside the front foot. Elbow toward the instep, then rotate that arm to the sky. Straighten the front leg, repeat.", easier: "mobility-lunge-reach" },
+  { slug: "mobility-hamstring-sweeps", name: "Hamstring sweeps", equipment: "none", areas: ["hamstrings"], seconds: 30, perSide: true, cue: "Heel forward, toes up, hinge at the hips and sweep both hands down toward the foot. Step and switch, walking or in place." },
+  { slug: "mobility-inchworm", name: "Inchworm", equipment: "none", areas: ["hamstrings", "shoulders"], seconds: 45, perSide: false, cue: "Fold forward, walk the hands out to a plank, then walk the feet up to the hands with legs as straight as is comfortable.", easier: "mobility-hamstring-sweeps" },
+  { slug: "mobility-hip-cars", name: "Standing hip circles", equipment: "wall", areas: ["hips"], seconds: 45, perSide: true, cue: "Hold a wall, lift a knee to hip height, then draw the biggest slow circle you can with it: out, back, down. Reverse.", easier: "stretch-figure-four" },
+  { slug: "mobility-open-book", name: "Open book", equipment: "none", areas: ["upper back"], seconds: 45, perSide: true, cue: "Lie on your side, knees bent up, arms together in front. Open the top arm across to the other side, following it with your eyes." },
+  { slug: "mobility-thread-needle", name: "Thread the needle", equipment: "none", areas: ["upper back", "shoulders"], seconds: 45, perSide: true, cue: "On hands and knees, slide one arm under your chest and rest the shoulder down. Then reach that arm to the ceiling.", easier: "mobility-open-book" },
+  { slug: "mobility-wall-slides", name: "Wall slides", equipment: "wall", areas: ["shoulders", "upper back"], seconds: 45, perSide: false, cue: "Back, head and forearms on the wall. Slide the arms up as far as they stay in contact, ribs down, then lower." },
+  { slug: "mobility-strap-pass", name: "Strap shoulder pass-through", equipment: "strap", areas: ["shoulders"], seconds: 30, perSide: false, cue: "Hold a strap wide with straight arms. Lift it overhead and behind you only as far as is easy; widen your grip if needed." },
+  { slug: "stretch-wall-lat", name: "Wall lat stretch", equipment: "wall", areas: ["shoulders", "upper back"], seconds: 45, perSide: true, cue: "Hand on the wall overhead, step back and sink the chest and hips away, like a streamline. Feel it down the side of your back.", easier: "mobility-wall-slides" },
+  { slug: "balance-single-leg", name: "Single-leg balance", equipment: "none", areas: ["balance", "ankles", "foot arch"], seconds: 45, perSide: true, cue: "Stand on one foot near a wall, knee soft, arch lifted. When it gets easy, close your eyes or turn your head slowly." },
+  { slug: "balance-single-leg-reach", name: "Single-leg reach", equipment: "none", areas: ["balance", "hamstrings", "glutes"], seconds: 45, perSide: true, cue: "On one leg, hinge forward and reach toward the floor in front, then to each side. Stand tall between reaches.", easier: "balance-single-leg" },
+  { slug: "mobility-toe-yoga", name: "Toe yoga", equipment: "none", areas: ["foot arch"], seconds: 30, perSide: false, cue: "Feet flat. Lift only the big toes, then only the little toes. Slow and controlled; it's harder than it sounds." },
+];
+
+/**
+ * Mobility screen demos (lib/mobility/screen.ts): one clip per test. Same upload as the moves; not
+ * routine moves themselves.
+ */
+export const SCREEN_CLIPS: { slug: string; name: string }[] = [
+  { slug: "screen-ankle", name: "Screen: knee-to-wall" },
+  { slug: "screen-hip-flexor", name: "Screen: couch hip extension" },
+  { slug: "screen-hamstring", name: "Screen: active straight-leg raise" },
+  { slug: "screen-hip-rotation", name: "Screen: 90-90 hip rotation" },
+  { slug: "screen-thoracic", name: "Screen: seated rotation" },
+  { slug: "screen-shoulder", name: "Screen: wall reach overhead" },
+  { slug: "screen-balance", name: "Screen: single-leg balance, eyes closed" },
+  { slug: "screen-squat", name: "Screen: overhead deep squat" },
 ];
 
 export const moveBySlug = (slug: string) => MOVES.find((m) => m.slug === slug) ?? null;
@@ -44,10 +86,10 @@ export const moveBySlug = (slug: string) => MOVES.find((m) => m.slug === slug) ?
 /** A clip filename to a catalog id: "Foam Roll - Hamstrings (L).mov" → "foam-roll-hamstrings". */
 export function matchSlug(filename: string): string | null {
   const base = filename.replace(/\.[a-z0-9]+$/i, "").toLowerCase().replace(/\((l|r|left|right)\)|\b(left|right)\b/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (moveBySlug(base)) return base;
+  if (moveBySlug(base) || SCREEN_CLIPS.some((c) => c.slug === base)) return base;
   const words = base.split("-").filter((w) => w.length > 1);
   let best: { slug: string; score: number } | null = null;
-  for (const m of MOVES) {
+  for (const m of [...MOVES, ...SCREEN_CLIPS]) {
     const target = new Set(`${m.slug} ${m.name}`.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" "));
     const hits = words.filter((w) => target.has(w)).length;
     const score = hits / Math.max(words.length, 1);

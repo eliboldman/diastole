@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { matchSlug, moveBySlug } from "../lib/recovery/catalog.ts";
+import { matchSlug, moveBySlug, SCREEN_CLIPS } from "../lib/recovery/catalog.ts";
 
 const LOOP = 20; // seconds
 const FADE = 0.5;
@@ -61,7 +61,7 @@ for (const f of files) {
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", src, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "26", "-movflags", "+faststart", video]);
   execFileSync("ffmpeg", ["-y", "-v", "error", "-ss", "1", "-i", video, "-frames:v", "1", "-q:v", "4", poster]);
   done.push({ slug, video, poster, seconds: Math.round(len * 10) / 10 });
-  console.log(`✓ ${f} → ${moveBySlug(slug)!.name} (${len.toFixed(1)} s)`);
+  console.log(`✓ ${f} → ${moveBySlug(slug)?.name ?? SCREEN_CLIPS.find((c) => c.slug === slug)?.name} (${len.toFixed(1)} s)`);
 }
 
 if (unmatched.length) console.log(`\nNot matched (rename to a catalog id, e.g. foam-roll-calves.mov):\n  ${unmatched.join("\n  ")}`);

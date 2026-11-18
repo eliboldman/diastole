@@ -38,6 +38,7 @@ import ZoneSuggestions from "@/components/coach/ZoneSuggestions";
 import SaveAsPlan from "@/components/plans/SaveAsPlan";
 import BedtimeTrend from "@/components/sleep/BedtimeTrend";
 import StrengthCoachCard from "@/components/strength/StrengthCoachCard";
+import MobilityCoachCard from "@/components/mobility/CoachCard";
 import { getTestStatus } from "@/lib/training/tests-data";
 import { getZoneSuggestions } from "@/lib/training/zone-suggest-data";
 import { getLoad } from "@/lib/training/load-data";
@@ -206,6 +207,8 @@ export default async function AthletePage({ params, searchParams }: { params: Pr
           <p className="mb-2 mt-1 text-sm text-white/55">How workouts felt, how hard, and anything that hurt. You get a notification when pain is moderate or severe.</p>
           <RecentCheckins athleteId={profile.id} timeZone={me.timezone} />
         </section>
+
+        <MobilityCoachCard athleteId={profile.id} today={athleteToday} firstName={(profile.full_name || "This athlete").split(" ")[0]} />
 
         <BossCoachPanel athleteId={profile.id} today={athleteToday} firstName={(profile.full_name || "This athlete").split(" ")[0]} />
 

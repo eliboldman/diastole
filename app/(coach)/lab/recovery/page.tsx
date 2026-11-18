@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import ShotList from "@/components/mobility/ShotList";
 import RoutineLibrary from "@/components/recovery/RoutineLibrary";
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -29,6 +30,7 @@ export default async function RecoveryLibraryPage() {
         Build routines from your demo moves and assign them like workouts. {withClip.size} of {MOVES.length} moves have your video so far.
       </p>
       <RoutineLibrary routines={routines} moves={MOVES.map((m) => ({ ...m, hasClip: withClip.has(m.slug) }))} roster={roster} today={today} />
+      <ShotList have={[...withClip]} />
     </DashboardShell>
   );
 }

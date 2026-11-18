@@ -9,10 +9,10 @@ export const metadata: Metadata = { title: "Recovery · Diastole" };
 
 /** The follow-along player for a starter, a coach routine, or an assignment ("a-<id>"). */
 export default async function RecoveryPlay({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<{ from?: string; s?: string }> }) {
-  await requireUser();
+  const me = await requireUser();
   const [{ key }, sp] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
-  const [routine, media] = await Promise.all([resolveRoutine(supabase, key), videoMap(supabase)]);
+  const [routine, media] = await Promise.all([resolveRoutine(supabase, key, me), videoMap(supabase)]);
   if (!routine || !routine.items.length) notFound();
   // Only return to pages inside the app.
   const back = sp.from && /^\/[a-z0-9/_-]*$/i.test(sp.from) ? sp.from : "/recovery";
