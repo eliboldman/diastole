@@ -82,9 +82,11 @@ export function useHeartRate(onPacket: (p: HrPacket) => void) {
       const d = (e as CustomEvent<{ bpm?: number; rr?: number[]; device?: string; status?: string; error?: string }>).detail ?? {};
       if (d.device) setDevice(d.device);
       if (d.status === "lost") setStatus("lost");
+      if (d.status === "idle") setStatus("idle");
+      if (d.status === "connected") setStatus((s) => (s === "live" ? s : "connecting"));
       if (d.error) {
         setError(d.error);
-        setStatus("error");
+        setStatus("idle");
       }
       if (typeof d.bpm === "number") take({ bpm: d.bpm > 25 && d.bpm < 240 ? d.bpm : null, rr: Array.isArray(d.rr) ? d.rr.filter((x) => x >= 270 && x <= 2000) : [] });
     };
