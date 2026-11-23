@@ -9,6 +9,7 @@ public enum GATT {
   public static let ftmsFeature = "2ACC"
   public static let indoorBikeData = "2AD2"
   public static let trainingStatus = "2AD3"
+  public static let supportedResistanceRange = "2AD6"
   public static let supportedPowerRange = "2AD8"
   public static let controlPoint = "2AD9"
   public static let machineStatus = "2ADA"
@@ -110,12 +111,35 @@ public struct PowerRange: Equatable, Sendable {
   }
 }
 
+/// Supported Resistance Level Range (0x2AD6): unitless levels, 0.1 resolution. Each trainer picks
+/// its own scale (some 0–20, some 0–100), so we map "how hard" onto whatever it reports.
+public struct ResistanceRange: Equatable, Sendable {
+  public let min: Double, max: Double
+  public init(min: Double, max: Double) { self.min = min; self.max = Swift.max(min, max) }
+
+  /// Used until the trainer tells us (fits the FTMS 1.0 uint8 encoding).
+  public static let fallback = ResistanceRange(min: 0, max: 20)
+
+  public static func parse(_ data: Data) -> ResistanceRange? {
+    var r = ByteReader(data)
+    guard let lo = r.s16(), let hi = r.s16() else { return nil }
+    return ResistanceRange(min: Double(lo) / 10, max: Double(hi) / 10)
+  }
+
+  /// Level for a share (0…1) of the trainer's range.
+  public func level(_ fraction: Double) -> Double {
+    let f = Swift.min(1, Swift.max(0, fraction))
+    return ((min + (max - min) * f) * 10).rounded() / 10
+  }
+}
+
 // MARK: - FTMS Control Point (0x2AD9)
 
 public enum ControlCommand: Equatable, Sendable {
   case requestControl
   case reset
-  /// Unitless level, 0.1 resolution (FTMS 1.0 uses a uint8).
+  /// Unitless level, 0.1 resolution. FTMS 1.0 sends a uint8; levels past 25.5 (trainers with a
+  /// 0–100 scale) need the wider sint16 form later revisions use.
   case setResistance(level: Double)
   /// ERG mode: hold this many watts regardless of cadence.
   case setTargetPower(watts: Int)
@@ -144,7 +168,8 @@ public enum ControlCommand: Equatable, Sendable {
     case .stop: b.append(0x01)
     case .pause: b.append(0x02)
     case let .setResistance(level):
-      b.append(UInt8(clamping: Int((level * 10).rounded())))
+      let raw = Int((level * 10).rounded())
+      if (0...255).contains(raw) { b.append(UInt8(raw)) } else { b.appendLE(Int16(clamping: raw)) }
     case let .setTargetPower(watts):
       b.appendLE(Int16(clamping: watts))
     case let .simulation(wind, grade, crr, cw):
@@ -181,6 +206,29 @@ public struct ControlResponse: Equatable, Sendable {
     var r = ByteReader(data)
     guard r.u8() == 0x80, let op = r.u8(), let res = r.u8() else { return nil }
     return ControlResponse(requestOpcode: op, result: Result(rawValue: res))
+  }
+}
+
+// MARK: - FTMS Machine Status (0x2ADA)
+
+/// The trainer telling us something changed on its side. We only act on the events that mean our
+/// control (and the ERG target or grade we set) is gone.
+public enum MachineStatus: Equatable, Sendable {
+  case reset
+  case stoppedOrPaused
+  case startedOrResumed
+  case controlLost
+  case other(UInt8)
+
+  public static func parse(_ data: Data) -> MachineStatus? {
+    guard let op = data.first else { return nil }
+    switch op {
+    case 0x01: return .reset
+    case 0x02: return .stoppedOrPaused
+    case 0x04: return .startedOrResumed
+    case 0xFF: return .controlLost
+    default: return .other(op)
+    }
   }
 }
 

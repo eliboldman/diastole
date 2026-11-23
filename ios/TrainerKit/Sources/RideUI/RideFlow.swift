@@ -24,6 +24,13 @@ public final class RideFlowModel {
   /// A copy of the last ride file to share (Strava, Garmin Connect, Files) from the summary.
   public private(set) var shareURL: URL?
   public var rollers = false
+  /// Course riding: the rider's choice, else on for a Zwift Hub (the Hub One has a single cog and
+  /// Zwift's own shifting needs Zwift's app; in the middle gear it rides like gears off anyway).
+  public var virtualGears: Bool {
+    get { gearsChoice ?? (link.trainerName?.localizedCaseInsensitiveContains("zwift hub") ?? false) }
+    set { gearsChoice = newValue; DeviceMemory.virtualGears = newValue }
+  }
+  private var gearsChoice: Bool? = DeviceMemory.virtualGears
   /// Apple TV: ride through an iPhone hub instead of the TV's own Bluetooth.
   public var useHub = false
 
@@ -89,7 +96,7 @@ public final class RideFlowModel {
   public var canStart: Bool { useHub ? hub?.state == .connected : bluetooth.state == .connected }
 
   public func start() {
-    let s = selectedCourse.map { RideSession(course: $0, massKg: massKg, link: link, rollers: rollers, difficulty: difficulty) }
+    let s = selectedCourse.map { RideSession(course: $0, massKg: massKg, link: link, rollers: rollers, difficulty: difficulty, virtualGears: virtualGears) }
       ?? RideSession(title: selected?.title ?? "Free ride", steps: selected?.steps ?? [], link: link, rollers: rollers)
     if selectedCourse == nil { s.mystery = selected?.isMystery ?? false }
     s.onFinish = { [weak self] in self?.end() }
@@ -294,6 +301,13 @@ public struct RideFlowView: View {
       }
       Text("How much of each climb the trainer makes you feel. 50% is a good start; 100% is the real grade, which can run out of gears on steep pitches. Your speed and distance always use the real grade.")
         .font(.footnote).foregroundStyle(RidePalette.dim)
+      Toggle(isOn: $model.virtualGears) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Virtual gears").font(.headline)
+          Text("For single-speed trainers like the Zwift Hub One: shift with the on-screen buttons. Leave the bike in one gear.")
+            .font(.footnote).foregroundStyle(RidePalette.dim)
+        }
+      }
     }
   }
 

@@ -192,7 +192,6 @@ public final class HubClient: TrainerLink {
   @ObservationIgnored private var connection: NWConnection?
   @ObservationIgnored private var lines = LineBuffer()
   @ObservationIgnored private var lastTarget: Int??
-  @ObservationIgnored private var lastGrade: Double?
   @ObservationIgnored private let queue = DispatchQueue(label: "diastole.hub.client")
 
   public init() {}
@@ -246,14 +245,14 @@ public final class HubClient: TrainerLink {
   public func setTarget(_ watts: Int?) {
     guard state == .connected, let c = connection, lastTarget != .some(watts) else { return }
     lastTarget = .some(watts)
-    lastGrade = nil
     c.send(content: HubMessage.target(watts: watts).line(), completion: .contentProcessed { _ in })
   }
 
   public func setGrade(_ percent: Double) {
     let g = (percent * 10).rounded() / 10
-    guard state == .connected, let c = connection, lastGrade.map({ abs($0 - g) >= 0.1 }) ?? true else { return }
-    lastGrade = g
+    // Not de-duplicated: RideSession sends real changes plus a 5 s keep-alive, which also covers
+    // a phone whose trainer reset mid-ride.
+    guard state == .connected, let c = connection, g.isFinite else { return }
     lastTarget = nil
     c.send(content: HubMessage.grade(percent: g).line(), completion: .contentProcessed { _ in })
   }

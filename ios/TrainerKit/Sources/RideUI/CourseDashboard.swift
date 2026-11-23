@@ -12,6 +12,7 @@ struct CourseDashboard: View {
   @State private var showMap = false
 
   private var m: LiveMetrics { link.metrics }
+  private var gears: Bool { session.gears != nil }
   private var c: CourseRunner? { session.course }
   private var unit: String { miles ? "mi" : "km" }
   private var elevUnit: String { miles ? "ft" : "m" }
@@ -143,7 +144,7 @@ struct CourseDashboard: View {
       } else if !link.canControl {
         Text("This trainer can't change resistance, so the grade is for show. Distance still comes from your power.").font(.subheadline).foregroundStyle(RidePalette.amber)
       }
-      Text("Trainer difficulty \(Int((session.difficulty * 100).rounded()))%\(session.rollers ? " · rollers cap climbs at 4%" : "")")
+      Text("Trainer difficulty \(Int((session.difficulty * 100).rounded()))%\(session.gears.map { " · gear \($0.number) of \($0.count)" } ?? "")\(session.rollers ? " · rollers cap climbs at 4%" : "")")
         .font(.footnote).foregroundStyle(RidePalette.dim)
     }
     .padding(22)
@@ -160,7 +161,8 @@ struct CourseDashboard: View {
       ("Climbed", elev(c?.climbedM ?? 0), elevUnit),
       ("Cadence", m.cadenceRpm.map { "\(Int($0.rounded()))" } ?? "–", "rpm"),
       ("Heart rate", m.heartRateBpm.map(String.init) ?? "–", "bpm"),
-      ("Trainer grade", session.sentGrade.map { String(format: "%+.1f", $0) } ?? "–", "%"),
+      session.gears.map { ("Gear", "\($0.number)", "of \($0.count)") }
+        ?? ("Trainer grade", session.sentGrade.map { String(format: "%+.1f", $0) } ?? "–", "%"),
     ]
     return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
       ForEach(items, id: \.0) { item in
@@ -180,16 +182,18 @@ struct CourseDashboard: View {
 
   private func controls(compact: Bool) -> some View {
     HStack(spacing: compact ? 8 : 12) {
-      Button { session.nudge(-1) } label: { Label("Easier", systemImage: "minus").frame(maxWidth: .infinity) }
-        .accessibilityHint("Lowers trainer difficulty by 10%")
+      Button { session.nudge(-1) } label: { Label(gears ? "Shift down" : "Easier", systemImage: gears ? "chevron.down" : "minus").frame(maxWidth: .infinity) }
+        .accessibilityHint(gears ? "One gear easier" : "Lowers trainer difficulty by 10%")
+        .disabled(session.gears?.gear == 0)
       Button {
         session.phase == .paused ? session.resume() : session.pause()
       } label: {
         Label(session.phase == .paused ? "Resume" : "Pause", systemImage: session.phase == .paused ? "play.fill" : "pause.fill").frame(maxWidth: .infinity)
       }
       .buttonStyle(.borderedProminent).tint(RidePalette.accent).foregroundStyle(.black)
-      Button { session.nudge(1) } label: { Label("Harder", systemImage: "plus").frame(maxWidth: .infinity) }
-        .accessibilityHint("Raises trainer difficulty by 10%")
+      Button { session.nudge(1) } label: { Label(gears ? "Shift up" : "Harder", systemImage: gears ? "chevron.up" : "plus").frame(maxWidth: .infinity) }
+        .accessibilityHint(gears ? "One gear harder" : "Raises trainer difficulty by 10%")
+        .disabled(session.gears.map { $0.gear == $0.count - 1 } ?? false)
       Button(role: .destructive) { confirmEnd = true } label: { Label("End", systemImage: "stop.fill").frame(maxWidth: .infinity) }
     }
     .buttonStyle(.bordered)

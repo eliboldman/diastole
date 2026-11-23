@@ -38,6 +38,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
   public private(set) var metrics = LiveMetrics()
   public private(set) var features: FTMSFeatures?
   public private(set) var powerRange: PowerRange?
+  public private(set) var resistanceRange: ResistanceRange?
   /// True once the trainer accepted Request Control: ERG targets will be honoured.
   public private(set) var inControl = false
   public private(set) var lastError: String?
@@ -58,6 +59,14 @@ public final class TrainerConnection: NSObject, TrainerLink {
   /// .none = nothing sent yet (so the first "free ride" is sent too); .some(nil) = released.
   @ObservationIgnored private var lastTarget: Int?? = .none
   @ObservationIgnored private var lastGrade: Double?? = .none
+  /// The newest ERG / resistance / grade command, re-sent if the trainer resets or drops control.
+  @ObservationIgnored private var lastSetting: ControlCommand?
+  /// Bumped per control-point write so a late watchdog can't clear a newer one.
+  @ObservationIgnored private var writeSeq = 0
+  @ObservationIgnored private var lastRecovery = Date.distantPast
+  /// How long to wait for the trainer's answer before giving up on a write (some firmware drops
+  /// indications now and then; without this one lost answer would freeze control for the ride).
+  static let responseTimeout: Duration = .seconds(3)
 
   private static let scanServices = [GATT.ftmsService, GATT.cyclingPowerService, GATT.heartRateService].map(CBUUID.init(string:))
 
@@ -120,7 +129,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
     } else if features == nil || features?.canSimulate == true {
       send(Self.flatRoad) // feels like riding on the flat: easiest to keep pedaling or restart
     } else if features?.canSetResistance == true {
-      send(.setResistance(level: 5))
+      send(.setResistance(level: (resistanceRange ?? .fallback).level(0.15)))
     } else {
       send(.setTargetPower(watts: powerRange?.min ?? 50)) // ERG-only trainer: hold something light
     }
@@ -129,16 +138,16 @@ public final class TrainerConnection: NSObject, TrainerLink {
   static let flatRoad = ControlCommand.simulation(windMps: 0, gradePercent: 0, crr: 0.004, cwKgPerM: 0.51)
 
   /// Course riding: simulation mode with this grade. Trainers without simulation get a resistance
-  /// level that rises with the grade (FTMS levels vary by trainer; 0–100 covers most).
+  /// level that rises with the grade across the trainer's own range (-5% easiest, 15% hardest).
+  /// Not de-duplicated: RideSession already limits it to real changes plus a resend every 5 s.
   public func setGrade(_ percent: Double) {
     let g = (min(20, max(-15, percent)) * 10).rounded() / 10
-    if case let .some(.some(last)) = lastGrade, abs(last - g) < 0.1 { return }
     lastGrade = .some(g)
     lastTarget = .none // a later setTarget must be sent even if it repeats an old value
     if features == nil || features?.canSimulate == true {
       send(.simulation(windMps: 0, gradePercent: g, crr: 0.004, cwKgPerM: 0.51))
     } else if features?.canSetResistance == true {
-      send(.setResistance(level: min(100, max(0, 20 + g * 5))))
+      send(.setResistance(level: (resistanceRange ?? .fallback).level((g + 5) / 20)))
     }
   }
 
@@ -148,7 +157,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
       pending.append(.requestControl)
     }
     // Only the newest target matters: drop older ones still waiting behind a slow trainer.
-    if command.setsTarget { pending.removeAll { $0.setsTarget } }
+    if command.setsTarget { pending.removeAll { $0.setsTarget }; lastSetting = command }
     pending.append(command)
     pump()
   }
@@ -160,7 +169,46 @@ public final class TrainerConnection: NSObject, TrainerLink {
     guard inFlight == nil, let cp = controlPoint, let t = trainer, !pending.isEmpty else { return }
     let cmd = pending.removeFirst()
     inFlight = cmd
+    writeSeq += 1
+    let seq = writeSeq
     t.writeValue(cmd.data, for: cp, type: .withResponse)
+    Task { [weak self] in
+      try? await Task.sleep(for: Self.responseTimeout)
+      self?.writeTimedOut(seq)
+    }
+  }
+
+  private func writeTimedOut(_ seq: Int) {
+    guard seq == writeSeq, let cmd = inFlight else { return }
+    inFlight = nil
+    if cmd == .requestControl { inControl = false }
+    lastError = "Trainer didn't answer \(cmd); carrying on"
+    pump()
+  }
+
+  /// The write itself failed (link hiccup): nothing will answer it, so move on.
+  fileprivate func onWrite(_ c: CBCharacteristic, error: Error?) {
+    guard c.uuid.uuidString == GATT.controlPoint, let error, inFlight != nil else { return }
+    lastError = error.localizedDescription
+    inFlight = nil
+    pump()
+  }
+
+  /// Machine Status: a reset or "control lost" means the trainer forgot our ERG target or grade
+  /// (power blip, spin-down, another app). Take control back and re-send the last setting.
+  private func handle(_ status: MachineStatus, now: Date = Date()) {
+    // A trainer that keeps repeating the event shouldn't get a command storm back.
+    guard status != .startedOrResumed, now.timeIntervalSince(lastRecovery) >= 2 else { return }
+    switch status {
+    case .reset, .controlLost:
+      lastRecovery = now
+      inControl = false
+      if let last = lastSetting { send(last) } else { send(.requestControl) }
+    case .stoppedOrPaused:
+      // Someone stopped it from the trainer's side: start again so targets are honoured.
+      if inControl { lastRecovery = now; send(.start); if let last = lastSetting { send(last) } }
+    default: break
+    }
   }
 
   private func handle(_ response: ControlResponse) {
@@ -184,7 +232,8 @@ public final class TrainerConnection: NSObject, TrainerLink {
   private func cleanUp(_ p: CBPeripheral) {
     if p == trainer {
       controlPoint = nil; inControl = false; pending = []; inFlight = nil; lastTarget = .none; lastGrade = .none
-      features = nil; powerRange = nil; distanceBase = nil
+      lastSetting = nil; writeSeq += 1
+      features = nil; powerRange = nil; resistanceRange = nil; distanceBase = nil
       metrics.powerW = nil; metrics.cadenceRpm = nil; metrics.speedKph = nil
       if wantTrainer == p.identifier { state = .connecting; central.connect(p) } // auto-reconnect
       else { trainer = nil; trainerName = nil; state = .idle }
@@ -230,7 +279,7 @@ public final class TrainerConnection: NSObject, TrainerLink {
       case GATT.controlPoint:
         controlPoint = c
         p.setNotifyValue(true, for: c) // indications carry the responses
-      case GATT.ftmsFeature, GATT.supportedPowerRange:
+      case GATT.ftmsFeature, GATT.supportedPowerRange, GATT.supportedResistanceRange:
         p.readValue(for: c)
       default: break
       }
@@ -267,6 +316,10 @@ public final class TrainerConnection: NSObject, TrainerLink {
       features = FTMSFeatures.parse(v)
     case GATT.supportedPowerRange:
       powerRange = PowerRange.parse(v)
+    case GATT.supportedResistanceRange:
+      resistanceRange = ResistanceRange.parse(v)
+    case GATT.machineStatus:
+      if p == trainer, let st = MachineStatus.parse(v) { handle(st) }
     default: break
     }
   }
@@ -304,6 +357,9 @@ extension TrainerConnection: CBCentralManagerDelegate, CBPeripheralDelegate {
   nonisolated public func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor c: CBCharacteristic, error: Error?) {
     guard error == nil else { return }
     MainActor.assumeIsolated { onNotifyEnabled(c) }
+  }
+  nonisolated public func peripheral(_ p: CBPeripheral, didWriteValueFor c: CBCharacteristic, error: Error?) {
+    MainActor.assumeIsolated { onWrite(c, error: error) }
   }
   nonisolated public func peripheral(_ p: CBPeripheral, didUpdateValueFor c: CBCharacteristic, error: Error?) {
     MainActor.assumeIsolated { onValue(p, c) }

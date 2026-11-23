@@ -127,6 +127,11 @@ enum DeviceMemory {
     get { UserDefaults.standard.object(forKey: "ride.difficulty") as? Double ?? 0.5 }
     set { UserDefaults.standard.set(min(1, max(0, newValue)), forKey: "ride.difficulty") }
   }
+  /// Course riding: on-screen shifting for single-speed trainers. Nil until the rider chooses.
+  static var virtualGears: Bool? {
+    get { UserDefaults.standard.object(forKey: "ride.gears") as? Bool }
+    set { UserDefaults.standard.set(newValue, forKey: "ride.gears") }
+  }
   static func rollers(_ id: UUID?) -> Bool { id.map { UserDefaults.standard.bool(forKey: "ride.rollers.\($0.uuidString)") } ?? false }
   static func setRollers(_ id: UUID?, _ on: Bool) { if let id { UserDefaults.standard.set(on, forKey: "ride.rollers.\(id.uuidString)") } }
 }

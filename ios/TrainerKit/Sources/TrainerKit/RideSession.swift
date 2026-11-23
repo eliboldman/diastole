@@ -48,8 +48,11 @@ public final class RideSession {
   /// climbs honest without running out of gears. Changing it takes effect immediately.
   /// (Clamped where it's set: an @Observable property can't reassign itself in didSet.)
   public var difficulty: Double = 0.5 { didSet { push() } }
-  /// The grade the trainer was last told (after difficulty).
+  /// The grade the trainer was last told (after difficulty and gears).
   public private(set) var sentGrade: Double?
+  /// Course riding on a single-speed trainer (Zwift Hub One): on-screen shifting. Nil = off, the
+  /// rider shifts the bike. Changing gear takes effect immediately.
+  public private(set) var gears: VirtualGears?
 
   public var isCourse: Bool { course != nil }
   public var isFreeRide: Bool { runner.steps.isEmpty && course == nil }
@@ -60,10 +63,11 @@ public final class RideSession {
   public var goalWatts: Int? { isFreeRide ? manualTarget : runner.targetWatts }
 
   /// Ride a race course: no workout steps; the course decides the resistance.
-  public convenience init(course: RideCourse, massKg: Double, link: TrainerLink, rollers: Bool = false, difficulty: Double = 0.5) {
+  public convenience init(course: RideCourse, massKg: Double, link: TrainerLink, rollers: Bool = false, difficulty: Double = 0.5, virtualGears: Bool = false) {
     self.init(title: course.title, steps: [], link: link, rollers: rollers)
     self.course = CourseRunner(course: course, massKg: massKg)
     self.difficulty = min(1, max(0, difficulty))
+    if virtualGears { gears = VirtualGears() }
   }
 
   public init(title: String, steps: [RideStep], link: TrainerLink, rollers: Bool = false) {
@@ -115,8 +119,18 @@ public final class RideSession {
     stepChanged()
   }
 
-  /// Rider's easier/harder nudge in 5% steps (workouts) or 5 W steps (free ride).
+  /// Virtual gears: one gear easier (-1) or harder (+1).
+  public func shift(_ direction: Int) {
+    guard var g = gears else { return }
+    g.shift(direction)
+    gears = g
+    push()
+  }
+
+  /// Rider's easier/harder nudge in 5% steps (workouts) or 5 W steps (free ride). On a course it
+  /// shifts when virtual gears are on, else changes trainer difficulty by 10%.
   public func nudge(_ direction: Int) {
+    if isCourse, gears != nil { shift(direction); return }
     if isCourse {
       difficulty = min(1, max(0, ((difficulty + Double(direction) * 0.1) * 10).rounded() / 10)) // didSet pushes
       return
@@ -222,6 +236,11 @@ public final class RideSession {
     guard phase == .riding else { return }
     if let c = course {
       var g = c.trainerGrade(difficulty: difficulty)
+      if let gears {
+        // The trainer's own speed is its flywheel (the real gear); fall back to the course speed.
+        let v = link.metrics.speedKph.map { $0 / 3.6 } ?? c.speedMps
+        g = gears.trainerGrade(roadGrade: g, trainerSpeedMps: v, massKg: c.massKg, cdA: c.cdA, crr: c.crr, airDensity: c.airDensity)
+      }
       if rollers { g = min(g, 4) } // rollers can't take steep resistance without upsetting balance
       if sentGrade.map({ abs($0 - g) >= 0.1 }) ?? true || Date().timeIntervalSince(gradeSentAt) >= 5 {
         sentGrade = g
