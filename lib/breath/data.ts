@@ -10,7 +10,7 @@ const HARD_LOAD = 100; // a session's training load (TRIMP-like) that counts as 
 export async function breathData(supabase: SupabaseClient, athleteId: string, today: string, tz: string) {
   const since = shift(today, -90);
   const [{ data: sessions }, { data: holds }, { data: wellness }, { data: ready }, { data: acts }, { data: races }] = await Promise.all([
-    supabase.from("breath_sessions").select("id, kind, pace, seconds, calm_before, calm_after, local_date, local_hour, created_at").eq("athlete_id", athleteId).gte("local_date", since).order("created_at", { ascending: false }).limit(500),
+    supabase.from("breath_sessions").select("id, kind, pace, seconds, calm_before, calm_after, local_date, local_hour, created_at, hr_start, hr_end, hr_swing, rmssd").eq("athlete_id", athleteId).gte("local_date", since).order("created_at", { ascending: false }).limit(500),
     supabase.from("breath_holds").select("id, taken_on, seconds").eq("athlete_id", athleteId).order("taken_on", { ascending: true }).limit(200),
     supabase.from("daily_wellness").select("date, source, hrv_ms, resting_hr").eq("athlete_id", athleteId).gte("date", since).order("date"),
     supabase.from("readiness_scores").select("overall").eq("athlete_id", athleteId).eq("date", today).maybeSingle(),
@@ -18,7 +18,7 @@ export async function breathData(supabase: SupabaseClient, athleteId: string, to
     supabase.from("races").select("race_date").eq("athlete_id", athleteId).gte("race_date", today).lte("race_date", shift(today, 1)),
   ]);
 
-  const rows = (sessions ?? []) as (SessionRow & { id: string; pace: number | null; seconds: number; created_at: string })[];
+  const rows = (sessions ?? []) as (SessionRow & { id: string; pace: number | null; seconds: number; created_at: string; hr_start: number | null; hr_end: number | null; hr_swing: number | null; rmssd: number | null })[];
   const lastFinder = rows.find((s) => s.kind === "finder" && s.pace != null);
   const pace = lastFinder ? Number(lastFinder.pace) : null;
 

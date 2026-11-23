@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { calmShift, cycle, holdBand, holdTrend, nightsEffect, pickPace, streak, suggest, type DayContext, type SessionRow } from "./plan.ts";
+import { breathSwing, parseHeartRate, rmssd, summarise, type HrSample } from "./hr.ts";
 
 const total = (k: Parameters<typeof cycle>[0], p?: number, prog?: number) => cycle(k, p, prog).reduce((a, x) => a + x.seconds, 0);
 
@@ -19,6 +20,10 @@ assert.equal(pickPace({ "6.5": 5, "5.5": 5 }), 5.5, "tie → nearer 5.5");
 assert.equal(pickPace({ "4.5": 5, "5.5": 2 }), 4.5);
 assert.equal(pickPace({ "7": 5 }), null, "unknown paces ignored");
 assert.equal(pickPace({}), null);
+const rated = { "6.5": 4, "6": 4, "5.5": 4, "5": 2, "4.5": 3 };
+assert.equal(pickPace(rated, { "6.5": 6, "6": 9, "5.5": 11, "5": 14, "4.5": 8 }), 5.5, "biggest swing among paces that felt OK");
+assert.equal(pickPace({ ...rated, "6.5": 5 }, { "6.5": 6, "6": 9 }), 6.5, "too few swings → ratings");
+assert.equal(pickPace({ "6.5": 1, "6": 1, "5.5": 2, "5": 1 }, { "6.5": 6, "6": 9, "5.5": 7, "5": 12 }), 5, "none felt OK → biggest swing overall");
 
 // Suggestions
 const base: DayContext = { hour: 10, readiness: null, trainedMinutes: 0, hardToday: false, raceToday: false, raceTomorrow: false, doneToday: [] };
@@ -70,5 +75,27 @@ assert.equal(calmShift(sessions.slice(0, 2)), null);
 assert.equal(streak(["2026-11-21", "2026-11-22", "2026-11-23"], "2026-11-23"), 3);
 assert.equal(streak(["2026-11-21", "2026-11-22"], "2026-11-23"), 2, "yesterday still counts");
 assert.equal(streak(["2026-11-20"], "2026-11-23"), 0);
+
+// Heart rate
+const pkt = (bytes: number[]) => parseHeartRate(new DataView(new Uint8Array(bytes).buffer));
+assert.deepEqual(pkt([0x00, 62]), { bpm: 62, rr: [] });
+assert.deepEqual(pkt([0x01, 0x2c, 0x01]), { bpm: null, rr: [] }, "300 bpm rejected");
+assert.deepEqual(pkt([0x10, 60, 0x00, 0x04, 0x00, 0x04]), { bpm: 60, rr: [1000, 1000] }, "RR in 1/1024 s");
+assert.deepEqual(pkt([0x18, 60, 0x10, 0x00, 0x00, 0x04]), { bpm: 60, rr: [1000] }, "skips energy field");
+assert.deepEqual(pkt([0x00]), { bpm: null, rr: [] });
+
+// A heart rate that swings ±5 bpm with a 10 s breath → about 10 bpm peak to trough.
+const wave: HrSample[] = Array.from({ length: 300 }, (_, t) => ({ t, bpm: 60 + 5 * Math.sin((2 * Math.PI * t) / 10) }));
+const sw = breathSwing(wave, 10)!;
+assert.ok(sw > 9 && sw <= 10, `swing ${sw}`);
+assert.equal(breathSwing(wave.slice(0, 40), 10), null, "too short");
+assert.equal(rmssd([1000, 1010, 990]), null, "too few beats");
+const beats = Array.from({ length: 60 }, (_, i) => (i % 2 ? 1040 : 1000));
+assert.equal(rmssd(beats), 40);
+assert.equal(rmssd([...beats.slice(0, 30), 400, ...beats.slice(30)]), 40, "artifact dropped");
+const falling: HrSample[] = Array.from({ length: 600 }, (_, t) => ({ t, bpm: 70 - t / 60 }));
+const sum = summarise(falling, [], 10)!;
+assert.equal(sum.start, 70);
+assert.equal(sum.end, 61);
 
 console.log("breath: all good");

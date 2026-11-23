@@ -29,6 +29,9 @@ export default async function BreathePage() {
   const weekMinutes = Math.round(thisWeek.reduce((a, s) => a + s.seconds, 0) / 60);
   const lastHold = d.holds.at(-1);
   const trend = holdTrend(d.holds);
+  const hrRows = d.sessions.filter((s) => s.hr_start != null && s.hr_end != null && s.kind !== "finder");
+  const avgDrop = hrRows.length ? Math.round(hrRows.reduce((a, s) => a + (Number(s.hr_start) - Number(s.hr_end)), 0) / hrRows.length) : 0;
+  const lastSwing = d.sessions.find((s) => s.kind === "resonance" && s.hr_swing != null)?.hr_swing ?? null;
 
   const row = (href: string, title: string, sub: string) => (
     <li key={href}>
@@ -69,8 +72,10 @@ export default async function BreathePage() {
       <section className="mt-6">
         <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Sessions</h2>
         <ul className="space-y-2">
-          {ORDER.map((k) => row(`/recovery/breathe/${k}`, SESSIONS[k].title, `${SESSIONS[k].short} · ${SESSIONS[k].minutes[0]} min`))}
-          {d.pace != null && row("/recovery/breathe/finder", "Find your pace again", `Now ${d.pace} breaths a minute. Worth redoing every couple of months`)}
+          {ORDER.map((k) => (
+            <SessionCard key={k} kind={k} note={k === "resonance" ? `Your pace: ${d.effectivePace} breaths a minute${d.pace == null ? " (default)" : ""}.` : null} />
+          ))}
+          {d.pace != null && <SessionCard kind="finder" note={`Now ${d.pace} breaths a minute. Worth redoing every couple of months.`} />}
         </ul>
       </section>
 
@@ -86,6 +91,12 @@ export default async function BreathePage() {
             {calm.change > 0
               ? `You feel calmer after: up ${calm.change} on the 5-point scale on average, over ${calm.n} sessions.`
               : `Across ${calm.n} sessions you haven't felt much calmer after. Try a different session or a longer one.`}
+          </p>
+        )}
+        {hrRows.length >= 2 && (
+          <p className="mt-3 text-sm text-white/70">
+            {`With a heart-rate sensor (${hrRows.length} sessions), your heart rate settled by ${avgDrop} bpm on average from the first minute to the last`}
+            {lastSwing != null ? `, and in your last recovery session it swung ${lastSwing} bpm with each breath` : ""}.
           </p>
         )}
         {effect.ready ? (
@@ -145,5 +156,32 @@ function Stat({ value, label }: { value: string; label: string }) {
       <p className="text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-[11px] leading-tight text-white/50">{label}</p>
     </div>
+  );
+}
+
+/** One session: what it's for and when, with how it works behind a tap, and a Start button. */
+function SessionCard({ kind, note }: { kind: Kind; note: string | null }) {
+  const s = SESSIONS[kind];
+  return (
+    <li className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{s.title}</p>
+          <p className="text-xs text-white/50">{`${s.short} · ${s.minutes[0]} min`}</p>
+        </div>
+        <Link href={`/recovery/breathe/${kind}`} aria-label={`Start ${s.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-300 text-emerald-950 active:scale-95">
+          <Play size={16} aria-hidden />
+        </Link>
+      </div>
+      <p className="mt-2 text-sm text-white/75">{s.why}</p>
+      <p className="mt-2 text-sm text-white/60"><span className="text-white/45">When: </span>{s.when}</p>
+      {note && <p className="mt-2 text-sm text-emerald-200/80">{note}</p>}
+      <details className="mt-2 text-sm text-white/65">
+        <summary className="cursor-pointer text-white/75">How it works</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">{s.how.map((h) => <li key={h}>{h}</li>)}</ol>
+        <p className="mt-2">{s.works}</p>
+        <p className="mt-2 text-white/50">{s.evidence}</p>
+      </details>
+    </li>
   );
 }

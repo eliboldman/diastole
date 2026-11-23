@@ -18,5 +18,5 @@ export default async function BreathSessionPage({ params, searchParams }: { para
   const info = SESSIONS[kind];
   const want = Number(sp.m);
   const minutes = info.minutes.includes(want) ? [want, ...info.minutes.filter((m) => m !== want)] : info.minutes;
-  return <BreathPlayer kind={kind} title={info.title} why={info.why} minutes={minutes} pace={pace} backHref="/recovery/breathe" />;
+  return <BreathPlayer info={info} minutes={minutes} pace={pace} backHref="/recovery/breathe" />;
 }

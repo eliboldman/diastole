@@ -14,7 +14,11 @@ export type SessionInfo = {
   kind: Kind;
   title: string;
   short: string; // a few words on the card
-  why: string; // what it's for and what backs it
+  why: string; // what it's for, in a sentence or two
+  when: string; // when to reach for it
+  how: string[]; // how to do it
+  works: string; // how it works, in plain words
+  evidence: string; // what backs it, honestly
   minutes: number[]; // lengths to choose from; the first is the default
 };
 
@@ -23,38 +27,59 @@ export const SESSIONS: Record<Kind, SessionInfo> = {
     kind: "resonance",
     title: "Recovery breathing",
     short: "Slow, even breaths at your pace",
-    why: "Breathing around 5–6 times a minute lines up your breathing with your heart-rate rhythm. That's where heart-rate variability peaks and your body shifts toward recovery. This is the best-studied part of breathwork.",
+    why: "Your main recovery tool. Slow, even breathing at your own pace moves your body out of training mode and into recovery mode.",
+    when: "After hard or long sessions, on low-readiness days, the day before a race, or any time you feel wound up. 10 minutes is the sweet spot.",
+    how: ["Sit or lie down, shoulders soft.", "Breathe in through your nose as the circle grows, out as it shrinks. In and out are the same length.", "Breathe low and quiet, letting your lower ribs widen. Don't take big gulps."],
+    works: "Your heart rate naturally speeds up when you breathe in and slows when you breathe out. At around 5–6 breaths a minute that rise and fall lines up with your blood-pressure reflex. The swings get as big as they can, heart-rate variability peaks, and the 'rest and recover' side of your nervous system takes over.",
+    evidence: "Strong. Dozens of studies (pooled in a 2023 meta-analysis of 31 trials) show slow breathing raises HRV and calms you during and right after. A 2014 study found 5.5 breaths a minute with an equal in and out gave the highest HRV of the patterns it tested. Uses your pace from the pace finder, or 5.5 until you've done it.",
     minutes: [10, 5, 15],
   },
   downshift: {
     kind: "downshift",
     title: "Sleep downshift",
     short: "Long, slow breaths out before bed",
-    why: "Breaths out that get longer than the breath in slow your heart and help you settle. Do it in bed with the lights down.",
+    why: "Helps you fall asleep, especially after evening training or before a race when your mind is racing.",
+    when: "In bed with the lights down, as the last thing you do. Great the night before a race.",
+    how: ["Lie on your back or side, eyes closed. Turn tones on and buzz off if you share a bed.", "Breathe in for 4 through your nose.", "Breathe out slowly for 6. It stretches to 7, then 8 as you go. Let the breath out be lazy, like a sigh."],
+    works: "Your heart slows on every breath out, so making the breath out longer than the breath in tips the balance toward calm. Slowing gradually lets your body follow without straining. If you drift off mid-session, that's a win.",
+    evidence: "Good for calming and slowing heart rate during the session. Evidence that it improves sleep itself is smaller but promising. It's also low risk, so worth trying.",
     minutes: [8, 5, 12],
   },
   sigh: {
     kind: "sigh",
     title: "Cyclic sighing",
     short: "Double breath in, long sigh out",
-    why: "Two breaths in through the nose, then a long, slow breath out. In a 2023 Stanford study, five minutes a day improved mood and lowered breathing rate more than mindfulness meditation did.",
+    why: "A quick reset for stress, nerves or a bad mood. The fastest way to feel calmer in a few minutes.",
+    when: "Between classes, before a hard workout you're dreading, after a stressful day, or any time you need a mental reset. Five minutes.",
+    how: ["Breathe in through your nose until nearly full.", "Then a second short breath in on top, to fill right up.", "Then a long, slow breath out through your mouth, like a sigh, until empty."],
+    works: "The second breath in re-opens tiny air sacs in your lungs, and the long breath out is when your heart slows the most. It's the same pattern your body uses on its own when you sigh or after crying.",
+    evidence: "Good. In a 2023 Stanford study (Balban et al., Cell Reports Medicine), five minutes a day for a month improved mood and lowered resting breathing rate more than mindfulness meditation did.",
     minutes: [5, 3],
   },
   box: {
     kind: "box",
     title: "Race-day focus",
     short: "In, hold, out, hold. Four each",
-    why: "An even, steady rhythm to calm nerves without making you sleepy. Use it before a race or key session.",
+    why: "Calms nerves without making you sleepy, so you stay sharp. For race mornings and key sessions.",
+    when: "On the start line, in the warm-up area, or before a big workout or test. Three minutes.",
+    how: ["Breathe in for 4.", "Hold gently for 4. No straining, throat relaxed.", "Breathe out for 4, then pause for 4. Repeat."],
+    works: "A steady, even count gives your mind something to hold onto and slows your breathing, which takes the edge off adrenaline. It's more upbeat than the slow recovery breathing, so you don't go flat before racing.",
+    evidence: "Moderate. Widely used by the military and in sport for staying calm under pressure, and slow breathing reliably reduces arousal. There are fewer controlled trials of box breathing specifically.",
     minutes: [3, 5],
   },
   finder: {
     kind: "finder",
     title: "Find your pace",
     short: "Five paces, 90 seconds each",
-    why: "Everyone's best pace is a little different (most people fall between 4.5 and 6.5 breaths a minute). Try five, rate how each felt, and Diastole uses your best one for recovery breathing.",
+    why: "Finds your own best breathing pace, so recovery breathing fits you instead of a one-size-fits-all number.",
+    when: "Once to start, then every couple of months as your fitness changes. Sitting quietly, not right after training.",
+    how: ["Follow each pace for 90 seconds: 6.5, 6, 5.5, 5, then 4.5 breaths a minute.", "After each, rate how easy and calming it felt.", "With a heart-rate sensor connected, Diastole also measures how far your heart rate swings with each breath, the lab method for finding this pace."],
+    works: "Everyone's 'resonant' pace (where heart rate and breathing sync up best) is a little different, mostly from 4.5 to 6.5 breaths a minute. Taller people and bigger bodies tend to be slower. In a lab it's found by watching heart rate at several paces; this does the same with your sensor, or your feel when you don't have one.",
+    evidence: "This is the standard approach in HRV biofeedback research (Lehrer and colleagues): try paces from 6.5 to 4.5 and pick the one with the biggest heart-rate swing.",
     minutes: [8],
   },
 };
+
 
 
 
@@ -82,12 +107,25 @@ export const clampPace = (p: number) => (Number.isFinite(p) ? Math.min(Math.max(
 
 export const PHASE_WORDS: Record<PhaseKind, string> = { in: "Breathe in", top: "Top up", hold: "Hold", out: "Breathe out", rest: "Pause" };
 
-/** Pick the pace from finder ratings: the highest-rated, ties going to the one nearest 5.5, then the quicker. */
-export function pickPace(ratings: Record<string, number>): number | null {
+/**
+ * Pick the pace. With heart-rate swings for at least four paces, the biggest swing among the paces that felt
+ * OK (rated 3+): the lab method. Otherwise the highest-rated, ties going nearest 5.5, then the quicker.
+ */
+export function pickPace(ratings: Record<string, number>, swings?: Record<string, number> | null): number | null {
   const rows = Object.entries(ratings)
     .map(([p, v]) => ({ p: Number(p), v }))
     .filter((x) => FINDER_PACES.includes(x.p as never) && Number.isInteger(x.v) && x.v >= 1 && x.v <= 5);
   if (!rows.length) return null;
+  const sw = Object.entries(swings ?? {})
+    .map(([p, v]) => ({ p: Number(p), v: Number(v) }))
+    .filter((x) => FINDER_PACES.includes(x.p as never) && Number.isFinite(x.v) && x.v > 0);
+  if (sw.length >= 4) {
+    const ok = new Set(rows.filter((r) => r.v >= 3).map((r) => r.p));
+    const pool = sw.filter((x) => ok.has(x.p));
+    const use = pool.length ? pool : sw;
+    use.sort((a, b) => b.v - a.v || Math.abs(a.p - DEFAULT_PACE) - Math.abs(b.p - DEFAULT_PACE) || b.p - a.p);
+    return use[0].p;
+  }
   rows.sort((a, b) => b.v - a.v || Math.abs(a.p - DEFAULT_PACE) - Math.abs(b.p - DEFAULT_PACE) || b.p - a.p);
   return rows[0].p;
 }
