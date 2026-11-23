@@ -8,6 +8,8 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { minutesLabel, routineSeconds, suggestRoutine } from "@/lib/recovery/catalog";
 import { routinesFor } from "@/lib/recovery/data";
 import { DAY_WORDS, todaysFlow } from "@/lib/mobility/data";
+import { shotList } from "@/lib/recovery/shots";
+import { SITE } from "@/lib/site";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Recovery · Diastole" };
@@ -34,6 +36,11 @@ export default async function RecoveryPage() {
         ])
       : [{ data: null }, { data: null }];
   const mobility = await todaysFlow(supabase, me.id, today, me.timezone);
+  // The head coach films the demo clips from here.
+  const films = me.role === "coach" && me.email?.toLowerCase() === SITE.contactEmail.toLowerCase();
+  const shots = films ? shotList() : [];
+  const { data: filmed } = films ? await supabase.from("recovery_videos").select("slug") : { data: null };
+  const filmedCount = films ? shots.filter((s) => (filmed ?? []).some((f) => f.slug === s.slug)).length : 0;
   const tip = suggestRoutine({ spots, readiness: (ready?.overall as string) ?? null });
   const when = (d: string) => (d === today ? "Today" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }));
 
@@ -54,6 +61,13 @@ export default async function RecoveryPage() {
       <BackLink href={me.role === "coach" ? "/me" : "/training"} label={me.role === "coach" ? "My day" : "Training"} />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Recovery</h1>
       <p className="mt-2 text-white/55">Rolling, stretching and breathing, with your coach&apos;s demos. General recovery guidance, not medical treatment.</p>
+
+      {films && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Your demos</h2>
+          <ul>{row("/recovery/film", "Film your demos", filmedCount < shots.length ? `${filmedCount} of ${shots.length} filmed · ${shots.length - filmedCount} to go` : `All ${shots.length} filmed · re-film any`)}</ul>
+        </section>
+      )}
 
       <section className="mt-6">
         <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Breathe</h2>

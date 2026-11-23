@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import ShotList from "@/components/mobility/ShotList";
+import Link from "next/link";
 import RoutineLibrary from "@/components/recovery/RoutineLibrary";
 import BackLink from "@/components/layout/BackLink";
 import DashboardShell from "@/components/layout/DashboardShell";
@@ -30,7 +30,13 @@ export default async function RecoveryLibraryPage() {
         Build routines from your demo moves and assign them like workouts. {withClip.size} of {MOVES.length} moves have your video so far.
       </p>
       <RoutineLibrary routines={routines} moves={MOVES.map((m) => ({ ...m, hasClip: withClip.has(m.slug) }))} roster={roster} today={today} />
-      <ShotList have={[...withClip]} />
+      <Link href="/recovery/film" className="mt-8 flex min-h-11 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm hover:bg-white/[0.06]">
+        <span>
+          <span className="block font-medium">Film your demos</span>
+          <span className="block text-white/50">Record each clip with your phone and upload it from the app</span>
+        </span>
+        <span aria-hidden className="text-white/40">›</span>
+      </Link>
     </DashboardShell>
   );
 }
