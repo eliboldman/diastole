@@ -56,6 +56,11 @@ export default async function RecoveryPage() {
       <p className="mt-2 text-white/55">Rolling, stretching and breathing, with your coach&apos;s demos. General recovery guidance, not medical treatment.</p>
 
       <section className="mt-6">
+        <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Breathe</h2>
+        <ul>{row("/recovery/breathe", "Breathe", "Slow breathing picked for your day, your own pace, and a CO₂ check")}</ul>
+      </section>
+
+      <section className="mt-6">
         <h2 className="mb-2 text-sm uppercase tracking-[0.15em] text-white/50">Mobility</h2>
         <ul className="space-y-2">
           {mobility
