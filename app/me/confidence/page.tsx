@@ -1,12 +1,12 @@
-import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import BankList from "@/components/confidence/BankList";
 import { readySummary } from "@/lib/confidence/collect";
 import { getBank, refreshBank } from "@/lib/confidence/data";
 import { createAdminClient, createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Confidence bank · Diastole" };
 
@@ -28,9 +28,7 @@ export default async function ConfidencePage({ searchParams }: { searchParams: P
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/account" className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
-        <ChevronLeft size={16} aria-hidden /> Profile
-      </Link>
+      <BackLink href="/account" label="Profile" />
       <h1 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Confidence bank</h1>
       <p className="mt-2 text-white/55">Proof you&apos;re ready, saved from your own training as you go. Only you and your coach see it.</p>
 

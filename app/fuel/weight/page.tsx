@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import EnergyCheckin from "@/components/fuel/EnergyCheckin";
@@ -9,6 +8,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { getWeightView } from "@/lib/fuel/weight-data";
 import { DAY_LABEL, LB, addDays, avg7, daysBetween, plannedKg, shiftedLine } from "@/lib/fuel/weight-plan";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Race weight · Diastole" };
 
@@ -49,9 +49,7 @@ export default async function WeightPage() {
 
   return (
     <DashboardShell role={me.role === "coach" ? "coach" : "athlete"}>
-      <Link href="/fuel" className="text-sm text-white/50 hover:text-white/80">
-        ← Fuel
-      </Link>
+      <BackLink href="/fuel" label="Fuel" />
       <h1 className="mt-3 text-4xl font-bold tracking-tight">Race weight</h1>
       <p className="mt-2 text-sm text-white/55">
         {Math.round(goal.start_kg / LB)} → {Math.round(goal.target_kg / LB)} lb by {fmt(week.target_date)}, then maintenance to race day ({fmt(goal.maintain_until)}). Watts and recovery come first.

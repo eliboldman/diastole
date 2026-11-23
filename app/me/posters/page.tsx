@@ -1,4 +1,3 @@
-import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -7,6 +6,7 @@ import { PosterArt } from "@/components/poster/RacePoster";
 import { raceDistance } from "@/components/race/RaceList";
 import { posterState } from "@/lib/poster/poster";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Posters · Diastole" };
 const SPORT: Record<string, string> = { run: "Run", bike: "Ride", swim: "Swim", tri: "Triathlon", other: "Race" };
@@ -19,9 +19,7 @@ export default async function PostersPage() {
   const full = posterState([], "0000-01-01", "9999-12-31"); // kept posters are finished: all color
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/account" className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
-        <ChevronLeft size={16} aria-hidden /> Profile
-      </Link>
+      <BackLink href="/account" label="Profile" />
       <h1 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Poster collection</h1>
       <p className="mt-2 text-white/55">Every A race you&apos;ve finished and kept, in full color.</p>
       {!races?.length ? (

@@ -18,6 +18,7 @@ import { easyVersion } from "./easy";
 import { CHECKPOINTS, LANE_RUN_PACE, PCB_PLAN_ID, PCB_RACE_DATE, fmtClock, laneFor, laneText, metricText, overallLane, type Lane, type MetricKey } from "./plan";
 import { pickRescheduleDate } from "./reschedule-rules";
 import { redTrend, swapCandidates } from "./week-call";
+import { athleteSection } from "@/lib/athlete-views";
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Athlete = { id: string; full_name: string | null; timezone: string; units: string | null; email: string | null };
@@ -320,7 +321,7 @@ export async function notifyTestZones(admin: Admin) {
         p_kind: "zone_suggestion",
         p_title: `New ${ZONE_LABEL[s.key]} from your ${s.test.title}`,
         p_body: `${zoneText(s.key, s.current, units)} → ${zoneText(s.key, s.suggested, units)}. Apply it and every upcoming workout re-works to the new number; the next 7 days update on your watch.`,
-        p_href: `/athlete/${id}#zones`,
+        p_href: athleteSection(id, "zones"),
         p_key: `zone:${id}:${s.key}:${s.suggested}`,
       });
       sent++;

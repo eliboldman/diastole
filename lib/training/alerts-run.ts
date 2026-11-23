@@ -7,6 +7,7 @@ import { addDays, mondayOf } from "./week";
 import { getWeek } from "./week-data";
 import { getZoneSuggestions } from "./zone-suggest-data";
 import { ZONE_LABEL, zoneText } from "./zone-suggest";
+import { athleteSection } from "@/lib/athlete-views";
 
 type Admin = ReturnType<typeof createAdminClient>;
 const NEW_EFFORT_MS = 2 * 86_400_000; // zone suggestions from efforts in the last two days
@@ -50,7 +51,7 @@ export async function runCoachAlerts(admin: Admin, coach: { id: string; units?: 
         p_kind: "zone_suggestion",
         p_title: `${who} ${ZONE_LABEL[s.key]} looks out of date`,
         p_body: `${zoneText(s.key, s.current, units)} → ${zoneText(s.key, s.suggested, units)}. ${s.why}`,
-        p_href: `/athlete/${athleteId}#zones`,
+        p_href: athleteSection(athleteId, "zones"),
         p_key: `zone:${athleteId}:${s.key}:${s.suggested}`,
       });
       zones++;

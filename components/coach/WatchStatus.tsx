@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import SyncedAgo from "@/components/SyncedAgo";
 import type { WatchStatus } from "@/lib/devices/status";
+import { athleteSection } from "@/lib/athlete-views";
 
 export type WatchRow = { id: string; name: string; status: WatchStatus };
 
@@ -28,7 +29,7 @@ export function WatchCard({ rows }: { rows: WatchRow[] }) {
         <ul className="mt-3 divide-y divide-white/[0.08]">
           {attention.map((r) => (
             <li key={r.id}>
-              <Link href={`/athlete/${r.id}#workouts`} className="-mx-2 flex items-start gap-3 rounded-xl px-2 py-2.5 hover:bg-white/[0.04]">
+              <Link href={athleteSection(r.id, "workouts")} className="-mx-2 flex items-start gap-3 rounded-xl px-2 py-2.5 hover:bg-white/[0.04]">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-200" aria-label="Needs attention" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">

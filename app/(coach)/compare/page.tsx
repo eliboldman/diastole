@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import DualLine from "@/components/compare/DualLine";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { createClient, requireCoach } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Compare athletes · Diastole" };
 
@@ -104,7 +104,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <DualLine title="Protein logged per day" days={days} a={a.protein} b={b.protein} fmt={(v) => `${Math.round(v)} g`} names={names} />
       </div>
       <p className="mt-4 max-w-2xl text-xs text-white/45">HRV from Garmin and Apple is measured differently, so compare each athlete with their own trend rather than with each other. Solid line: {A.name.split(" ")[0]}. Dashed: {B.name.split(" ")[0]}.</p>
-      <Link href="/athletes" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-200 hover:underline">← Athletes</Link>
+      <BackLink href="/athletes" label="Athletes" />
     </DashboardShell>
   );
 }

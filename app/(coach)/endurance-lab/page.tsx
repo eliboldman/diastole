@@ -11,6 +11,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { FORM, type FormMetric } from "@/lib/activity/form";
 import { daysBackIso } from "@/lib/activity/zones";
 import { createClient, requireCoach } from "@/lib/supabase/server";
+import { athleteSection } from "@/lib/athlete-views";
 
 export const metadata: Metadata = { title: "The Endurance Lab · Diastole" };
 export const maxDuration = 120; // "Check everyone's form" can call Claude
@@ -94,6 +95,9 @@ export default async function EnduranceLabPage() {
             <Link href="/library" className={`${linkRow} mt-4`}>
               Open the library <ChevronRight size={16} className="text-white/45" aria-hidden />
             </Link>
+            <Link href="/workouts" className={`${linkRow} mt-3`}>
+              Every athlete&apos;s workouts <ChevronRight size={16} className="text-white/45" aria-hidden />
+            </Link>
             <ConnectImport athletes={roster} />
             <Link href="/lab/recovery" className={`${linkRow} mt-3`}>
               Recovery routines and demos <ChevronRight size={16} className="text-white/45" aria-hidden />
@@ -119,7 +123,7 @@ export default async function EnduranceLabPage() {
             <div className="grid gap-6">
               {[...byAthlete.entries()].map(([athleteId, list]) => (
                 <div key={athleteId}>
-                  <Link href={`/athlete/${athleteId}#form`} className="mb-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium hover:underline">
+                  <Link href={athleteSection(athleteId, "form")} className="mb-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium hover:underline">
                     {nameOf(athleteId)} <ChevronRight size={15} className="text-white/45" aria-hidden />
                   </Link>
                   <FormInsights athleteId={athleteId} insights={list} tomorrow={tomorrow} compact />

@@ -14,6 +14,7 @@ import { getWatchStatuses } from "@/lib/devices/status-data";
 import { createClient, requireCoach } from "@/lib/supabase/server";
 
 import InviteForm from "./InviteForm";
+import InvitePanel from "./InvitePanel";
 import DietitianAccess from "./DietitianAccess";
 import DietitianRow from "./DietitianRow";
 import RemoveAthlete from "./RemoveAthlete";
@@ -52,64 +53,6 @@ export default async function AthletesPage() {
             { href: "/nutrition", label: "Team fueling", icon: <Apple size={16} aria-hidden /> },
           ]}
         />
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/55">
-          Invite an athlete by email. They&apos;ll get a sign-in link, then connect their Garmin or Apple Watch.
-        </p>
-
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
-          <h2 className="mb-4 text-lg font-medium">Invite an athlete</h2>
-          <InviteForm />
-        </section>
-
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
-          <h2 className="text-lg font-medium">Invite a coach</h2>
-          <p className="mb-4 mt-1 text-sm text-white/55">
-            A coach gets their own roster: they invite and plan for their own athletes, and can&apos;t see yours (you can&apos;t see theirs).
-          </p>
-          <InviteForm role="coach" />
-          {!!coachInvites?.length && (
-            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
-              {coachInvites.map((i) => (
-                <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-4 py-1">
-                  <span className="text-white/80">{i.email}</span>
-                  <span className="flex items-center gap-2 text-white/50">
-                    Invited {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    <ResendInvite id={i.id} />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-2xl">
-          <h2 className="text-lg font-medium">Invite a dietitian</h2>
-          <p className="mb-4 mt-1 text-sm text-white/55">
-            A dietitian joins your team with full access to the athletes you choose: meals, nutrition targets, training, readiness, activities and health data. By default they see every athlete; use “change” under their name to limit them to the athletes you pick. They can set each athlete&apos;s nutrition goals and leave them a note on their Fuel page. Athletes see which dietitians can view their data.
-          </p>
-          <InviteForm role="dietitian" />
-          {(!!dietitians?.length || !!dietitianInvites?.length) && (
-            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
-              {(dietitians ?? []).map((d) => (
-                <DietitianRow key={d.id} id={d.id} label={d.full_name || d.email || "Dietitian"} sub={`Joined ${short(d.created_at)}`}>
-                  <DietitianAccess
-                    target={{ dietitian: d.id }}
-                    roster={roster}
-                    all={d.dietitian_all}
-                    picked={(access ?? []).filter((x) => x.dietitian_id === d.id).map((x) => x.athlete_id)}
-                  />
-                </DietitianRow>
-              ))}
-              {(dietitianInvites ?? []).map((i) => (
-                <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending>
-                  <DietitianAccess target={{ invite: i.id }} roster={roster} all={i.dietitian_all} picked={(i.dietitian_athletes ?? []) as string[]} />
-                  <ResendInvite id={i.id} />
-                </DietitianRow>
-              ))}
-            </ul>
-          )}
-        </section>
-
         {(athletes ?? []).filter((a) => a.id !== coach.id).length > 1 && (
           <RosterBulk athletes={(athletes ?? []).filter((a) => a.id !== coach.id).map((a) => ({ id: a.id, name: a.full_name || a.email || "Athlete" }))} pods={await coachPods(coach.id)} />
         )}
@@ -146,10 +89,71 @@ export default async function AthletesPage() {
           })}
           {!athletes?.length && (
             <EmptyState emoji="👋" title="No athletes yet">
-              Invite your first athlete with the form above. They get an email link, and their watch data shows up here once they connect.
+              Invite your first athlete below. They get an email link, and their watch data shows up here once they connect.
             </EmptyState>
           )}
         </section>
+        <InvitePanel
+          open={!athletes?.length}
+          pending={(coachInvites?.length ?? 0) + (dietitianInvites?.length ?? 0)}
+          panels={{
+            athlete: (
+              <>
+                <p className="mb-4 text-sm text-white/55">They&apos;ll get a sign-in link by email, then connect their Garmin or Apple Watch.</p>
+                <InviteForm />
+              </>
+            ),
+            coach: (
+              <>
+                <p className="mb-4 text-sm text-white/55">
+                  A coach gets their own roster: they invite and plan for their own athletes, and can&apos;t see yours (you can&apos;t see theirs).
+                </p>
+          <InviteForm role="coach" />
+          {!!coachInvites?.length && (
+            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
+              {coachInvites.map((i) => (
+                <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-4 py-1">
+                  <span className="text-white/80">{i.email}</span>
+                  <span className="flex items-center gap-2 text-white/50">
+                    Invited {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    <ResendInvite id={i.id} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+              </>
+            ),
+            dietitian: (
+              <>
+                <p className="mb-4 text-sm text-white/55">
+                  A dietitian sees the athletes you choose (all by default; use “change” under their name to limit it): meals, nutrition targets, training, readiness, activities and health data. They can set nutrition goals and leave notes on an athlete&apos;s Fuel page. Athletes see which dietitians can view their data.
+                </p>
+          <InviteForm role="dietitian" />
+          {(!!dietitians?.length || !!dietitianInvites?.length) && (
+            <ul className="mt-4 divide-y divide-white/[0.08] text-sm">
+              {(dietitians ?? []).map((d) => (
+                <DietitianRow key={d.id} id={d.id} label={d.full_name || d.email || "Dietitian"} sub={`Joined ${short(d.created_at)}`}>
+                  <DietitianAccess
+                    target={{ dietitian: d.id }}
+                    roster={roster}
+                    all={d.dietitian_all}
+                    picked={(access ?? []).filter((x) => x.dietitian_id === d.id).map((x) => x.athlete_id)}
+                  />
+                </DietitianRow>
+              ))}
+              {(dietitianInvites ?? []).map((i) => (
+                <DietitianRow key={i.id} id={i.id} label={i.email} sub={`Invited ${short(i.created_at)}`} pending>
+                  <DietitianAccess target={{ invite: i.id }} roster={roster} all={i.dietitian_all} picked={(i.dietitian_athletes ?? []) as string[]} />
+                  <ResendInvite id={i.id} />
+                </DietitianRow>
+              ))}
+            </ul>
+          )}
+              </>
+            ),
+          }}
+        />
       </div>
     </DashboardShell>
   );

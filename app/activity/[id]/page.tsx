@@ -37,6 +37,7 @@ import { normalizePain } from "@/lib/avatar/pain";
 import { normalizeStrain } from "@/lib/avatar/strain";
 import { writeAutoStrain } from "@/lib/avatar/strain-store";
 import { inAthleteView } from "@/lib/view-server";
+import { athleteSection } from "@/lib/athlete-views";
 
 export const metadata: Metadata = { title: "Workout · Diastole" };
 
@@ -492,7 +493,7 @@ export default async function ActivityPage({ params, searchParams }: { params: P
           title="Zones"
           aside={
             canEditZones ? (
-              <Link href={`/athlete/${act.athlete_id}#zones`} className="text-sm text-emerald-200 hover:underline">
+              <Link href={athleteSection(act.athlete_id, "zones")} className="text-sm text-emerald-200 hover:underline">
                 Edit zones →
               </Link>
             ) : null

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { athleteSection } from "@/lib/athlete-views";
 
 // Everything waiting on the coach, from every feature, newest first. Row-level security keeps it
 // to this coach's athletes and pods.
@@ -24,7 +25,7 @@ export async function getInbox(supabase: SupabaseClient, coachId: string): Promi
   const who = (id: string) => names.get(id) ?? "Athlete";
   const items: InboxItem[] = [];
   for (const s of sug.data ?? []) items.push({ type: "suggestion", id: s.id, who: who(s.athlete_id), title: s.summary, detail: s.rationale, at: s.created_at, href: `/dashboard#suggestions` });
-  for (const b of boss.data ?? []) items.push({ type: "boss", id: b.id, who: who(b.athlete_id), title: `Boss this month: ${LIMITER[b.limiter] ?? b.limiter}`, detail: b.evidence, at: b.created_at, href: `/athlete/${b.athlete_id}#boss` });
+  for (const b of boss.data ?? []) items.push({ type: "boss", id: b.id, who: who(b.athlete_id), title: `Boss this month: ${LIMITER[b.limiter] ?? b.limiter}`, detail: b.evidence, at: b.created_at, href: athleteSection(b.athlete_id, "boss") });
   for (const p of plan.data ?? []) items.push({ type: "plan_change", id: p.id, who: who(p.athlete_id), title: p.summary, detail: p.why, at: p.created_at, href: `/athlete/${p.athlete_id}` });
   for (const r of req.data ?? []) items.push({ type: "request", id: r.id, who: who(r.athlete_id), title: `Asked to add: ${r.title}`, detail: `${r.sport} · ${new Date(`${r.scheduled_date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}`, at: r.created_at, href: `/athlete/${r.athlete_id}/workouts/${r.id}` });
   for (const s of str.data ?? []) {

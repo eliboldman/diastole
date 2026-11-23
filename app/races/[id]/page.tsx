@@ -23,6 +23,7 @@ import { daysUntil, RACE_WEEK_DAYS, raceWeekChecklist } from "@/lib/fuel/race";
 import { getRace, getRaceTools, planFor } from "@/lib/fuel/race-data";
 import { getRacePrediction } from "@/lib/predict/data";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import { athleteSection } from "@/lib/athlete-views";
 
 export const metadata: Metadata = { title: "Race · Diastole" };
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -105,7 +106,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
             </div>
           </section>
         )}
-        {showEst && <RaceEstimate prediction={est.prediction} goal={race.goal_seconds} note={est.note} own={own} sport={race.sport} hasDistance={Number(race.distance_km) > 0} zonesHref={own ? "/me/setup#numbers" : `/athlete/${race.athlete_id}#zones`} />}
+        {showEst && <RaceEstimate prediction={est.prediction} goal={race.goal_seconds} note={est.note} own={own} sport={race.sport} hasDistance={Number(race.distance_km) > 0} zonesHref={own ? "/me/setup#numbers" : athleteSection(race.athlete_id, "zones")} />}
         {days >= 0 && <CourseCard raceId={race.id} athleteId={race.athlete_id} sport={race.sport} view={course} units={me.units} coach={me.role === "coach" && !own} today={today} raceDate={race.race_date} />}
         {pack && (
           <section id="packing" className="scroll-mt-6 rounded-[28px] border border-white/10 bg-white/[0.055] p-6 lg:col-span-2" data-print-show>

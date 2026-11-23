@@ -10,8 +10,6 @@ import PodTabs, { type PodView } from "@/components/PodTabs";
 import PodWeek, { type PodWeekData } from "@/components/PodWeek";
 import { FEED_PAGE, type FeedItem } from "@/lib/pod-feed-types";
 import { createClient, requireUser } from "@/lib/supabase/server";
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import RememberPod from "@/components/RememberPod";
 import CampList from "@/components/camp/CampList";
 import { getPodCamps } from "@/lib/camp/data";
@@ -20,6 +18,7 @@ import PodBaton from "@/components/baton/PodBaton";
 import Campfire from "@/components/campfire/Campfire";
 import LatestEpisode from "@/components/stories/LatestEpisode";
 import { TIPS } from "@/lib/discovery";
+import BackLink from "@/components/layout/BackLink";
 
 export default async function AthletePodPage({
   params,
@@ -62,9 +61,7 @@ export default async function AthletePodPage({
   return (
     <AthleteShell isCoach={me.role === "coach"}>
       <RememberPod id={id} />
-      <Link href="/me/pods?all=1" className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
-        <ChevronLeft size={16} aria-hidden /> All pods &amp; sharing
-      </Link>
+      <BackLink href="/me/pods?all=1" label="All pods & sharing" />
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{feed.pod.name}</h1>
         <LeavePod podId={id} name={feed.pod.name} />

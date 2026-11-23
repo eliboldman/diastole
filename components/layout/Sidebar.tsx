@@ -1,6 +1,6 @@
 "use client";
 
-import { Apple, BookOpen, Gem, Inbox, Sparkles, CalendarDays, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { Apple, Gem, Inbox, Sparkles, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -25,7 +25,7 @@ type Item = { label: string; href: string; icon: LucideIcon; short?: string; mat
 const NAV: Record<NavRole, Item[]> = {
   coach: [
     { label: "Today", href: "/dashboard", icon: Sun, match: /^\/digest(\/|$)/ },
-    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods|compare)(\/|$)|^\/activity\// },
+    { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods|compare|nutrition)(\/|$)|^\/activity\// },
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
     // A coach's own athlete pages (day, training, fuel) live under Me.
@@ -57,18 +57,15 @@ const tabItems = (role: NavRole, ids: string[]): Item[] =>
 // races, setup, connections, settings) lives under Me, so it isn't repeated here.
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
+    // Workouts and Library sit under the Lab tab, Pods and Team fueling under Athletes, your own
+    // fuel under Me, so they aren't repeated here.
     { label: "Approvals", href: "/inbox", icon: Inbox },
     { label: "Team calendar", href: "/team-calendar", icon: CalendarRange },
-    { label: "Workouts", href: "/workouts", icon: CalendarDays },
-    { label: "Library", href: "/library", icon: BookOpen },
-    { label: "Pods", href: "/pods", icon: Orbit },
-    { label: "Team fueling", href: "/nutrition", icon: Apple },
     { label: "Ask Diastole", href: "/ask", icon: Sparkles },
-    { label: "My fuel", href: "/fuel", icon: Utensils },
     { label: "Help", href: "/help", icon: LifeBuoy },
   ],
   athlete: [
-    { label: "Calendar", href: "/calendar", icon: CalendarRange },
+    // Calendar lives under Training.
     { label: "My pods", href: "/me/pods", icon: Orbit },
     { label: "Grit bank & store", href: "/me/grit", icon: Gem },
     { label: "Help", href: "/help", icon: LifeBuoy },

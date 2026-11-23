@@ -1,10 +1,9 @@
-import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AthleteShell from "@/components/AthleteShell";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Episodes · Diastole" };
 
@@ -22,9 +21,7 @@ export default async function EpisodesPage({ params }: { params: Promise<{ id: s
   const seasons = [...new Set((eps ?? []).map((e) => e.season))];
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href={me.role === "coach" ? `/pods/${id}` : `/me/pods/${id}`} className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
-        <ChevronLeft size={16} aria-hidden /> {pod?.name ?? "Pod"}
-      </Link>
+      <BackLink href={me.role === "coach" ? `/pods/${id}` : `/me/pods/${id}`} label={pod?.name ?? "Pod"} />
       <h1 className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">Episodes</h1>
       <p className="mt-2 text-white/55">Your pod&apos;s weeks, as told by your coach.</p>
       {!eps?.length && <p className="mt-8 text-white/55">No episodes yet. The first one arrives after a week of training together.</p>}

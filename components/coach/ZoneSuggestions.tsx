@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 
 import { applyZoneSuggestion, dismissZoneSuggestion } from "@/lib/training/zone-actions";
 import { ZONE_LABEL, zoneText, type Suggestion } from "@/lib/training/zone-suggest";
+import { athleteSection } from "@/lib/athlete-views";
 
 export type ZoneRow = { athleteId: string; name?: string; suggestions: Suggestion[] };
 
@@ -43,7 +44,7 @@ function Item({ s, units }: { s: Suggestion & { athleteId: string; name?: string
       <div className="min-w-0 flex-1 basis-56">
         <p className="text-sm font-medium">
           {s.name && (
-            <Link href={`/athlete/${s.athleteId}#zones`} className="hover:underline">
+            <Link href={athleteSection(s.athleteId, "zones")} className="hover:underline">
               {s.name}
             </Link>
           )}

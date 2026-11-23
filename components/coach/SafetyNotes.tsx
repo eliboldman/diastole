@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import SafetyNoteActions from "@/components/coach/SafetyNoteActions";
 import { createClient } from "@/lib/supabase/server";
+import { athleteSection } from "@/lib/athlete-views";
 
 const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -35,7 +36,7 @@ export default async function SafetyNotes({ athleteId }: { athleteId?: string })
               {athleteId ? (
                 <p className="text-xs text-white/45">{`Since ${day(n.created_on)}${n.updated_on !== n.created_on ? ` · updated ${day(n.updated_on)}` : ""}`}</p>
               ) : (
-                <Link href={`/athlete/${n.athlete_id}#fuel`} className="flex min-h-10 items-center justify-between gap-2">
+                <Link href={athleteSection(n.athlete_id, "safety")} className="flex min-h-10 items-center justify-between gap-2">
                   <span className="truncate font-medium">{name}</span>
                   <span className="flex shrink-0 items-center gap-1 text-xs text-white/45">
                     {`since ${day(n.created_on)}`} <ChevronRight size={14} aria-hidden />

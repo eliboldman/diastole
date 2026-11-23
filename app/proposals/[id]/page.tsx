@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AthleteShell from "@/components/AthleteShell";
@@ -8,6 +7,7 @@ import type { Brick, Step } from "@/lib/workouts/garmin-format";
 import { structure } from "@/lib/workouts/totals";
 
 import Decide, { type Choice } from "../Decide";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Suggestion · Diastole" };
 
@@ -63,9 +63,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/proposals" className="text-sm text-white/50 hover:text-white/80">
-        ← Suggestions
-      </Link>
+      <BackLink href="/proposals" label="Suggestions" />
       <h1 className="mt-3 text-3xl font-bold tracking-tight">{p.title}</h1>
       {p.body && <p className="mt-3 max-w-2xl text-white/70">{p.body}</p>}
 

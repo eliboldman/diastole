@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import EmptyState from "@/components/EmptyState";
 
-import { CalendarDays, CalendarRange, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Plus, Shuffle, Sparkles, Sun, type LucideIcon } from "lucide-react";
+import { CalendarRange, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Shuffle, Sun, type LucideIcon } from "lucide-react";
 
 import SyncedAgo from "@/components/SyncedAgo";
 
@@ -236,11 +236,9 @@ export default async function TodayPage() {
   );
 }
 
+// Only places the menus don't already cover (workouts and the builder live under the Lab tab).
 const SHORTCUTS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "My day", href: "/me", icon: Sun },
-  { label: "Build a workout", href: "/endurance-lab", icon: Plus },
   { label: "Calendar", href: "/calendar", icon: CalendarRange },
-  { label: "All workouts", href: "/workouts", icon: CalendarDays },
-  { label: "Ask Diastole", href: "/ask", icon: Sparkles },
   { label: "Weekly digest", href: "/digest", icon: ClipboardList },
 ];

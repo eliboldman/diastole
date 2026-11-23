@@ -1,6 +1,4 @@
-import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import AthleteShell from "@/components/AthleteShell";
 import { GritMark } from "@/components/grit/Art";
@@ -9,6 +7,7 @@ import { gearOf, ITEM } from "@/lib/grit/catalog";
 import { getGrit } from "@/lib/grit/data";
 import { settleGrit } from "@/lib/grit/settle";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import BackLink from "@/components/layout/BackLink";
 
 export const metadata: Metadata = { title: "Grit bank · Diastole" };
 
@@ -40,9 +39,7 @@ export default async function GritPage() {
 
   return (
     <AthleteShell isCoach={me.role === "coach"}>
-      <Link href="/me" className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white">
-        <ChevronLeft size={16} aria-hidden /> Today
-      </Link>
+      <BackLink href="/me" label="Today" />
 
       <section className="row-in mt-4 rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-emerald-300/[0.10] to-white/[0.03] p-6 backdrop-blur-xl">
         <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/70">Grit bank</p>
