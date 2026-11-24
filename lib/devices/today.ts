@@ -10,6 +10,7 @@ import { rideMassKg, rideSeconds, toRideCourses, toRideSteps, type RideCourse, t
 import { estimateSession } from "@/lib/fuel/plan";
 import { watchFuel, type WatchFuel } from "@/lib/fuel/watch";
 import { toAppleWorkout, type AppleWorkout } from "@/lib/apple/format";
+import { watchBreath, type WatchBreath } from "@/lib/breath/watch";
 
 // What the Garmin watch app (and the Apple TV home screen) shows: today's plan, readiness and last
 // night's numbers. Keys are short and lists capped because a Connect IQ background task can hand
@@ -30,6 +31,7 @@ export type TodayPayload = {
   nx: { t: string; s: string; d: string }[]; // tomorrow
   m: { hrv?: number; rhr?: number; sl?: number; ss?: number; bb?: number; st?: number };
   ck?: PendingCheckin;
+  br?: WatchBreath; // breathing: today's suggestion and the athlete's pace
   u: number; // unix seconds when built
 };
 
@@ -47,7 +49,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
   const today = localDate(now, tz);
   const tomorrow = localDate(new Date(now.getTime() + 86_400_000), tz);
 
-  const [workouts, readiness, wellness, recent] = await Promise.all([
+  const [workouts, readiness, wellness, recent, br] = await Promise.all([
     admin
       .from("planned_workouts")
       .select("id, scheduled_date, title, sport, steps, why, pool_length, pool_unit, mystery, revealed_at, start_time")
@@ -66,6 +68,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
       .gte("duration_s", 600)
       .order("start_time", { ascending: false })
       .limit(5),
+    watchBreath(admin, profile.id, tz).catch(() => null),
   ]);
 
   const rows = workouts.data ?? [];
@@ -131,6 +134,7 @@ export async function buildToday(profile: Profile, admin: Admin = createAdminCli
     nx: rows.filter((r) => r.scheduled_date === tomorrow).slice(0, 2).map((r) => ({ t: cut(titleFor(r), 40), s: SPORT_SHORT[r.sport] ?? r.sport, d: r.scheduled_date })),
     m,
     ...(ck ? { ck } : {}),
+    ...(br ? { br } : {}),
     u: Math.floor(now.getTime() / 1000),
   };
 }

@@ -26,7 +26,8 @@ module Demo {
                   "l" => ["Warm-up 15 min easy", "6 × 3 min at 7:05/mi, 2 min jog", "Cool-down 10 min"] }
             ],
             "nx" => [{ "t" => "Easy Miles & Snappy Strides", "s" => "run", "d" => "2026-11-13" }],
-            "m" => { "hrv" => 52, "rhr" => 48, "sl" => 437, "bb" => 71 }
+            "m" => { "hrv" => 52, "rhr" => 48, "sl" => 437, "bb" => 71 },
+            "br" => { "k" => "resonance", "m" => 10, "y" => "After today's session. Ten slow minutes help you switch into recovery.", "p" => 5.5 }
         });
         if (CHECKIN) {
             var t = Application.Storage.getValue(Api.TODAY_KEY) as Dictionary;

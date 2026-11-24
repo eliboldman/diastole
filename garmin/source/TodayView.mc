@@ -10,6 +10,7 @@ import Toybox.WatchUi;
 // Signed in: cards you move through with up/down (or a swipe), each sliding in like the app's
 // pages. A finished session without a check-in opens the check-in first (see CheckinView).
 //   Today      readiness ring, the first session, last night at a glance
+//   Breathe    today's breathing suggestion; Start opens the Diastole Breathe app (BreatheLaunch)
 //   Workout    one card per session; Start opens every step (WorkoutDetail)
 //   Last night sleep, HRV, resting HR, Body Battery
 //   Tomorrow
@@ -42,7 +43,7 @@ class TodayView extends WatchUi.View {
         if (demoTick < pageCount()) { go(1); }
         else if (demoTick == pageCount()) {
             go(1);
-            var wk = workoutAt(1);
+            var wk = workoutAt(2);
             if (wk != null) { var d = new WorkoutDetail(wk); WatchUi.pushView(d, new WorkoutDetailDelegate(d), WatchUi.SLIDE_LEFT); }
         } else { (demoTimer as Timer.Timer).stop(); }
     }
@@ -72,14 +73,16 @@ class TodayView extends WatchUi.View {
     }
 
     function pageCount() as Number {
-        return 3 + workouts().size();
+        return 4 + workouts().size();
     }
 
-    // The workout on this page, or null (Today, Last night, Tomorrow).
+    // The workout on this page, or null (Today, Breathe, Last night, Tomorrow). Workouts start at 2.
     function workoutAt(p as Number) as Dictionary? {
         var ws = workouts();
-        return p >= 1 && p <= ws.size() ? ws[p - 1] as Dictionary : null;
+        return p >= 2 && p <= ws.size() + 1 ? ws[p - 2] as Dictionary : null;
     }
+
+    var notice as String? = null; // Breathe card: "get the app" when it isn't installed
 
     function go(by as Number) as Void {
         var n = pageCount();
@@ -144,8 +147,9 @@ class TodayView extends WatchUi.View {
     hidden function drawPage(dc as Graphics.Dc, t as Dictionary, p as Number, oy as Number) as Void {
         var ws = workouts();
         if (p == 0) { drawToday(dc, t, ws, oy); }
-        else if (p <= ws.size()) { drawWorkout(dc, ws[p - 1] as Dictionary, p, ws.size(), oy); }
-        else if (p == ws.size() + 1) { drawNight(dc, t, oy); }
+        else if (p == 1) { drawBreathe(dc, t, oy); }
+        else if (p <= ws.size() + 1) { drawWorkout(dc, ws[p - 2] as Dictionary, p - 1, ws.size(), oy); }
+        else if (p == ws.size() + 2) { drawNight(dc, t, oy); }
         else { drawTomorrow(dc, t, oy); }
     }
 
@@ -272,6 +276,29 @@ class TodayView extends WatchUi.View {
         Lay.pill(dc, w / 2, py + oy, more, Graphics.FONT_XTINY, Ui.GREEN, Graphics.COLOR_BLACK);
     }
 
+    // ── Breathe ───────────────────────────────────────────────────────────
+    hidden function drawBreathe(dc as Graphics.Dc, t as Dictionary, oy as Number) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var br = t["br"] instanceof Dictionary ? t["br"] as Dictionary : null;
+        var k = br != null && br["k"] instanceof String ? br["k"] as String : null;
+        var y = Lay.drawFit(dc, (h * 0.12).toNumber(), oy, k != null ? "BREATHE · FOR YOU" : "BREATHE", [Graphics.FONT_XTINY], Ui.GREEN, 1) + 2;
+        // A small orb, like the Breathe app's.
+        var r = (w * 0.07).toNumber();
+        dc.setColor(Ui.GREEN, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawCircle(w / 2, y + r + oy, r);
+        dc.fillCircle(w / 2, y + r + oy, r / 3);
+        dc.setPenWidth(1);
+        y += 2 * r + 6;
+        var title = k != null ? BreatheLaunch.title(k) : "Guided breathing";
+        if (k != null && br["m"] instanceof Number) { title = title + " · " + (br["m"] as Number).toString() + " min"; }
+        y = Lay.drawFit(dc, y, oy, title, [Graphics.FONT_SMALL, Graphics.FONT_TINY, Graphics.FONT_XTINY], Graphics.COLOR_WHITE, 2) + 2;
+        var sub = notice != null ? notice as String : (br != null && br["y"] instanceof String ? br["y"] as String : "Recovery, sleep, a quick reset, race-day focus.");
+        Lay.drawFit(dc, y, oy, sub, [Graphics.FONT_XTINY], notice != null ? Ui.AMBER : Ui.DIM, 3);
+        Lay.pill(dc, w / 2, (h * 0.84).toNumber() + oy, "Start  ›  breathe", Graphics.FONT_XTINY, Ui.GREEN, Graphics.COLOR_BLACK);
+    }
+
     // ── Last night ────────────────────────────────────────────────────────
     hidden function drawNight(dc as Graphics.Dc, t as Dictionary, oy as Number) as Void {
         var w = dc.getWidth();
@@ -367,10 +394,15 @@ class TodayDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    // Start (or a tap): opens the session on a workout card or Today; refreshes elsewhere.
+    // Start (or a tap): opens the session on a workout card or Today, Breathe on its card;
+    // refreshes elsewhere.
     function onSelect() as Boolean {
-        var wk = view.workoutAt(view.page == 0 ? 1 : view.page);
-        if (wk != null && view.page <= view.workouts().size()) {
+        if (view.page == 1) {
+            BreatheLaunch.open(view);
+            return true;
+        }
+        var wk = view.workoutAt(view.page == 0 ? 2 : view.page);
+        if (wk != null) {
             var d = new WorkoutDetail(wk);
             WatchUi.pushView(d, new WorkoutDetailDelegate(d), WatchUi.SLIDE_LEFT);
         } else {
@@ -381,6 +413,7 @@ class TodayDelegate extends WatchUi.BehaviorDelegate {
 
     function onMenu() as Boolean {
         var menu = new WatchUi.Menu2({ :title => "Diastole" });
+        menu.addItem(new WatchUi.MenuItem("Breathe", "Guided breathing", :breathe, null));
         menu.addItem(new WatchUi.MenuItem("Refresh", null, :refresh, null));
         menu.addItem(new WatchUi.MenuItem("Sign out of watch", null, :signout, null));
         WatchUi.pushView(menu, new TodayMenuDelegate(view), WatchUi.SLIDE_UP);
@@ -398,7 +431,9 @@ class TodayMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         WatchUi.popView(WatchUi.SLIDE_DOWN);
-        if (item.getId() == :refresh) {
+        if (item.getId() == :breathe) {
+            BreatheLaunch.open(view);
+        } else if (item.getId() == :refresh) {
             view.refresh();
         } else {
             // The server token stays valid until removed on diastole.app; tell it we're leaving.
