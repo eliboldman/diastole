@@ -217,6 +217,25 @@ export function countSteps(steps: Step[]): number {
   return steps.reduce((n, s) => n + 1 + (s.kind === "repeat" ? countSteps(s.steps) : 0), 0);
 }
 
+/**
+ * What goes to Garmin for one planned workout. A brick goes as two workouts on the same day, bike then
+ * run, not one multisport workout: Edge bike computers can't load multisport workouts (and Garmin
+ * refuses to send them to one), while two single-sport workouts work on every device.
+ */
+export function toGarminWorkouts(w: { title: string; description?: string | null; sport: Sport; steps: Step[]; pool?: Pool; brick?: Brick }) {
+  const brick = w.sport === "bike" && w.brick?.steps?.length ? w.brick : null;
+  if (!brick) return [toGarminWorkout(w)];
+  // "Base 5 x 8 min + Brick run 15 min easy" names each half; otherwise the run says what it is.
+  const [bikeTitle, ...rest] = w.title.split(" + ");
+  const runTitle = rest.length ? rest.join(" + ") : `${w.title}: run off the bike`;
+  let bike, run;
+  const errors: string[] = [];
+  try { bike = toGarminWorkout({ ...w, title: rest.length ? bikeTitle : w.title, brick: null }); } catch (e) { errors.push((e as Error).message); }
+  try { run = toGarminWorkout({ title: runTitle, description: "Run straight off the bike." + (w.description ? `\n\n${w.description}` : ""), sport: "run", steps: brick.steps }); } catch (e) { errors.push(`Run off the bike: ${(e as Error).message}`); }
+  if (errors.length) throw new Error(errors.join(" "));
+  return [bike!, run!];
+}
+
 export function toGarminWorkout(w: { title: string; description?: string | null; sport: Sport; steps: Step[]; pool?: Pool; brick?: Brick }) {
   const pool = w.sport === "swim" ? inferPool(w.steps, w.pool ?? null) : null;
   const brick = w.sport === "bike" && w.brick?.steps?.length ? w.brick : null;

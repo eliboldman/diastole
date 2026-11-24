@@ -1,7 +1,7 @@
 // Run with: node lib/workouts/garmin-format.test.ts
 import assert from "node:assert/strict";
 
-import { toGarminWorkout, validateSteps, type Pool, type Step } from "./garmin-format.ts";
+import { toGarminWorkout, toGarminWorkouts, validateSteps, type Pool, type Step } from "./garmin-format.ts";
 
 const steps: Step[] = [
   { kind: "step", intensity: "WARMUP", duration: { type: "time", seconds: 600 }, target: { type: "hr_zone", zone: 2 } },
@@ -133,5 +133,13 @@ console.log("garmin-format: all checks passed");
   assert.throws(() => toGarminWorkout({ title: "x", sport: "bike", steps: bike, brick: { sport: "run", steps: [{ kind: "step", intensity: "MAIN", duration: { type: "time", seconds: 60 } }] as Step[] } }), /Run off the bike/);
   // A brick on a run workout is ignored.
   assert.equal((toGarminWorkout({ title: "x", sport: "run", steps: run, brick: { sport: "run", steps: run } }) as { sport: string }).sport, "RUNNING");
+  // What's actually sent: two single-sport workouts, so an Edge can load the bike.
+  const two = toGarminWorkouts({ title: "Base 5 x 8 min + Brick run 15 min easy", sport: "bike", steps: bike, brick: { sport: "run", steps: run } });
+  assert.deepEqual(two.map((x) => x.sport), ["CYCLING", "RUNNING"]);
+  assert.deepEqual(two.map((x) => x.workoutName), ["Base 5 x 8 min", "Brick run 15 min easy"]);
+  assert.equal(two[1].segments[0].steps[0].stepOrder, 1);
+  assert.equal(toGarminWorkouts({ title: "Long ride", sport: "bike", steps: bike, brick: { sport: "run", steps: run } })[1].workoutName, "Long ride: run off the bike");
+  assert.equal(toGarminWorkouts({ title: "Ride", sport: "bike", steps: bike }).length, 1);
+  assert.throws(() => toGarminWorkouts({ title: "x", sport: "bike", steps: bike, brick: { sport: "run", steps: [{ kind: "step", intensity: "MAIN", duration: { type: "time", seconds: 60 } }] as Step[] } }), /Run off the bike/);
   console.log("brick: passed");
 }

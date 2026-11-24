@@ -3,7 +3,7 @@ import "server-only";
 import { sealed, sealedTitle } from "@/lib/workouts/mystery";
 import { garminFetch } from "@/lib/garmin/client";
 import { createAdminClient } from "@/lib/supabase/server";
-import { toGarminWorkout, type Brick, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
+import { toGarminWorkouts, type Brick, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
 import { toGarminStrength, type StrengthItem } from "@/lib/strength/workout";
 
 /** The athlete's weight unit for the watch (pounds for mile users). */
@@ -37,7 +37,7 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     w.title = sealedTitle(w);
     w.description = "Sealed by your coach. Each step shows as it starts.";
   }
-  const body = w.sport === "strength" ? toGarminStrength(w.title, (w.strength ?? []) as StrengthItem[], await weightUnit(admin, w.athlete_id), w.description) : toGarminWorkout({
+  const bodies = w.sport === "strength" ? [toGarminStrength(w.title, (w.strength ?? []) as StrengthItem[], await weightUnit(admin, w.athlete_id), w.description)] : toGarminWorkouts({
     title: w.title,
     description: w.description,
     sport: w.sport as Sport,
@@ -46,33 +46,47 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     brick: (w.brick ?? null) as Brick,
   });
 
-  const created = await garminFetch(w.athlete_id, "/workoutportal/workout/v2", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!created.ok) throw new Error(`Garmin rejected the workout (${created.status}): ${(await created.text()).slice(0, 300)}`);
-  const { workoutId: garminWorkoutId } = (await created.json()) as { workoutId: number };
+  // A brick is two Garmin workouts (bike, then run). Their ids are stored comma-separated.
+  const ids: string[] = [];
+  const scheduleIds: string[] = [];
+  const undo = async () => {
+    for (const id of ids) await garminFetch(w.athlete_id, `/training-api/workout/v2/${id}`, { method: "DELETE" }).catch(() => {});
+  };
+  for (const body of bodies) {
+    const created = await garminFetch(w.athlete_id, "/workoutportal/workout/v2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!created.ok) {
+      const text = (await created.text()).slice(0, 300);
+      await undo();
+      throw new Error(`Garmin rejected the workout (${created.status}): ${text}`);
+    }
+    const { workoutId: garminWorkoutId } = (await created.json()) as { workoutId: number };
+    ids.push(String(garminWorkoutId));
 
-  const scheduled = await garminFetch(w.athlete_id, "/training-api/schedule/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workoutId: garminWorkoutId, date: w.scheduled_date }),
-  });
-  if (!scheduled.ok) {
-    // Don't leave an unscheduled orphan in the athlete's Garmin library.
-    await garminFetch(w.athlete_id, `/training-api/workout/v2/${garminWorkoutId}`, { method: "DELETE" }).catch(() => {});
-    throw new Error(`Garmin couldn't schedule the workout (${scheduled.status}): ${(await scheduled.text()).slice(0, 300)}`);
-  }
-
-  // The schedule id lets a later delete remove the calendar entry explicitly, not just the workout.
-  const scheduleText = await scheduled.text();
-  let scheduleId: string | null = null;
-  try {
-    const parsed = JSON.parse(scheduleText);
-    scheduleId = String(typeof parsed === "object" && parsed ? (parsed.scheduleId ?? parsed.id ?? "") : parsed) || null;
-  } catch {
-    scheduleId = scheduleText.trim() || null;
+    const scheduled = await garminFetch(w.athlete_id, "/training-api/schedule/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workoutId: garminWorkoutId, date: w.scheduled_date }),
+    });
+    if (!scheduled.ok) {
+      // Don't leave unscheduled orphans in the athlete's Garmin library.
+      const text = (await scheduled.text()).slice(0, 300);
+      await undo();
+      throw new Error(`Garmin couldn't schedule the workout (${scheduled.status}): ${text}`);
+    }
+    // The schedule id lets a later delete remove the calendar entry explicitly, not just the workout.
+    const scheduleText = await scheduled.text();
+    let scheduleId = "";
+    try {
+      const parsed = JSON.parse(scheduleText);
+      scheduleId = String(typeof parsed === "object" && parsed ? (parsed.scheduleId ?? parsed.id ?? "") : parsed);
+    } catch {
+      scheduleId = scheduleText.trim();
+    }
+    scheduleIds.push(scheduleId);
   }
 
   await admin
@@ -80,12 +94,12 @@ export async function sendWorkoutToGarmin(workoutId: string) {
     .update({
       status: "sent",
       sent_at: new Date().toISOString(),
-      external_id: String(garminWorkoutId),
-      garmin_schedule_id: scheduleId,
+      external_id: ids.join(","),
+      garmin_schedule_id: scheduleIds.some(Boolean) ? scheduleIds.join(",") : null,
     })
     .eq("id", w.id);
 
-  return { garminWorkoutId };
+  return { garminWorkoutId: Number(ids[0]) };
 }
 
 /**
@@ -101,13 +115,16 @@ export async function removeWorkoutFromGarmin(workoutId: string) {
     .single();
   if (!w?.external_id) return;
 
-  if (w.garmin_schedule_id) {
-    const res = await garminFetch(w.athlete_id, `/training-api/schedule/${w.garmin_schedule_id}`, { method: "DELETE" });
+  // Older bricks went as one multisport workout; newer ones are two ids, comma-separated.
+  for (const scheduleId of String(w.garmin_schedule_id ?? "").split(",").filter(Boolean)) {
+    const res = await garminFetch(w.athlete_id, `/training-api/schedule/${scheduleId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the calendar entry (${res.status}).`);
   }
   // Deleting the workout also drops any schedule Garmin still has for it (older sends stored no schedule id).
-  const res = await garminFetch(w.athlete_id, `/training-api/workout/v2/${w.external_id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the workout (${res.status}).`);
+  for (const id of String(w.external_id).split(",").filter(Boolean)) {
+    const res = await garminFetch(w.athlete_id, `/training-api/workout/v2/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 404) throw new Error(`Garmin couldn't remove the workout (${res.status}).`);
+  }
 
   await admin.from("planned_workouts").update({ external_id: null, garmin_schedule_id: null }).eq("id", workoutId);
 }

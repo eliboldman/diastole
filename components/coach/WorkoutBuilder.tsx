@@ -892,7 +892,7 @@ export default function WorkoutBuilder({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-medium">Run off the bike</h3>
-              <p className="text-xs text-white/50">Makes this a brick. Garmin gets one multisport workout: bike, then run, with the transition. Apple Watch gets the bike only.</p>
+              <p className="text-xs text-white/50">Makes this a brick. Garmin gets two workouts on the day, the bike then the run, so it loads on an Edge as well as a watch. Apple Watch gets the bike only.</p>
             </div>
             <button
               type="button"
