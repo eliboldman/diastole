@@ -1,15 +1,13 @@
 "use client";
 
-import { Apple, Gem, Inbox, Sparkles, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
+import { Apple, Gem, HeartPulse, Inbox, Sparkles, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { BackButton } from "@/components/layout/BackLink";
 import GritPill from "@/components/grit/GritPill";
-import ViewSwitch from "@/components/layout/ViewSwitch";
-import { VIEW_COOKIE, type View } from "@/lib/view";
 import HeartbeatLogo from "@/components/secrets/HeartbeatLogo";
 import SecretToast from "@/components/secrets/SecretToast";
 import { TAB_ICON } from "@/components/layout/tab-icons";
@@ -28,8 +26,8 @@ const NAV: Record<NavRole, Item[]> = {
     { label: "Athletes", href: "/athletes", icon: Users, match: /^\/(athlete|pods|compare|nutrition)(\/|$)|^\/activity\// },
     { label: "Endurance Lab", short: "Lab", href: "/endurance-lab", icon: FlaskConical, match: /^\/(library|workouts|calendar|lab)(\/|$)/ },
     { label: "Messages", href: "/messages", icon: MessageCircle },
-    // A coach's own athlete pages (day, training, fuel) live under Me.
-    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log|training|fuel|races)(\/|$)/ },
+    // A coach's own athlete pages (day, training, fuel, recovery) live under Me.
+    { label: "Me", href: "/account", icon: User, match: /^\/(me|settings|connect|garmin-log|training|fuel|races|recovery)(\/|$)/ },
   ],
   athlete: [
     { label: "Today", href: "/me", icon: Sun, match: /^\/me$/ },
@@ -53,12 +51,20 @@ const tabItems = (role: NavRole, ids: string[]): Item[] =>
     return t ? [{ label: t.label, href: t.href, icon: TAB_ICON[id] ?? Sun, match: t.match ? new RegExp(t.match) : undefined }] : [];
   });
 
-// Desktop has room for one-click shortcuts below the tabs. Anything about you (your own training,
-// races, setup, connections, settings) lives under Me, so it isn't repeated here.
+// A coach who trains too: one click to their own athlete pages, in the same menu (no separate view).
+const MINE: Item[] = [
+  { label: "My day", href: "/me", icon: Sun },
+  { label: "My training", href: "/training", icon: Dumbbell },
+  { label: "My fuel", href: "/fuel", icon: Utensils },
+  { label: "Recovery & breathing", href: "/recovery", icon: HeartPulse },
+];
+
+// Desktop has room for one-click shortcuts below the tabs. Setup, connections and settings live
+// under Me, so they aren't repeated here.
 const SHORTCUTS: Record<NavRole, Item[]> = {
   coach: [
-    // Workouts and Library sit under the Lab tab, Pods and Team fueling under Athletes, your own
-    // fuel under Me, so they aren't repeated here.
+    ...MINE,
+    // Workouts and Library sit under the Lab tab, Pods and Team fueling under Athletes.
     { label: "Approvals", href: "/inbox", icon: Inbox },
     { label: "Team calendar", href: "/team-calendar", icon: CalendarRange },
     { label: "Ask Diastole", href: "/ask", icon: Sparkles },
@@ -73,9 +79,6 @@ const SHORTCUTS: Record<NavRole, Item[]> = {
   dietitian: [{ label: "Help", href: "/help", icon: LifeBuoy }],
 };
 
-// Coach-only pages always show the coach menu, even while a coach is in athlete view.
-const COACH_PATH = /^\/(dashboard|digest|athletes|athlete|endurance-lab|library|workouts|lab|pods|ask|garmin-log|nutrition|settings|health|inbox|compare|team-calendar)(\/|$)/;
-
 function isActive(pathname: string, item: Item) {
   if (pathname === item.href) return true;
   // Athlete Today (/me) owns only /me itself; /me/... pages belong to Grit, Me or Pods.
@@ -84,38 +87,16 @@ function isActive(pathname: string, item: Item) {
 }
 
 export default function Sidebar({
-  role: accountRole = "coach",
-  tabs = DEFAULT_TABS[accountRole],
-  athleteTabs = DEFAULT_TABS.athlete,
-  view: savedView = "coach",
+  role = "coach",
+  tabs = DEFAULT_TABS[role],
   grit = null,
 }: {
   role?: NavRole;
   tabs?: string[];
-  athleteTabs?: string[];
-  view?: View;
   grit?: number | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const canSwitch = accountRole === "coach";
-  const [view, setView] = useState<View>(savedView);
-  const [prevSaved, setPrevSaved] = useState(savedView);
-  if (prevSaved !== savedView) {
-    setPrevSaved(savedView);
-    setView(savedView);
-  }
-  // A coach in athlete view gets the athlete menu everywhere except coach-only pages.
-  const role: NavRole = canSwitch && view === "athlete" && !COACH_PATH.test(pathname) ? "athlete" : accountRole;
-  const shownView: View = role === "athlete" ? "athlete" : "coach";
-  const switchTo = (next: View) => {
-    setView(next);
-    document.cookie = `${VIEW_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-    const target = next === "athlete" ? "/me" : "/dashboard";
-    if (pathname === target) router.refresh();
-    else router.push(target);
-  };
-  const tabBar = tabItems(role, role === accountRole ? tabs : athleteTabs);
+  const tabBar = tabItems(role, tabs);
   const items = NAV[role];
   const shortcuts = SHORTCUTS[role];
   const home = role === "coach" ? "/dashboard" : role === "dietitian" ? "/nutrition" : "/me";
@@ -153,7 +134,7 @@ export default function Sidebar({
           </nav>
           <div className="my-4 border-t border-white/[0.08]" />
           <nav aria-label="Shortcuts" className="space-y-2">
-            {shortcuts.map((item) => navLink(item, pathname === item.href || pathname.startsWith(`${item.href}/`)))}
+            {shortcuts.map((item) => navLink(item, isActive(pathname, item)))}
           </nav>
         </div>
       </aside>
@@ -162,7 +143,6 @@ export default function Sidebar({
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
         <BackButton />
         {showGrit && <span className="px-1"><GritPill balance={grit} active={pathname.startsWith("/me/grit")} /></span>}
-        {canSwitch && <ViewSwitch view={shownView} onSwitch={switchTo} />}
         <span className="relative inline-flex">
           <SearchButton />
         </span>
@@ -177,15 +157,14 @@ export default function Sidebar({
         <div className="flex h-12 items-center justify-between pl-1 pr-1">
           <div className="flex min-w-0 items-center">
             <BackButton compact className="h-11 w-11 justify-center px-0" />
-            <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} brand={!canSwitch && !showGrit} />
+            <MobileMenu pathname={pathname} items={items} shortcuts={shortcuts} home={home} brand={!showGrit} />
           </div>
           <div className="flex items-center gap-1">
-            {canSwitch && <ViewSwitch compact view={shownView} onSwitch={switchTo} />}
             {showGrit && <GritPill balance={grit} active={pathname.startsWith("/me/grit")} />}
             <span className="relative inline-flex">
               <SearchButton />
             </span>
-            {!(role === accountRole ? tabs : athleteTabs).includes("messages") && !(canSwitch && showGrit) && (
+            {!tabs.includes("messages") && (
               <Link href="/messages" aria-label="Messages" className={`flex h-11 w-11 items-center justify-center rounded-xl ${pathname.startsWith("/messages") ? "text-emerald-200" : "text-white/70"}`}>
                 <MessageCircle size={19} />
               </Link>
@@ -330,7 +309,7 @@ function MobileMenu({ pathname, items, shortcuts, home, brand = true }: { pathna
         {shortcuts.length > 0 && (
           <>
             <div className="mx-3 my-3 border-t border-white/[0.08]" />
-            <div className="space-y-1">{shortcuts.map((item) => link(item, pathname === item.href || pathname.startsWith(`${item.href}/`)))}</div>
+            <div className="space-y-1">{shortcuts.map((item) => link(item, isActive(pathname, item)))}</div>
           </>
         )}
         <div className="mx-3 my-3 border-t border-white/[0.08]" />

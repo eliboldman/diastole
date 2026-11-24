@@ -62,6 +62,7 @@ export default async function MePage() {
         { href: "/me", icon: Sun, title: "My day", summary: "Today's workout, fuel and check-in" },
         { href: "/training", icon: Dumbbell, title: "My training", summary: "Calendar and finished workouts" },
         { href: "/fuel", icon: Utensils, title: "My fuel", summary: "Today's targets and log" },
+        { href: "/recovery", icon: HeartPulse, title: "Recovery & breathing", summary: "Breathe, mobility and recovery sessions" },
       ]
     : [];
 
