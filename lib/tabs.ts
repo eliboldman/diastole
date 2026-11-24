@@ -47,7 +47,7 @@ export const TAB_OPTIONS: Record<TabRole, TabDef[]> = {
   ],
 };
 
-export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "training", "fuel", "messages", "profile"], coach: ["today", "athletes", "lab", "messages"], dietitian: ["nutrition", "messages", "help"] };
+export const DEFAULT_TABS: Record<TabRole, string[]> = { athlete: ["me", "training", "fuel", "messages", "profile"], coach: ["today", "athletes", "messages", "training", "profile"], dietitian: ["nutrition", "messages", "help"] };
 export const TABS_COOKIE = "d_tabs";
 export const MIN_TABS = 3;
 export const MAX_TABS = 5;

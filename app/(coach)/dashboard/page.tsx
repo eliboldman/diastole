@@ -16,6 +16,7 @@ import Spotlight from "@/components/Spotlight";
 import WhatsNew from "@/components/WhatsNew";
 import { latestRelease, seen, TIPS } from "@/lib/discovery";
 import WorkoutRequests from "@/components/coach/WorkoutRequests";
+import YouToday from "@/components/coach/YouToday";
 import PlanChanges from "@/components/coach/PlanChanges";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { AI_MODELS, DEFAULT_SETTINGS, monthToDateSpend, type AiModel } from "@/lib/ai/coach";
@@ -134,6 +135,9 @@ export default async function TodayPage() {
         <div><CheckinPrompt athleteId={coach.id} /></div>
         <div><Spotlight tip={TIPS.changeOfPlans} seen={seen(prof?.seen_tips, TIPS.changeOfPlans.id)} /></div>
       </div>
+
+      {/* Your own day, for coaches who train too. */}
+      <YouToday coachId={coach.id} coachOfSelf={roster.some((r) => r.id === coach.id)} today={todayIso} timeZone={coach.timezone} units={coach.units === "km" ? "km" : "mi"} />
 
       {/* Needs you: each card only shows when there's something to act on. */}
       <div className="[&:has(.needs>:not(:empty))_.all-clear]:hidden">

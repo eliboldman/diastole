@@ -3,11 +3,12 @@
 import { Apple, Gem, HeartPulse, Inbox, Sparkles, CalendarRange, ChevronDown, Dumbbell, FlaskConical, LifeBuoy, LogOut, MessageCircle, Orbit, Sun, User, Users, Utensils, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { BackButton } from "@/components/layout/BackLink";
 import GritPill from "@/components/grit/GritPill";
+import QuickActions from "@/components/layout/QuickActions";
 import HeartbeatLogo from "@/components/secrets/HeartbeatLogo";
 import SecretToast from "@/components/secrets/SecretToast";
 import { TAB_ICON } from "@/components/layout/tab-icons";
@@ -97,6 +98,9 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const tabBar = tabItems(role, tabs);
+  // Quick actions ("+") for people who train: in the middle of the phone tab bar, and in the desktop top bar.
+  const quick = role === "dietitian" ? null : role;
+  const mid = Math.ceil(tabBar.length / 2);
   const items = NAV[role];
   const shortcuts = SHORTCUTS[role];
   const home = role === "coach" ? "/dashboard" : role === "dietitian" ? "/nutrition" : "/me";
@@ -143,6 +147,7 @@ export default function Sidebar({
       <div className="fixed right-6 top-6 z-50 hidden items-center gap-1 rounded-2xl border border-white/10 bg-panel/60 p-1 backdrop-blur-3xl md:flex">
         <BackButton />
         {showGrit && <span className="px-1"><GritPill balance={grit} active={pathname.startsWith("/me/grit")} /></span>}
+        {quick && <QuickActions role={quick} />}
         <span className="relative inline-flex">
           <SearchButton />
         </span>
@@ -176,11 +181,17 @@ export default function Sidebar({
 
       {/* Mobile: the tab bar */}
       <nav aria-label="Tabs" className="tabbar fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">
-        <ul className="grid" style={{ gridTemplateColumns: `repeat(${tabBar.length}, minmax(0, 1fr))` }}>
-          {tabBar.map((item) => {
+        <ul className="grid" style={{ gridTemplateColumns: `repeat(${tabBar.length + (quick ? 1 : 0)}, minmax(0, 1fr))` }}>
+          {tabBar.map((item, i) => {
             const active = isActive(pathname, item);
             return (
-              <li key={item.href}>
+              <Fragment key={item.href}>
+                {quick && i === mid && (
+                  <li>
+                    <QuickActions role={quick} bar />
+                  </li>
+                )}
+                <li>
                 <Link
                   href={item.href}
                   aria-current={active ? "page" : undefined}
@@ -189,7 +200,8 @@ export default function Sidebar({
                   <item.icon size={22} strokeWidth={active ? 2.2 : 1.7} aria-hidden />
                   {item.label}
                 </Link>
-              </li>
+                </li>
+              </Fragment>
             );
           })}
         </ul>
