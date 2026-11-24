@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { bestsOf } from "@/lib/activity/bests";
+import { isBreathwork } from "@/lib/activity/breathwork";
 import { writeAutoStrain } from "@/lib/avatar/strain-store";
 import { parseFit, type FitActivity } from "@/lib/activity/fit";
 import { formToStore } from "@/lib/activity/form-store";
@@ -49,14 +50,15 @@ export function summaryColumns(fit: FitActivity) {
 
 /**
  * Parses a FIT file and stores it against the activity with this external id (Garmin activityId),
- * creating the activity if its summary hasn't arrived yet. Summary values already present from
+ * creating the activity if its summary hasn't arrived yet. Breathwork files are skipped (null). Summary values already present from
  * Garmin's own summary are kept; the FIT file only fills gaps. Returns the activity id.
  */
 export async function saveFitActivity(
   admin: Admin,
   opts: { athleteId: string; source: "garmin" | "garmin_export"; externalId: string; bytes: Uint8Array; name?: string | null },
-): Promise<string> {
+): Promise<string | null> {
   const fit = parseFit(opts.bytes);
+  if (isBreathwork(sportName(fit), opts.name)) return null; // breathing sessions aren't training activities
 
   const { data: existing } = await admin
     .from("activities")

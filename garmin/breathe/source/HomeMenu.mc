@@ -18,7 +18,7 @@ class HomeMenu extends WatchUi.Menu2 {
             var sub = kind.equals("resonance") ? Plan.short(kind) + " · " + Plan.paceText(Net.pace()) + "/min" : Plan.short(kind);
             addItem(new WatchUi.MenuItem(Plan.title(kind), sub, "s:" + kind + ":0", null));
         }
-        addItem(new WatchUi.MenuItem("CO2 check", "Seated breath hold, timed", "hold", null));
+        addItem(new WatchUi.MenuItem("CO2 check", "Seated breath hold, timed", "hold", null)); // not recorded as an activity
         if (Net.token() == null) {
             addItem(new WatchUi.MenuItem("Link to Diastole", "Saves your sessions", "link", null));
         }

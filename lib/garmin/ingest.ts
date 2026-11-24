@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isBreathwork } from "@/lib/activity/breathwork";
 import { mergeIfDuplicate } from "@/lib/activity/merge";
 import { linkPlannedWorkout, saveFitActivity } from "@/lib/activity/store";
 import { forgetGarmin, garminFetch } from "@/lib/garmin/client";
@@ -139,6 +140,7 @@ export async function ingestGarminPayload(body: Record<string, Summary[]>): Prom
         const start = num(item.startTimeInSeconds);
         const externalId = String(item.summaryId ?? item.activityId ?? "");
         if (!start || !externalId) continue;
+        if (isBreathwork(typeof item.activityType === "string" ? item.activityType : null, typeof item.activityName === "string" ? item.activityName : null)) continue; // kept in garmin_raw only
         await admin.from("activities").upsert(
           {
             athlete_id: athleteId,

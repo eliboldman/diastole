@@ -1,3 +1,5 @@
+import Toybox.Activity;
+import Toybox.ActivityRecording;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
@@ -9,7 +11,8 @@ import Toybox.WatchUi;
 // A guided session. A circle grows as you breathe in and shrinks as you breathe out, with a buzz at
 // every change (long = in, two short = out, a tap = hold/pause) so eyes can stay closed. The ring
 // around the edge fills as the session goes. Wrist heart rate (and beat-to-beat intervals where the
-// watch gives them) is recorded for the summary. Start pauses; Back offers resume / finish / discard.
+// watch gives them) is recorded for the summary. Like a native activity it records to Garmin Connect
+// (as Breathwork) and Start or Back pauses with Resume / Save / Discard.
 class PlayerView extends WatchUi.View {
     const LEAD_MS = 3000; // "Get ready" before the first breath
     const TICK_MS = 100;
@@ -42,6 +45,7 @@ class PlayerView extends WatchUi.View {
     var hrNow as Number? = null;
 
     hidden var timer as Timer.Timer?;
+    hidden var rec as ActivityRecording.Session? = null; // the Garmin activity
 
     function initialize(kind as String, minutes as Number) {
         View.initialize();
@@ -62,6 +66,11 @@ class PlayerView extends WatchUi.View {
     }
 
     (:debug)
+    hidden function dbg(m as String) as Void { System.println(m); }
+    (:release)
+    hidden function dbg(m as String) as Void {}
+
+    (:debug)
     function debugShort(ms as Number) as Void { totalMs = ms; }
 
     // ── Clock ──────────────────────────────────────────────────────────────
@@ -77,6 +86,7 @@ class PlayerView extends WatchUi.View {
             since = now;
             if (leadLeft <= 0) {
                 started = true;
+                startRecording();
                 newCycle(0);
                 Look.cue("in");
             }
@@ -127,6 +137,7 @@ class PlayerView extends WatchUi.View {
             if (at > 0 && p != cyclePace) {
                 banner = "Now " + Plan.paceText(p) + " a minute";
                 bannerUntil = at + 6000;
+                if (rec != null) { (rec as ActivityRecording.Session).addLap(); } // a lap per pace
             }
         }
         cyclePace = p;
@@ -145,6 +156,7 @@ class PlayerView extends WatchUi.View {
         if (!running) { return; }
         if (started) { acc += System.getTimer() - since; }
         running = false;
+        if (rec != null && (rec as ActivityRecording.Session).isRecording()) { (rec as ActivityRecording.Session).stop(); }
         WatchUi.requestUpdate();
     }
 
@@ -152,6 +164,7 @@ class PlayerView extends WatchUi.View {
         if (running || finished) { return; }
         since = System.getTimer();
         running = true;
+        if (rec != null) { (rec as ActivityRecording.Session).start(); }
         WatchUi.requestUpdate();
     }
 
@@ -161,6 +174,7 @@ class PlayerView extends WatchUi.View {
         pause();
         finished = true;
         stopAll();
+        endRecording(save && acc >= 30000);
         if (save && acc >= 30000) {
             Look.done();
             var d = new DoneView(self);
@@ -168,6 +182,31 @@ class PlayerView extends WatchUi.View {
         } else {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
         }
+    }
+
+    // ── The Garmin activity ────────────────────────────────────────────────
+    // Breathwork (sport 67 / sub-sport 62 in FIT). Watches on older firmware that don't know it
+    // record a generic activity instead; the "Breathwork" name keeps Diastole from counting it as training.
+    hidden function startRecording() as Void {
+        if (!(Toybox has :ActivityRecording)) { return; }
+        var name = "Breathwork"; // FIT names are short (16 bytes)
+        try {
+            rec = ActivityRecording.createSession({ :name => name, :sport => 67 as Activity.Sport, :subSport => 62 as Activity.SubSport });
+        } catch (e) {
+            try { rec = ActivityRecording.createSession({ :name => name, :sport => Activity.SPORT_GENERIC }); }
+            catch (e2) { rec = null; }
+        }
+        if (rec != null) { (rec as ActivityRecording.Session).start(); }
+        dbg("rec started=" + (rec != null));
+    }
+
+    hidden function endRecording(save as Boolean) as Void {
+        if (rec == null) { return; }
+        var r = rec as ActivityRecording.Session;
+        if (r.isRecording()) { r.stop(); }
+        var ok = save ? r.save() : r.discard();
+        dbg("rec " + (save ? "saved " : "discarded ") + ok);
+        rec = null;
     }
 
     function stopAll() as Void {
@@ -293,7 +332,7 @@ class PlayerView extends WatchUi.View {
             dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
             var fh = dc.getFontHeight(Graphics.FONT_XTINY);
             dc.fillRectangle(0, wy - fh, w, fh * 2);
-            Look.pill(dc, cx, wy, "Paused · Start resumes", Graphics.FONT_XTINY, Look.AMBER, Graphics.COLOR_BLACK);
+            Look.pill(dc, cx, wy, "Paused", Graphics.FONT_XTINY, Look.AMBER, Graphics.COLOR_BLACK);
         }
     }
 }
@@ -306,17 +345,18 @@ class PlayerDelegate extends WatchUi.BehaviorDelegate {
         self.view = view;
     }
 
+    // Start or Back: pause, then Resume / Save / Discard (like a native activity).
     function onSelect() as Boolean {
-        view.togglePause();
-        return true;
+        if (view.finished) { return true; }
+        if (!view.running) { view.resume(); return true; }
+        return onBack();
     }
 
-    // Back: pause, then resume / finish and save / discard.
     function onBack() as Boolean {
         view.pause();
         var menu = new WatchUi.Menu2({ :title => "Paused" });
         menu.addItem(new WatchUi.MenuItem("Resume", null, :resume, null));
-        menu.addItem(new WatchUi.MenuItem("Finish and save", null, :finish, null));
+        menu.addItem(new WatchUi.MenuItem("Save", "To Garmin and Diastole", :finish, null));
         menu.addItem(new WatchUi.MenuItem("Discard", null, :discard, null));
         WatchUi.pushView(menu, new PauseDelegate(view), WatchUi.SLIDE_UP);
         return true;

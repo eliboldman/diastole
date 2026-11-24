@@ -102,14 +102,14 @@ class DoneView extends WatchUi.View {
 
     function onSync(code as Number, data as Dictionary?) as Void {
         if (code == 200) {
-            status = "Saved to Diastole";
+            status = "Saved to Garmin and Diastole";
             if (kind.equals("finder") && data != null && Net.isNum(data["pace"])) { foundPace = (data["pace"] as Numeric).toFloat(); }
         } else if (code == 0) {
-            status = "Kept on watch. Link via the Diastole widget to save";
+            status = "Saved to Garmin. Link via the Diastole widget to save to Diastole";
         } else if (code < 0) {
-            status = "Kept on watch. Sends when your phone connects";
+            status = "Saved to Garmin. Goes to Diastole when your phone connects";
         } else {
-            status = "Couldn't save this one";
+            status = "Saved to Garmin. Diastole couldn't take this one";
         }
         WatchUi.requestUpdate();
     }
@@ -137,7 +137,7 @@ class DoneView extends WatchUi.View {
             if (swing != null) { line = line + "  ·  swing " + (swing as Float).format("%.1f"); }
             ly = Look.text(dc, ly, line, Graphics.FONT_XTINY, Graphics.COLOR_WHITE, 2);
         }
-        Look.text(dc, ly + 4, status, Graphics.FONT_XTINY, status.equals("Saved to Diastole") ? Look.GREEN : Look.AMBER, 3);
+        Look.text(dc, ly + 4, status, Graphics.FONT_XTINY, status.equals("Saved to Garmin and Diastole") ? Look.GREEN : Look.AMBER, 3);
     }
 }
 
