@@ -12,13 +12,20 @@ import type { Flag } from "@/lib/readiness/engine";
 import { rescheduleWorkout } from "@/lib/workouts/actions";
 
 export type CalItem =
-  | { kind: "plan"; id: string; day: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek }
-  | { kind: "done"; id: string; day: string; text: string; sub: string; href: string };
+  | { kind: "plan"; id: string; day: string; sport: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek }
+  | { kind: "done"; id: string; day: string; sport: string; text: string; sub: string; href: string };
 
 export type Span = "month" | "2weeks" | "week";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const BUBBLE_W = 340;
+const SPORT_EDGE: Record<string, string> = { run: "border-l-emerald-300", bike: "border-l-amber-300", swim: "border-l-sky-300", strength: "border-l-fuchsia-300" };
+// Week spans fill the window: one row (or two) of seven days, sized to the screen so nothing scrolls sideways.
+const ROW_H: Record<Span, string> = {
+  week: "h-[calc(100dvh-21rem)] min-h-[15rem] sm:h-[calc(100dvh-17rem)]",
+  "2weeks": "h-[calc((100dvh-22rem)/2)] min-h-[9.5rem] sm:h-[calc((100dvh-18rem)/2)] sm:min-h-[11rem]",
+  month: "min-h-14 sm:min-h-24",
+};
 
 /**
  * The calendar grid. Tap a workout for its summary bubble; tap empty space in a day to list that day
@@ -233,8 +240,8 @@ export default function CalendarBoard({
         </div>
       )}
 
-      <div className="mt-4 rounded-[28px] border border-white/10 bg-white/[0.05] p-2 backdrop-blur-xl sm:p-3">
-        <div className={`grid-cols-7 pb-1 text-center text-[11px] uppercase tracking-wider text-white/45 ${expanded ? "hidden sm:grid" : "grid"}`}>
+      <div className={`mt-4 rounded-[28px] border border-white/10 bg-white/[0.05] backdrop-blur-xl sm:p-3 ${expanded ? "-mx-2 p-1 sm:mx-0" : "p-2"}`}>
+        <div className={`grid-cols-7 pb-1 text-center text-[11px] uppercase tracking-wider text-white/45 grid`}>
           {WEEKDAYS.map((d) => (
             <span key={d} className="py-1">
               <span className="sm:hidden">{d[0]}</span>
@@ -244,7 +251,7 @@ export default function CalendarBoard({
         </div>
         <div className="grid gap-1">
           {weeks.map((week) => (
-            <div key={week[0]} className={`grid gap-1 ${expanded ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-7"}`}>
+            <div key={week[0]} className="grid grid-cols-7 gap-0.5 sm:gap-1">
               {week.map((d) => {
                 const list = byDay.get(d) ?? [];
                 const flag = flags[d];
@@ -265,9 +272,7 @@ export default function CalendarBoard({
                     onDragOver={(e) => { e.preventDefault(); setOver(d); }}
                     onDragLeave={() => setOver((o) => (o === d ? null : o))}
                     onDrop={(e) => onDrop(e, d)}
-                    className={`group relative flex cursor-pointer flex-col rounded-2xl border p-1.5 text-left transition sm:p-2 ${
-                      expanded ? "min-h-16 sm:min-h-44" : "min-h-14 sm:min-h-24"
-                    } ${
+                    className={`group relative flex min-w-0 cursor-pointer flex-col rounded-xl border text-left transition sm:rounded-2xl sm:p-2 ${expanded ? "overflow-hidden p-0.5" : "p-1.5"} ${ROW_H[span]} ${
                       over === d
                         ? "border-emerald-300/60 bg-emerald-300/[0.14]"
                         : moving
@@ -279,7 +284,6 @@ export default function CalendarBoard({
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2">
-                        {expanded && <span className="text-xs text-white/50 sm:hidden">{WEEKDAYS[new Date(`${d}T12:00:00Z`).getUTCDay()]}</span>}
                         <span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs ${isToday ? "bg-emerald-300 font-semibold text-emerald-950" : "text-white/70"}`}>
                           {+d.slice(8)}
                         </span>
@@ -296,7 +300,7 @@ export default function CalendarBoard({
                       </span>
                     )}
 
-                    <span className={`mt-1 min-w-0 gap-1 ${expanded ? "grid" : "hidden sm:grid"}`}>
+                    <span className={`mt-1 min-w-0 content-start gap-0.5 sm:gap-1 ${expanded ? "grid flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none]" : "hidden sm:grid"}`}>
                       {shown.map((i) =>
                         i.kind === "plan" ? (
                           <button
@@ -323,22 +327,22 @@ export default function CalendarBoard({
                             }}
                             aria-expanded={peek?.id === i.id}
                             title={i.movable ? "Tap for details. Drag (or press and hold on a phone) to move." : undefined}
-                            className={`min-w-0 rounded-md border px-1.5 py-0.5 text-left text-[11px] transition ${
+                            className={`min-w-0 rounded-md border border-l-2 px-1.5 py-0.5 text-left text-[11px] transition ${SPORT_EDGE[i.sport] ?? ""} ${
                               i.done ? "border-white/5 bg-white/[0.08] text-white/75" : "border-emerald-300/25 text-emerald-100 hover:bg-emerald-300/[0.08]"
-                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "py-1 sm:text-xs" : ""}`}
+                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "px-1 py-1 text-[10px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
                           >
-                            <span className="block truncate">{i.text}</span>
-                            {expanded && i.sub && <span className="block truncate text-[10px] text-white/50 sm:text-[11px]">{i.sub}</span>}
+                            <span className={`block ${expanded ? "line-clamp-3 break-words sm:line-clamp-2" : "truncate"}`}>{i.text}</span>
+                            {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
                           </button>
                         ) : (
                           <Link
                             key={i.id}
                             href={i.href}
                             onClick={(e) => e.stopPropagation()}
-                            className={`min-w-0 rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[11px] text-white/75 hover:bg-white/[0.12] ${expanded ? "py-1 sm:text-xs" : ""}`}
+                            className={`min-w-0 rounded-md border-l-2 bg-white/[0.08] px-1.5 py-0.5 text-[11px] text-white/75 hover:bg-white/[0.12] ${SPORT_EDGE[i.sport] ?? "border-l-white/30"} ${expanded ? "px-1 py-1 text-[10px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
                           >
-                            <span className="block truncate">{i.text}</span>
-                            {expanded && i.sub && <span className="block truncate text-[10px] text-white/50 sm:text-[11px]">{i.sub}</span>}
+                            <span className={`block ${expanded ? "line-clamp-3 break-words sm:line-clamp-2" : "truncate"}`}>{i.text}</span>
+                            {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
                           </Link>
                         ),
                       )}

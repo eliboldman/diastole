@@ -12,6 +12,7 @@ import { addDays, dayIn, monthGrid, monthKey, parseMonth, shiftMonth } from "@/l
 import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, sportLabel } from "@/lib/activity/format";
 import WorkoutPeek, { type Peek } from "@/components/calendar/WorkoutPeek";
+import { sportGroup } from "@/lib/pod-stickers";
 import { PEEK_COLUMNS, toPeek, type PeekRow } from "@/lib/workouts/peek";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -140,7 +141,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       const done = w.status === "completed" || doneHere.some((x) => x.planned_workout_id === w.id);
       const peek = toPeek(w, { coach: isCoach, done, units, who: isCoach && !focus ? nameOf(w.athlete_id) : undefined });
       calItems.push({
-        kind: "plan", id: w.id, day: d, done,
+        kind: "plan", id: w.id, day: d, done, sport: w.sport,
         text: `${prefix(w.athlete_id)}${peek.title}`,
         sub: [peek.sport, peek.minutes && `${peek.minutes} min`, w.status === "draft" && "draft"].filter(Boolean).join(" · "),
         // Coaches move anything not yet done; athletes move their own sent sessions (their coach is notified).
@@ -152,7 +153,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   for (const [d, as] of doneBy) {
     for (const a of as) {
       calItems.push({
-        kind: "done", id: a.id, day: d, href: `/activity/${a.id}`,
+        kind: "done", id: a.id, day: d, href: `/activity/${a.id}`, sport: sportGroup(a.sport),
         text: `${prefix(a.athlete_id)}${a.sport ? sportLabel(a.sport) : "Activity"}`,
         sub: [a.duration_s && `${Math.round(a.duration_s / 60)} min`, shortDistance(a.distance_m, me.units, a.sport)].filter(Boolean).join(" · "),
       });
