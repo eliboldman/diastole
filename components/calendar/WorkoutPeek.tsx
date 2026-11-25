@@ -2,7 +2,7 @@
 
 import { ChevronRight, Clock, Flame, Lock } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 export type Peek = {
   id: string;
@@ -40,12 +40,6 @@ export default function WorkoutPeek({ w }: { w: Peek }) {
     };
   }, [open]);
 
-  const facts = [
-    w.time && { icon: Clock, text: w.time },
-    w.minutes && { icon: Clock, text: `About ${w.minutes} min` },
-    !w.sealed && w.hardMinutes >= 8 && { icon: Flame, text: `${w.hardMinutes} min hard` },
-  ].filter(Boolean) as { icon: typeof Clock; text: string }[];
-
   return (
     <li ref={box} className="relative">
       <button
@@ -82,44 +76,62 @@ export default function WorkoutPeek({ w }: { w: Peek }) {
         >
           <span aria-hidden className="absolute -top-1.5 left-8 h-3 w-3 rotate-45 border-l border-t border-emerald-300/20 bg-[#0c1512]" />
 
-          {facts.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {facts.map((f) => (
-                <span key={f.text} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-2.5 py-1 text-xs text-white/80">
-                  <f.icon size={12} aria-hidden /> {f.text}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {w.sealed ? (
-            <p className="mt-3 flex items-start gap-2 text-sm text-white/65">
-              <Lock size={14} className="mt-0.5 shrink-0" aria-hidden />
-              Mystery workout. The steps stay hidden until you reveal them on the workout page.
-            </p>
-          ) : (
-            <>
-              {w.description && <p className="mt-3 text-sm text-white/75">{w.description}</p>}
-              {w.lines.length > 0 && (
-                <ol className="mt-3 grid gap-1 text-sm text-white/70">
-                  {w.lines.map((l, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="w-4 shrink-0 text-right tabular-nums text-white/35">{i + 1}</span>
-                      <span className="min-w-0">{l}</span>
-                    </li>
-                  ))}
-                  {w.more > 0 && <li className="pl-6 text-white/45">{`+ ${w.more} more`}</li>}
-                </ol>
-              )}
-              {!w.description && !w.lines.length && <p className="mt-3 text-sm text-white/55">No details on this one yet.</p>}
-            </>
-          )}
-
-          <Link href={w.href} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm text-emerald-200 hover:text-emerald-100">
-            Full workout <ChevronRight size={14} aria-hidden />
-          </Link>
+          <PeekBody w={w} />
         </div>
       )}
     </li>
+  );
+}
+
+/** What's inside the bubble: when, how long, the steps, and a link to the full workout. Also used by the calendar grid. */
+export function PeekBody({ w, children }: { w: Peek; children?: ReactNode }) {
+  const facts = [
+    w.time && { icon: Clock, text: w.time },
+    w.minutes && { icon: Clock, text: `About ${w.minutes} min` },
+    !w.sealed && w.hardMinutes >= 8 && { icon: Flame, text: `${w.hardMinutes} min hard` },
+  ].filter(Boolean) as { icon: typeof Clock; text: string }[];
+
+  return (
+    <>
+      {facts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {facts.map((f) => (
+            <span key={f.text} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-2.5 py-1 text-xs text-white/80">
+              <f.icon size={12} aria-hidden /> {f.text}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {w.sealed ? (
+        <p className="mt-3 flex items-start gap-2 text-sm text-white/65">
+          <Lock size={14} className="mt-0.5 shrink-0" aria-hidden />
+          Mystery workout. The steps stay hidden until you reveal them on the workout page.
+        </p>
+      ) : (
+        <>
+          {w.description && <p className="mt-3 text-sm text-white/75">{w.description}</p>}
+          {w.lines.length > 0 && (
+            <ol className="mt-3 grid gap-1 text-sm text-white/70">
+              {w.lines.map((l, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="w-4 shrink-0 text-right tabular-nums text-white/35">{i + 1}</span>
+                  <span className="min-w-0">{l}</span>
+                </li>
+              ))}
+              {w.more > 0 && <li className="pl-6 text-white/45">{`+ ${w.more} more`}</li>}
+            </ol>
+          )}
+          {!w.description && !w.lines.length && <p className="mt-3 text-sm text-white/55">No details on this one yet.</p>}
+        </>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4">
+        <Link href={w.href} className="inline-flex min-h-11 items-center gap-1 text-sm text-emerald-200 hover:text-emerald-100">
+          Full workout <ChevronRight size={14} aria-hidden />
+        </Link>
+        {children}
+      </div>
+    </>
   );
 }
