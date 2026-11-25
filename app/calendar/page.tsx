@@ -192,7 +192,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <AthleteShell isCoach={isCoach} wide={span !== "month"}>
-      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-4 sm:justify-start sm:gap-x-6">
         <div className="min-w-0">
           <p className="hidden text-xs uppercase tracking-[0.3em] text-emerald-200/60 sm:block">Calendar</p>
           <h1 className="text-2xl font-medium tracking-tight sm:mt-2 sm:text-4xl">{title}</h1>
