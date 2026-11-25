@@ -3,7 +3,7 @@
 import { Move, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 
 import { FLAG_STYLE } from "@/components/coach/Flags";
 import { useToast } from "@/components/coach/Toast";
@@ -45,6 +45,10 @@ export default function CalendarBoard({
   const [, start] = useTransition();
   const { show, element: toast } = useToast(7000);
   const bubble = useRef<HTMLDivElement>(null);
+  // Touch drag: press and hold a workout, then drag it (phones have no native drag and drop).
+  const [touchDrag, setTouchDrag] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
+  const hold = useRef<{ id: string; text: string; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const dragged = useRef(false); // swallow the tap that ends a touch drag
 
   // A fresh render from the server (after a move, or a new range) replaces the local copy.
   const [seen, setSeen] = useState(initial);
@@ -97,6 +101,35 @@ export default function CalendarBoard({
     return () => window.removeEventListener("keydown", key);
   }, [moving]);
 
+  const holdStart = (e: ReactTouchEvent, id: string, text: string) => {
+    const t = e.touches[0];
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = {
+      id, text, x: t.clientX, y: t.clientY,
+      timer: setTimeout(() => {
+        const h = hold.current;
+        if (!h) return;
+        hold.current = null;
+        dragged.current = true;
+        setPeek(null);
+        navigator.vibrate?.(12);
+        setTouchDrag({ id: h.id, text: h.text, x: h.x, y: h.y });
+      }, 380),
+    };
+  };
+  const holdMove = (e: ReactTouchEvent) => {
+    const h = hold.current;
+    const t = e.touches[0];
+    if (h && Math.hypot(t.clientX - h.x, t.clientY - h.y) > 8) {
+      clearTimeout(h.timer); // the finger moved first: it's a scroll, not a drag
+      hold.current = null;
+    }
+  };
+  const holdEnd = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+  };
+
   const setDay = (id: string, day: string) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, day } : x)));
 
   const move = (id: string, to: string) => {
@@ -132,6 +165,49 @@ export default function CalendarBoard({
     const id = e.dataTransfer.getData("text/plain");
     if (id) move(id, day);
   };
+
+  // While a touch drag is live: follow the finger, light up the day under it, stop the page scrolling
+  // (but nudge it near the top or bottom edge so a day off screen can be reached), drop on release.
+  const dragId = touchDrag?.id ?? null;
+  useEffect(() => {
+    if (!dragId) return;
+    let y = 0;
+    let target: string | null = null;
+    let raf = 0;
+    const edge = () => {
+      const h = window.innerHeight;
+      if (y && y < 90) window.scrollBy(0, -10);
+      else if (y > h - 120) window.scrollBy(0, 10);
+      raf = requestAnimationFrame(edge);
+    };
+    raf = requestAnimationFrame(edge);
+    const onMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      y = t.clientY;
+      setTouchDrag((d) => (d ? { ...d, x: t.clientX, y: t.clientY } : d));
+      const cell = (document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-day]");
+      target = cell?.dataset.day ?? null;
+      setOver(target);
+    };
+    const onEnd = () => {
+      setTouchDrag(null);
+      setOver(null);
+      setTimeout(() => (dragged.current = false), 400); // in case the browser sends no click after the drag
+      if (target) move(dragId, target);
+    };
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onEnd);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+    };
+    // move() is re-created each render; the drag only needs the one current when it started.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragId]);
 
   const tapDay = (day: string) => {
     if (moving) {
@@ -179,6 +255,7 @@ export default function CalendarBoard({
                 return (
                   <div
                     key={d}
+                    data-day={d}
                     role="button"
                     tabIndex={0}
                     aria-label={moving ? `Move to ${fmtDay(d)}` : fmtDay(d)}
@@ -233,17 +310,22 @@ export default function CalendarBoard({
                               e.dataTransfer.setData("text/plain", i.id);
                             }}
                             onDragEnd={() => setOver(null)}
+                            onTouchStart={i.movable ? (e) => holdStart(e, i.id, i.text) : undefined}
+                            onTouchMove={i.movable ? holdMove : undefined}
+                            onTouchEnd={i.movable ? holdEnd : undefined}
+                            onContextMenu={i.movable ? (e) => e.preventDefault() : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (dragged.current) return void (dragged.current = false);
                               if (moving) return tapDay(d);
                               const rect = e.currentTarget.getBoundingClientRect();
                               setPeek((p) => (p?.id === i.id ? null : { id: i.id, rect }));
                             }}
                             aria-expanded={peek?.id === i.id}
-                            title={i.movable ? "Tap for details, drag to move" : undefined}
+                            title={i.movable ? "Tap for details. Drag (or press and hold on a phone) to move." : undefined}
                             className={`min-w-0 rounded-md border px-1.5 py-0.5 text-left text-[11px] transition ${
                               i.done ? "border-white/5 bg-white/[0.08] text-white/75" : "border-emerald-300/25 text-emerald-100 hover:bg-emerald-300/[0.08]"
-                            } ${i.movable ? "cursor-grab active:cursor-grabbing" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "py-1 sm:text-xs" : ""}`}
+                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "py-1 sm:text-xs" : ""}`}
                           >
                             <span className="block truncate">{i.text}</span>
                             {expanded && i.sub && <span className="block truncate text-[10px] text-white/50 sm:text-[11px]">{i.sub}</span>}
@@ -272,7 +354,12 @@ export default function CalendarBoard({
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-emerald-200/80" /> Planned</span>
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/70" /> Completed</span>
           {Object.keys(flags).length > 0 && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Readiness</span>}
-          {items.some((i) => i.kind === "plan" && i.movable) && <span className="hidden sm:inline">Drag a planned workout to move it.</span>}
+          {items.some((i) => i.kind === "plan" && i.movable) && (
+            <span>
+              <span className="hidden sm:inline">Drag a planned workout to move it.</span>
+              <span className="sm:hidden">{expanded ? "Press and hold a workout, then drag it to move it." : "Switch to Week or 2 weeks to drag workouts."}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -310,6 +397,15 @@ export default function CalendarBoard({
               </button>
             )}
           </PeekBody>
+        </div>
+      )}
+      {touchDrag && (
+        <div
+          aria-hidden
+          style={{ left: touchDrag.x, top: touchDrag.y }}
+          className="pointer-events-none fixed z-[70] -translate-x-1/2 -translate-y-[130%] rounded-lg border border-emerald-300/60 bg-emerald-950/95 px-3 py-1.5 text-xs text-emerald-50 shadow-2xl shadow-black/60"
+        >
+          {touchDrag.text}
         </div>
       )}
       {toast}

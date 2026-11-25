@@ -43,7 +43,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const span: Span = SPANS.some((x) => x.key === sp.span) ? (sp.span as Span) : SPANS.some((x) => x.key === remembered) ? (remembered as Span) : "month";
   const weeksIn = span === "week" ? 1 : 2;
 
-  let month = parseMonth(sp.month, today);
+  let month = parseMonth(sp.month ?? (isDate(sp.day) ? sp.day!.slice(0, 7) : undefined), today);
   let grid: string[][];
   if (span === "month") {
     grid = monthGrid(month);
@@ -143,7 +143,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         kind: "plan", id: w.id, day: d, done,
         text: `${prefix(w.athlete_id)}${peek.title}`,
         sub: [peek.sport, peek.minutes && `${peek.minutes} min`, w.status === "draft" && "draft"].filter(Boolean).join(" · "),
-        movable: isCoach && !done,
+        // Coaches move anything not yet done; athletes move their own sent sessions (their coach is notified).
+        movable: !done && (isCoach || (w.athlete_id === me.id && ["approved", "sent"].includes(w.status))),
         peek,
       });
     }

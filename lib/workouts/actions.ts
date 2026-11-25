@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { resendWorkoutToGarmin } from "@/lib/garmin/training";
 import { removeFromDevice, retireWorkout } from "@/lib/workouts/retire";
-import { createClient, requireCoach } from "@/lib/supabase/server";
+import { createAdminClient, createClient, requireCoach, requireUser, type Profile } from "@/lib/supabase/server";
 import { adjustSteps, describeAdjustment, type Adjustment } from "@/lib/workouts/adjust";
 import { fromConnectWorkout } from "@/lib/workouts/connect-import";
 import { validateSteps, type Brick, type Pool, type PoolUnit, type Sport, type Step } from "@/lib/workouts/garmin-format";
@@ -274,8 +274,9 @@ export async function adjustWorkout(id: string, a: Adjustment): Promise<Result> 
 }
 
 export async function rescheduleWorkout(id: string, date: string): Promise<Result> {
-  const coach = await requireCoach();
+  const coach = await requireUser();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Pick a date." };
+  if (coach.role !== "coach") return athleteReschedule(coach, id, date);
   const supabase = await createClient();
   const w = await load(supabase, id);
   if (!w || w.deleted_at) return { ok: false, error: "Workout not found." };
@@ -293,6 +294,48 @@ export async function rescheduleWorkout(id: string, date: string): Promise<Resul
     refresh(w.athlete_id, id);
     return { ok: false, error: `Moved, but updating Garmin failed: ${(e as Error).message}` };
   }
+}
+
+const fmtDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** An athlete moves one of their own planned workouts to another day. Their coach gets a notification. */
+async function athleteReschedule(me: Profile, id: string, date: string): Promise<Result> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "Workout not found." };
+  const admin = createAdminClient() as unknown as Supa;
+  const { data } = await admin.from("planned_workouts").select(COLS).eq("id", id).eq("athlete_id", me.id).maybeSingle();
+  const w = data as WorkoutRow | null;
+  if (!w || w.deleted_at) return { ok: false, error: "Workout not found." };
+  if (!["approved", "sent"].includes(w.status)) return { ok: false, error: "That workout can't be moved." };
+  if (w.scheduled_date === date) return { ok: false, error: "It's already on that date." };
+
+  const { error } = await admin.from("planned_workouts").update({ scheduled_date: date }).eq("id", id).eq("athlete_id", me.id);
+  if (error) return { ok: false, error: error.message };
+  const updated = { ...w, scheduled_date: date };
+  await snapshot(admin, updated, `moved by the athlete from ${w.scheduled_date}`, me.id);
+
+  if (w.coach_id && w.coach_id !== me.id) {
+    const first = (me.full_name ?? "").trim().split(/\s+/)[0] || "An athlete";
+    await admin.rpc("server_notify", {
+      p_user: w.coach_id,
+      p_kind: "plan_change",
+      p_title: `${first} moved ${w.title}`,
+      p_body: `From ${fmtDay(w.scheduled_date)} to ${fmtDay(date)}.`,
+      p_href: `/calendar?athlete=${me.id}&start=${date}&day=${date}`,
+      p_key: `moved:${id}:${Date.now()}`,
+    });
+  }
+
+  let extra = "";
+  try {
+    extra = await afterChange(admin, updated);
+  } catch (e) {
+    return { ok: false, error: `Moved, but updating Garmin failed: ${(e as Error).message}` };
+  } finally {
+    refresh(w.athlete_id, id);
+    revalidatePath("/calendar");
+    revalidatePath("/me");
+  }
+  return { ok: true, id, message: `Moved to ${date}.${extra}` };
 }
 
 export async function duplicateWorkout(id: string, date?: string): Promise<Result> {
