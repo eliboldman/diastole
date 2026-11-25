@@ -12,8 +12,8 @@ import type { Flag } from "@/lib/readiness/engine";
 import { rescheduleWorkout } from "@/lib/workouts/actions";
 
 export type CalItem =
-  | { kind: "plan"; id: string; day: string; sport: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek }
-  | { kind: "done"; id: string; day: string; sport: string; text: string; sub: string; href: string };
+  | { kind: "plan"; id: string; day: string; sport: string; who: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek }
+  | { kind: "done"; id: string; day: string; sport: string; who: string; text: string; sub: string; href: string };
 
 export type Span = "month" | "2weeks" | "week";
 
@@ -22,8 +22,8 @@ const BUBBLE_W = 340;
 const SPORT_EDGE: Record<string, string> = { run: "border-l-emerald-300", bike: "border-l-amber-300", swim: "border-l-sky-300", strength: "border-l-fuchsia-300" };
 // Week spans fill the window: one row (or two) of seven days, sized to the screen so nothing scrolls sideways.
 const ROW_H: Record<Span, string> = {
-  week: "h-[calc(100dvh-29rem)] min-h-[15rem] sm:h-[calc(100dvh-23rem)]",
-  "2weeks": "h-[calc((100dvh-30rem)/2)] min-h-[9.5rem] sm:h-[calc((100dvh-24rem)/2)] sm:min-h-[10rem]",
+  week: "h-[calc(100dvh-22rem)] min-h-[14rem] sm:h-[calc(100dvh-23rem)]",
+  "2weeks": "h-[calc((100dvh-23rem)/2)] min-h-[8rem] sm:h-[calc((100dvh-24rem)/2)] sm:min-h-[10rem]",
   month: "min-h-14 sm:min-h-24",
 };
 
@@ -233,7 +233,7 @@ export default function CalendarBoard({
       {movingItem && (
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] px-4 py-2 text-sm text-emerald-50">
           <Move size={16} className="shrink-0 text-emerald-200" aria-hidden />
-          <span className="min-w-0 flex-1">Tap the day to move “{movingItem.text}” to.</span>
+          <span className="min-w-0 flex-1">Tap the day to move “{movingItem.who ? `${movingItem.who} · ` : ""}{movingItem.text}” to.</span>
           <button type="button" onClick={() => setMoving(null)} className="flex min-h-11 items-center gap-1 rounded-xl px-2 text-white/70 hover:text-white">
             <X size={15} aria-hidden /> Cancel
           </button>
@@ -329,9 +329,16 @@ export default function CalendarBoard({
                             title={i.movable ? "Tap for details. Drag (or press and hold on a phone) to move." : undefined}
                             className={`min-w-0 rounded-md border border-l-2 px-1.5 py-0.5 text-left text-[11px] transition ${SPORT_EDGE[i.sport] ?? ""} ${
                               i.done ? "border-white/5 bg-white/[0.08] text-white/75" : "border-emerald-300/25 text-emerald-100 hover:bg-emerald-300/[0.08]"
-                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "px-1 py-1 text-[10px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
+                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "px-1 py-1 text-[9px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
                           >
-                            <span className={`block ${expanded ? "line-clamp-3 break-words sm:line-clamp-2" : "truncate"}`}>{i.text}</span>
+                            {expanded ? (
+                              <>
+                                {i.who && <span className="block truncate font-semibold text-white/70">{i.who}</span>}
+                                <span className="line-clamp-3 overflow-hidden [overflow-wrap:normal] [word-break:normal] sm:line-clamp-2">{i.text}</span>
+                              </>
+                            ) : (
+                              <span className="block truncate">{i.who ? `${i.who} · ` : ""}{i.text}</span>
+                            )}
                             {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
                           </button>
                         ) : (
@@ -339,9 +346,16 @@ export default function CalendarBoard({
                             key={i.id}
                             href={i.href}
                             onClick={(e) => e.stopPropagation()}
-                            className={`min-w-0 rounded-md border-l-2 bg-white/[0.08] px-1.5 py-0.5 text-[11px] text-white/75 hover:bg-white/[0.12] ${SPORT_EDGE[i.sport] ?? "border-l-white/30"} ${expanded ? "px-1 py-1 text-[10px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
+                            className={`min-w-0 rounded-md border-l-2 bg-white/[0.08] px-1.5 py-0.5 text-[11px] text-white/75 hover:bg-white/[0.12] ${SPORT_EDGE[i.sport] ?? "border-l-white/30"} ${expanded ? "px-1 py-1 text-[9px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
                           >
-                            <span className={`block ${expanded ? "line-clamp-3 break-words sm:line-clamp-2" : "truncate"}`}>{i.text}</span>
+                            {expanded ? (
+                              <>
+                                {i.who && <span className="block truncate font-semibold text-white/70">{i.who}</span>}
+                                <span className="line-clamp-3 overflow-hidden [overflow-wrap:normal] [word-break:normal] sm:line-clamp-2">{i.text}</span>
+                              </>
+                            ) : (
+                              <span className="block truncate">{i.who ? `${i.who} · ` : ""}{i.text}</span>
+                            )}
                             {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
                           </Link>
                         ),

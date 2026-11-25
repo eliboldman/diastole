@@ -127,7 +127,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const title =
     span === "month"
       ? new Date(Date.UTC(month.year, month.month - 1, 15)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
-      : `${md(from, { month: "short", day: "numeric" })} – ${md(to, { month: from.slice(0, 7) === to.slice(0, 7) ? undefined : "short", day: "numeric" })}, ${to.slice(0, 4)}`;
+      : (
+          <>
+            {md(from, { month: "short", day: "numeric" })} – {md(to, { month: from.slice(0, 7) === to.slice(0, 7) ? undefined : "short", day: "numeric" })}
+            <span className="hidden sm:inline">, {to.slice(0, 4)}</span>
+          </>
+        );
   const step = (n: number) => (span === "month" ? { month: monthKey(shiftMonth(month, n)), day: undefined } : { start: addDays(from, n * 7 * weeksIn), day: undefined });
   const switchTo = (k: Span) => (k === "month" ? { span: k, month: selected.slice(0, 7), start: undefined, day: selected } : { span: k, start: sunday(selected), month: undefined, day: selected });
 
@@ -142,7 +147,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       const peek = toPeek(w, { coach: isCoach, done, units, who: isCoach && !focus ? nameOf(w.athlete_id) : undefined });
       calItems.push({
         kind: "plan", id: w.id, day: d, done, sport: w.sport,
-        text: `${prefix(w.athlete_id)}${peek.title}`,
+        who: prefix(w.athlete_id).replace(" · ", ""),
+        text: peek.title,
         sub: [peek.sport, peek.minutes && `${peek.minutes} min`, w.status === "draft" && "draft"].filter(Boolean).join(" · "),
         // Coaches move anything not yet done; athletes move their own sent sessions (their coach is notified).
         movable: !done && (isCoach || (w.athlete_id === me.id && ["approved", "sent"].includes(w.status))),
@@ -154,7 +160,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     for (const a of as) {
       calItems.push({
         kind: "done", id: a.id, day: d, href: `/activity/${a.id}`, sport: sportGroup(a.sport),
-        text: `${prefix(a.athlete_id)}${a.sport ? sportLabel(a.sport) : "Activity"}`,
+        who: prefix(a.athlete_id).replace(" · ", ""),
+        text: a.sport ? sportLabel(a.sport) : "Activity",
         sub: [a.duration_s && `${Math.round(a.duration_s / 60)} min`, shortDistance(a.distance_m, me.units, a.sport)].filter(Boolean).join(" · "),
       });
     }
@@ -163,44 +170,48 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <AthleteShell isCoach={isCoach}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/60">Calendar</p>
-          <h1 className="mt-2 text-3xl font-medium tracking-tight sm:text-4xl">{title}</h1>
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-4">
+        <div className="min-w-0">
+          <p className="hidden text-xs uppercase tracking-[0.3em] text-emerald-200/60 sm:block">Calendar</p>
+          <h1 className="text-2xl font-medium tracking-tight sm:mt-2 sm:text-4xl">{title}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href={href(step(-1))} aria-label={span === "month" ? "Previous month" : "Earlier"} scroll={false} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] active:scale-90 hover:bg-white/[0.09]">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <Link href={href(step(-1))} aria-label={span === "month" ? "Previous month" : "Earlier"} scroll={false} className="flex h-11 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] active:scale-90 hover:bg-white/[0.09] sm:w-11">
             <ChevronLeft size={18} />
           </Link>
-          <Link href={href(span === "month" ? { month: today.slice(0, 7), day: today } : { start: sunday(today), day: today })} scroll={false} className="flex h-11 items-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm active:scale-95 hover:bg-white/[0.09]">
+          <Link href={href(span === "month" ? { month: today.slice(0, 7), day: today } : { start: sunday(today), day: today })} scroll={false} className="flex h-11 items-center rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-sm sm:px-4 active:scale-95 hover:bg-white/[0.09]">
             Today
           </Link>
-          <Link href={href(step(1))} aria-label={span === "month" ? "Next month" : "Later"} scroll={false} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] active:scale-90 hover:bg-white/[0.09]">
+          <Link href={href(step(1))} aria-label={span === "month" ? "Next month" : "Later"} scroll={false} className="flex h-11 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] active:scale-90 hover:bg-white/[0.09] sm:w-11">
             <ChevronRight size={18} />
           </Link>
         </div>
       </div>
 
       <SpanCookie span={sp.span && span === sp.span ? span : null} />
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <nav aria-label="Calendar range" className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+      <div className="mt-4 flex items-center gap-2 sm:mt-5 sm:gap-3">
+        <nav aria-label="Calendar range" className="flex shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
           {SPANS.map((x) => (
             <Link
               key={x.key}
               href={href(switchTo(x.key))}
               scroll={false}
               aria-current={span === x.key ? "page" : undefined}
-              className={`flex min-h-10 items-center rounded-xl px-3.5 text-sm transition ${span === x.key ? "bg-emerald-300 font-semibold text-emerald-950" : "text-white/65 hover:text-white"}`}
+              className={`flex min-h-10 items-center rounded-xl px-2.5 text-sm transition sm:px-3.5 ${span === x.key ? "bg-emerald-300 font-semibold text-emerald-950" : "text-white/65 hover:text-white"}`}
             >
               {x.label}
             </Link>
           ))}
         </nav>
-        {isCoach && <CalendarAthletePicker athletes={roster} value={focus ?? ""} query={span === "month" ? `span=month&month=${monthKey(month)}` : `span=${span}&start=${from}`} />}
+        {isCoach && (
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <CalendarAthletePicker athletes={roster} value={focus ?? ""} query={span === "month" ? `span=month&month=${monthKey(month)}` : `span=${span}&start=${from}`} />
+          </div>
+        )}
       </div>
 
       {isCoach && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="mt-3 hidden flex-wrap items-center gap-3 sm:flex">
           <Link href="/team-calendar" className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] px-4 text-sm text-emerald-100 hover:bg-emerald-300/[0.14]">
             Team week: drag to move →
           </Link>

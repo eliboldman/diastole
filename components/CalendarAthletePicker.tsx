@@ -10,7 +10,7 @@ export default function CalendarAthletePicker({ athletes, value, query }: { athl
       aria-label="Athlete"
       value={value}
       onChange={(e) => router.push(`/calendar?${query}${e.target.value ? `&athlete=${e.target.value}` : ""}`, { scroll: false })}
-      className="min-h-12 w-full rounded-2xl border border-white/10 bg-panel px-3 text-base sm:w-72 sm:text-sm"
+      className="min-h-12 w-full min-w-0 rounded-2xl border border-white/10 bg-panel px-3 text-base sm:w-72 sm:text-sm"
     >
       <option value="">All athletes</option>
       {athletes.map((a) => (
