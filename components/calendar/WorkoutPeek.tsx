@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Clock, Flame, Lock } from "lucide-react";
+import { CheckCircle2, ChevronRight, Clock, Flame, Lock } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
@@ -18,7 +18,11 @@ export type Peek = {
   lines: string[];
   more: number; // steps left out of the bubble
   sealed: boolean;
+  actual?: Actual[]; // what was recorded for it (two for a brick)
+  unplanned?: boolean; // an activity with no planned session: the bubble shows only what was recorded
 };
+
+export type Actual = { href: string; facts: string[] };
 
 /** A row in the calendar's day list. Tapping it opens a small bubble with what the workout is, so you can prepare without leaving the calendar. */
 export default function WorkoutPeek({ w }: { w: Peek }) {
@@ -91,8 +95,23 @@ export function PeekBody({ w, children }: { w: Peek; children?: ReactNode }) {
     !w.sealed && w.hardMinutes >= 8 && { icon: Flame, text: `${w.hardMinutes} min hard` },
   ].filter(Boolean) as { icon: typeof Clock; text: string }[];
 
+  const recorded = (w.actual ?? []).length > 0 && (
+    <div className="mb-3 grid gap-1.5">
+      {w.actual!.map((a) => (
+        <Link key={a.href} href={a.href} className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm hover:bg-white/[0.1]">
+          <CheckCircle2 size={15} className="shrink-0 text-emerald-300" aria-hidden />
+          <span className="min-w-0 flex-1 text-white/80">{a.facts.join(" · ") || "Recorded"}</span>
+          <span className="shrink-0 text-xs text-emerald-200">Activity</span>
+          <ChevronRight size={14} className="shrink-0 text-white/40" aria-hidden />
+        </Link>
+      ))}
+    </div>
+  );
+  if (w.unplanned) return <>{recorded}{children}</>;
+
   return (
     <>
+      {recorded}
       {facts.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {facts.map((f) => (

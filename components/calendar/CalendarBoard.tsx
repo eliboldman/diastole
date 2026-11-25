@@ -1,7 +1,6 @@
 "use client";
 
 import { Move, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 
@@ -11,9 +10,8 @@ import { PeekBody, type Peek } from "@/components/calendar/WorkoutPeek";
 import type { Flag } from "@/lib/readiness/engine";
 import { rescheduleWorkout } from "@/lib/workouts/actions";
 
-export type CalItem =
-  | { kind: "plan"; id: string; day: string; sport: string; who: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek }
-  | { kind: "done"; id: string; day: string; sport: string; who: string; text: string; sub: string; href: string };
+/** One session on the calendar: the plan and what was recorded for it, or an activity with no plan. */
+export type CalItem = { id: string; day: string; sport: string; who: string; text: string; sub: string; done: boolean; movable: boolean; peek: Peek };
 
 export type Span = "month" | "2weeks" | "week";
 
@@ -22,8 +20,8 @@ const BUBBLE_W = 340;
 const SPORT_EDGE: Record<string, string> = { run: "border-l-emerald-300", bike: "border-l-amber-300", swim: "border-l-sky-300", strength: "border-l-fuchsia-300" };
 // Week spans fill the window: one row (or two) of seven days, sized to the screen so nothing scrolls sideways.
 const ROW_H: Record<Span, string> = {
-  week: "h-[calc(100dvh-22rem)] min-h-[14rem] sm:h-[calc(100dvh-23rem)]",
-  "2weeks": "h-[calc((100dvh-23rem)/2)] min-h-[8rem] sm:h-[calc((100dvh-24rem)/2)] sm:min-h-[10rem]",
+  week: "h-[calc(100dvh-21rem)] min-h-[15rem] sm:h-[calc(100dvh-19rem)]",
+  "2weeks": "h-[calc((100dvh-21.5rem)/2)] min-h-[9rem] sm:h-[calc((100dvh-20rem)/2)] sm:min-h-[11rem]",
   month: "min-h-14 sm:min-h-24",
 };
 
@@ -67,7 +65,7 @@ export default function CalendarBoard({
   const expanded = span !== "month";
   const byDay = new Map<string, CalItem[]>();
   for (const i of items) byDay.set(i.day, [...(byDay.get(i.day) ?? []), i]);
-  const open = peek ? items.find((i) => i.id === peek.id && i.kind === "plan") : null;
+  const open = peek ? items.find((i) => i.id === peek.id) : null;
   const movingItem = moving ? items.find((i) => i.id === moving) : null;
 
   // Place the bubble under the workout, or above it when there's no room below; keep it on screen.
@@ -141,7 +139,7 @@ export default function CalendarBoard({
 
   const move = (id: string, to: string) => {
     const w = items.find((x) => x.id === id);
-    if (!w || w.kind !== "plan" || !w.movable || w.day === to) return;
+    if (!w || !w.movable || w.day === to) return;
     const from = w.day;
     setDay(id, to);
     start(async () => {
@@ -240,7 +238,7 @@ export default function CalendarBoard({
         </div>
       )}
 
-      <div className={`mt-4 rounded-[28px] border border-white/10 bg-white/[0.05] backdrop-blur-xl sm:p-3 ${expanded ? "-mx-2 p-1 sm:mx-0" : "p-2"}`}>
+      <div className={`mt-4 rounded-[28px] border border-white/10 bg-white/[0.05] backdrop-blur-xl sm:p-3 ${expanded ? "-mx-3 p-1 sm:mx-0" : "p-2"}`}>
         <div className={`grid-cols-7 pb-1 text-center text-[11px] uppercase tracking-wider text-white/45 grid`}>
           {WEEKDAYS.map((d) => (
             <span key={d} className="py-1">
@@ -295,71 +293,52 @@ export default function CalendarBoard({
                     {!expanded && (
                       <span className="mt-auto flex flex-wrap gap-0.5 pt-1 sm:hidden">
                         {list.slice(0, 4).map((i) => (
-                          <span key={i.id} className={`h-1.5 w-1.5 rounded-full ${i.kind === "plan" && !i.done ? "border border-emerald-200/80" : "bg-white/70"}`} />
+                          <span key={i.id} className={`h-1.5 w-1.5 rounded-full ${!i.done ? "border border-emerald-200/80" : "bg-white/70"}`} />
                         ))}
                       </span>
                     )}
 
                     <span className={`mt-1 min-w-0 content-start gap-0.5 sm:gap-1 ${expanded ? "grid flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none]" : "hidden sm:grid"}`}>
-                      {shown.map((i) =>
-                        i.kind === "plan" ? (
-                          <button
-                            key={i.id}
-                            type="button"
-                            data-chip
-                            draggable={i.movable}
-                            onDragStart={(e) => {
-                              setPeek(null);
-                              e.dataTransfer.effectAllowed = "move";
-                              e.dataTransfer.setData("text/plain", i.id);
-                            }}
-                            onDragEnd={() => setOver(null)}
-                            onTouchStart={i.movable ? (e) => holdStart(e, i.id, i.text) : undefined}
-                            onTouchMove={i.movable ? holdMove : undefined}
-                            onTouchEnd={i.movable ? holdEnd : undefined}
-                            onContextMenu={i.movable ? (e) => e.preventDefault() : undefined}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (dragged.current) return void (dragged.current = false);
-                              if (moving) return tapDay(d);
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setPeek((p) => (p?.id === i.id ? null : { id: i.id, rect }));
-                            }}
-                            aria-expanded={peek?.id === i.id}
-                            title={i.movable ? "Tap for details. Drag (or press and hold on a phone) to move." : undefined}
-                            className={`min-w-0 rounded-md border border-l-2 px-1.5 py-0.5 text-left text-[11px] transition ${SPORT_EDGE[i.sport] ?? ""} ${
-                              i.done ? "border-white/5 bg-white/[0.08] text-white/75" : "border-emerald-300/25 text-emerald-100 hover:bg-emerald-300/[0.08]"
-                            } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "px-1 py-1 text-[9px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
-                          >
-                            {expanded ? (
-                              <>
-                                {i.who && <span className="block truncate font-semibold text-white/70">{i.who}</span>}
-                                <span className="line-clamp-3 overflow-hidden [overflow-wrap:normal] [word-break:normal] sm:line-clamp-2">{i.text}</span>
-                              </>
-                            ) : (
-                              <span className="block truncate">{i.who ? `${i.who} · ` : ""}{i.text}</span>
-                            )}
-                            {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
-                          </button>
-                        ) : (
-                          <Link
-                            key={i.id}
-                            href={i.href}
-                            onClick={(e) => e.stopPropagation()}
-                            className={`min-w-0 rounded-md border-l-2 bg-white/[0.08] px-1.5 py-0.5 text-[11px] text-white/75 hover:bg-white/[0.12] ${SPORT_EDGE[i.sport] ?? "border-l-white/30"} ${expanded ? "px-1 py-1 text-[9px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
-                          >
-                            {expanded ? (
-                              <>
-                                {i.who && <span className="block truncate font-semibold text-white/70">{i.who}</span>}
-                                <span className="line-clamp-3 overflow-hidden [overflow-wrap:normal] [word-break:normal] sm:line-clamp-2">{i.text}</span>
-                              </>
-                            ) : (
-                              <span className="block truncate">{i.who ? `${i.who} · ` : ""}{i.text}</span>
-                            )}
-                            {expanded && i.sub && <span className="mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
-                          </Link>
-                        ),
-                      )}
+                      {shown.map((i) => (
+                        <button
+                          key={i.id}
+                          type="button"
+                          data-chip
+                          draggable={i.movable}
+                          onDragStart={(e) => {
+                            setPeek(null);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", i.id);
+                          }}
+                          onDragEnd={() => setOver(null)}
+                          onTouchStart={i.movable ? (e) => holdStart(e, i.id, i.text) : undefined}
+                          onTouchMove={i.movable ? holdMove : undefined}
+                          onTouchEnd={i.movable ? holdEnd : undefined}
+                          onContextMenu={i.movable ? (e) => e.preventDefault() : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (dragged.current) return void (dragged.current = false);
+                            if (moving) return tapDay(d);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setPeek((p) => (p?.id === i.id ? null : { id: i.id, rect }));
+                          }}
+                          aria-expanded={peek?.id === i.id}
+                          title={i.movable ? "Tap for details. Drag (or press and hold on a phone) to move." : undefined}
+                          className={`min-w-0 rounded-md border border-l-2 px-1.5 py-0.5 text-left text-[11px] transition ${SPORT_EDGE[i.sport] ?? ""} ${
+                            i.done ? "border-white/5 bg-white/[0.08] text-white/75" : "border-emerald-300/25 text-emerald-100 hover:bg-emerald-300/[0.08]"
+                          } ${i.movable ? "cursor-grab select-none [-webkit-touch-callout:none] active:cursor-grabbing" : ""} ${touchDrag?.id === i.id ? "opacity-40" : ""} ${peek?.id === i.id ? "ring-1 ring-emerald-300/60" : ""} ${expanded ? "px-1 py-1 text-[9px] leading-tight sm:px-1.5 sm:text-xs" : ""}`}
+                        >
+                          {expanded ? (
+                            <span className="pointer-events-none block">
+                              {i.who && <span className="block truncate font-semibold text-white/70">{i.who}</span>}
+                              <span className="line-clamp-3 overflow-hidden [overflow-wrap:normal] [word-break:normal] sm:line-clamp-2">{i.text}</span>
+                            </span>
+                          ) : (
+                            <span className="pointer-events-none block truncate">{i.who ? `${i.who} · ` : ""}{i.text}</span>
+                          )}
+                          {expanded && i.sub && <span className="pointer-events-none mt-0.5 block truncate text-[9px] text-white/50 sm:text-[11px]">{i.sub}</span>}
+                        </button>
+                      ))}
                       {list.length > shown.length && <span className="px-1 text-[11px] text-white/45">+{list.length - shown.length} more</span>}
                     </span>
                   </div>
@@ -368,11 +347,11 @@ export default function CalendarBoard({
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap gap-4 px-2 pt-3 pb-1 text-[11px] text-white/50">
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border border-emerald-200/80" /> Planned</span>
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/70" /> Completed</span>
-          {Object.keys(flags).length > 0 && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Readiness</span>}
-          {items.some((i) => i.kind === "plan" && i.movable) && (
+        <div className={`flex flex-wrap gap-x-4 gap-y-1 px-2 pb-1 text-[11px] text-white/50 ${expanded ? "pt-1.5 sm:pt-3" : "pt-3"}`}>
+          <span className={`items-center gap-1.5 ${expanded ? "hidden sm:flex" : "flex"}`}><span className="h-2 w-2 rounded-full border border-emerald-200/80" /> Planned</span>
+          <span className={`items-center gap-1.5 ${expanded ? "hidden sm:flex" : "flex"}`}><span className="h-2 w-2 rounded-full bg-white/70" /> Completed</span>
+          {Object.keys(flags).length > 0 && <span className={`items-center gap-1.5 ${expanded ? "hidden sm:flex" : "flex"}`}><span className="h-2 w-2 rounded-full bg-emerald-300" /> Readiness</span>}
+          {items.some((i) => i.movable) && (
             <span>
               <span className="hidden sm:inline">Drag a planned workout to move it.</span>
               <span className="sm:hidden">{expanded ? "Press and hold a workout, then drag it to move it." : "Switch to Week or 2 weeks to drag workouts."}</span>
@@ -381,7 +360,7 @@ export default function CalendarBoard({
         </div>
       </div>
 
-      {open && open.kind === "plan" && (
+      {open && (
         <div
           ref={bubble}
           role="dialog"

@@ -11,7 +11,7 @@ import SpanCookie from "@/components/calendar/SpanCookie";
 import { addDays, dayIn, monthGrid, monthKey, parseMonth, shiftMonth } from "@/lib/calendar";
 import type { Flag } from "@/lib/readiness/engine";
 import { shortDistance, sportLabel } from "@/lib/activity/format";
-import WorkoutPeek, { type Peek } from "@/components/calendar/WorkoutPeek";
+import WorkoutPeek, { type Actual, type Peek } from "@/components/calendar/WorkoutPeek";
 import { sportGroup } from "@/lib/pod-stickers";
 import { PEEK_COLUMNS, toPeek, type PeekRow } from "@/lib/workouts/peek";
 import { createClient, requireUser } from "@/lib/supabase/server";
@@ -30,7 +30,6 @@ const SPANS: { key: Span; label: string }[] = [
 ];
 const isDate = (v?: string) => /^\d{4}-\d{2}-\d{2}$/.test(v ?? "");
 const sunday = (d: string) => addDays(d, -new Date(`${d}T12:00:00Z`).getUTCDay());
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_", " ");
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
@@ -115,14 +114,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     return `/calendar?${p}`;
   };
 
-  const dayPlanned = plannedBy.get(selected) ?? [];
-  const dayDone = doneBy.get(selected) ?? [];
-  const linked = new Set(dayDone.map((a) => a.planned_workout_id).filter(Boolean));
-
-  // What the bubble shows for each planned session. A sealed mystery stays sealed for the athlete (coaches wrote it, so they see it).
-  const peeks: Peek[] = dayPlanned.map((w) =>
-    toPeek(w, { coach: isCoach, done: w.status === "completed" || linked.has(w.id), units: me.units === "km" ? "km" : "mi", who: isCoach && !focus ? nameOf(w.athlete_id) : undefined }),
-  );
   const md = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { ...o, timeZone: "UTC" });
   const title =
     span === "month"
@@ -136,18 +127,41 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const step = (n: number) => (span === "month" ? { month: monthKey(shiftMonth(month, n)), day: undefined } : { start: addDays(from, n * 7 * weeksIn), day: undefined });
   const switchTo = (k: Span) => (k === "month" ? { span: k, month: selected.slice(0, 7), start: undefined, day: selected } : { span: k, start: sunday(selected), month: undefined, day: selected });
 
-  // Everything the grid shows, with the bubble's contents for planned sessions.
+  // Everything the grid shows. A finished activity joins the planned session it belongs to (its link,
+  // or the same athlete, day and sport), so each session is one item; activities with no plan stand alone.
   const units = me.units === "km" ? "km" : "mi";
-  const prefix = (id: string) => (isCoach && !focus ? `${nameOf(id)} · ` : "");
+  const prefix = (id: string) => (isCoach && !focus ? nameOf(id) : "");
+  const allDone = (done ?? []) as Done[];
+  const used = new Set<string>();
+  const actual = (a: Done): Actual => {
+    used.add(a.id);
+    return {
+      href: `/activity/${a.id}`,
+      facts: [
+        new Date(a.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: me.timezone }),
+        a.duration_s && `${Math.round(a.duration_s / 60)} min`,
+        shortDistance(a.distance_m, me.units, a.sport),
+        a.avg_hr && `${Math.round(a.avg_hr)} bpm avg`,
+      ].filter(Boolean) as string[],
+    };
+  };
   const calItems: CalItem[] = [];
   for (const [d, ws] of plannedBy) {
-    const doneHere = doneBy.get(d) ?? [];
     for (const w of ws) {
-      const done = w.status === "completed" || doneHere.some((x) => x.planned_workout_id === w.id);
-      const peek = toPeek(w, { coach: isCoach, done, units, who: isCoach && !focus ? nameOf(w.athlete_id) : undefined });
+      const act =
+        allDone.find((x) => x.planned_workout_id === w.id) ??
+        (w.status === "draft"
+          ? undefined
+          : (doneBy.get(d) ?? []).find((x) => !x.planned_workout_id && !used.has(x.id) && x.athlete_id === w.athlete_id && sportGroup(x.sport) === sportGroup(w.sport)));
+      const acts = act ? [actual(act)] : [];
+      // A brick is two recordings: the run off the bike joins it too.
+      const runOff = act && w.brick?.steps?.length ? (doneBy.get(d) ?? []).find((x) => !used.has(x.id) && x.athlete_id === w.athlete_id && (x.planned_workout_id === w.id || (!x.planned_workout_id && sportGroup(x.sport) === "run"))) : undefined;
+      if (runOff) acts.push(actual(runOff));
+      const done = w.status === "completed" || acts.length > 0;
+      const peek: Peek = { ...toPeek(w, { coach: isCoach, done, units, who: prefix(w.athlete_id) || undefined }), actual: acts };
       calItems.push({
-        kind: "plan", id: w.id, day: d, done, sport: w.sport,
-        who: prefix(w.athlete_id).replace(" · ", ""),
+        id: w.id, day: d, done, sport: sportGroup(w.sport),
+        who: prefix(w.athlete_id),
         text: peek.title,
         sub: [peek.sport, peek.minutes && `${peek.minutes} min`, w.status === "draft" && "draft"].filter(Boolean).join(" · "),
         // Coaches move anything not yet done; athletes move their own sent sessions (their coach is notified).
@@ -158,18 +172,26 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   }
   for (const [d, as] of doneBy) {
     for (const a of as) {
+      if (used.has(a.id)) continue;
+      const label = a.sport ? sportLabel(a.sport) : "Activity";
       calItems.push({
-        kind: "done", id: a.id, day: d, href: `/activity/${a.id}`, sport: sportGroup(a.sport),
-        who: prefix(a.athlete_id).replace(" · ", ""),
-        text: a.sport ? sportLabel(a.sport) : "Activity",
+        id: a.id, day: d, done: true, movable: false, sport: sportGroup(a.sport),
+        who: prefix(a.athlete_id),
+        text: label,
         sub: [a.duration_s && `${Math.round(a.duration_s / 60)} min`, shortDistance(a.distance_m, me.units, a.sport)].filter(Boolean).join(" · "),
+        peek: {
+          id: a.id, href: `/activity/${a.id}`, title: label, who: prefix(a.athlete_id) || undefined, badge: { label: "Done", done: true }, sport: label,
+          time: null, minutes: a.duration_s ? Math.round(a.duration_s / 60) : null, hardMinutes: 0, description: null, lines: [], more: 0, sealed: false,
+          actual: [actual(a)], unplanned: true,
+        },
       });
     }
   }
+  const dayItems = calItems.filter((i) => i.day === selected);
   const dayBase = href({ day: "DAY" }).replace("DAY", "");
 
   return (
-    <AthleteShell isCoach={isCoach}>
+    <AthleteShell isCoach={isCoach} wide={span !== "month"}>
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-4">
         <div className="min-w-0">
           <p className="hidden text-xs uppercase tracking-[0.3em] text-emerald-200/60 sm:block">Calendar</p>
@@ -208,15 +230,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             <CalendarAthletePicker athletes={roster} value={focus ?? ""} query={span === "month" ? `span=month&month=${monthKey(month)}` : `span=${span}&start=${from}`} />
           </div>
         )}
-      </div>
-
-      {isCoach && (
-        <div className="mt-3 hidden flex-wrap items-center gap-3 sm:flex">
-          <Link href="/team-calendar" className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] px-4 text-sm text-emerald-100 hover:bg-emerald-300/[0.14]">
-            Team week: drag to move →
+        {isCoach && (
+          <Link href="/team-calendar" className="hidden min-h-11 items-center rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] px-4 text-sm text-emerald-100 hover:bg-emerald-300/[0.14] sm:inline-flex">
+            Team week →
           </Link>
-        </div>
-      )}
+        )}
+      </div>
 
       <CalendarBoard
         key={`${from}:${focus ?? ""}`}
@@ -238,35 +257,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           {flagBy.get(selected) && <FlagBadge flag={flagBy.get(selected)!} />}
         </div>
 
-        {!dayPlanned.length && !dayDone.length ? (
+        {!dayItems.length ? (
           <p className="mt-3 text-sm text-white/55">{selected > today ? "Nothing planned yet." : "Rest day. Nothing planned or recorded."}</p>
         ) : (
           <ul className="stagger mt-4 grid gap-2">
-            {peeks.map((w) => (
-              <WorkoutPeek key={w.id} w={w} />
-            ))}
-            {dayDone.map((a) => (
-              <li key={a.id}>
-                <Link href={`/activity/${a.id}`} className="lift flex items-center justify-between gap-3 rounded-2xl bg-white/[0.06] p-4">
-                <span>
-                  <span className="block font-medium">
-                    {isCoach && !focus && <span className="text-white/55">{nameOf(a.athlete_id)} · </span>}
-                    {cap(a.sport ?? "activity")}
-                  </span>
-                  <span className="text-sm text-white/55">
-                    {[
-                      new Date(a.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: me.timezone }),
-                      a.duration_s && `${Math.round(a.duration_s / 60)} min`,
-                      shortDistance(a.distance_m, me.units, a.sport),
-                      a.avg_hr && `${Math.round(a.avg_hr)} bpm avg`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-[11px] uppercase tracking-wider text-white/50">Completed</span>
-                </Link>
-              </li>
+            {dayItems.map((i) => (
+              <WorkoutPeek key={i.id} w={i.peek} />
             ))}
           </ul>
         )}

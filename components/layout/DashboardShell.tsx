@@ -26,7 +26,7 @@ async function gritBalance(): Promise<number | null> {
 
 type Tone = "green" | "yellow" | "red" | "blue" | null;
 
-export default async function DashboardShell({ children, tone = "green", role = "coach" }: { children: ReactNode; tone?: Tone; role?: NavRole }) {
+export default async function DashboardShell({ children, tone = "green", role = "coach", wide = false }: { children: ReactNode; tone?: Tone; role?: NavRole; wide?: boolean }) {
   // Each person's own bottom tabs (Settings → Bottom tabs), from the cookie so they draw at once.
   const jar = await cookies();
   const tabs = tabsFromCookie(jar.get(TABS_COOKIE)?.value, role);
@@ -37,7 +37,7 @@ export default async function DashboardShell({ children, tone = "green", role = 
       <ShellBack>
         <Sidebar role={role} tabs={tabs} grit={grit} />
         <RoleCookie role={role} />
-        <div className="page-breathe-in relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-8 md:py-10 md:pl-28">
+        <div className={`page-breathe-in relative z-10 mx-auto ${wide ? "max-w-[112rem]" : "max-w-6xl"} px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-8 md:py-10 md:pl-28`}>
           {jar.get("d_demo_return") && <DemoBanner />}
           {children}
         </div>

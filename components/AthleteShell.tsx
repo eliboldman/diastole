@@ -4,6 +4,6 @@ import DashboardShell from "@/components/layout/DashboardShell";
 
 /** Signed-in pages outside the coach area. Same hover sidebar and bottom tabs as the coach,
  *  with the athlete menu, or the coach menu for a coach on their own pages. */
-export default function AthleteShell({ children, isCoach = false }: { children: ReactNode; isCoach?: boolean }) {
-  return <DashboardShell role={isCoach ? "coach" : "athlete"}>{children}</DashboardShell>;
+export default function AthleteShell({ children, isCoach = false, wide = false }: { children: ReactNode; isCoach?: boolean; wide?: boolean }) {
+  return <DashboardShell role={isCoach ? "coach" : "athlete"} wide={wide}>{children}</DashboardShell>;
 }
