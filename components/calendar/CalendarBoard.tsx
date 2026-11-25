@@ -22,8 +22,8 @@ const BUBBLE_W = 340;
 const SPORT_EDGE: Record<string, string> = { run: "border-l-emerald-300", bike: "border-l-amber-300", swim: "border-l-sky-300", strength: "border-l-fuchsia-300" };
 // Week spans fill the window: one row (or two) of seven days, sized to the screen so nothing scrolls sideways.
 const ROW_H: Record<Span, string> = {
-  week: "h-[calc(100dvh-21rem)] min-h-[15rem] sm:h-[calc(100dvh-17rem)]",
-  "2weeks": "h-[calc((100dvh-22rem)/2)] min-h-[9.5rem] sm:h-[calc((100dvh-18rem)/2)] sm:min-h-[11rem]",
+  week: "h-[calc(100dvh-29rem)] min-h-[15rem] sm:h-[calc(100dvh-23rem)]",
+  "2weeks": "h-[calc((100dvh-30rem)/2)] min-h-[9.5rem] sm:h-[calc((100dvh-24rem)/2)] sm:min-h-[10rem]",
   month: "min-h-14 sm:min-h-24",
 };
 
